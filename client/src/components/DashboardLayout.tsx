@@ -1,0 +1,374 @@
+import { useAuth } from "@/_core/hooks/useAuth";
+import { trpc } from "@/lib/trpc";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/useMobile";
+import {
+  Archive,
+  BarChart3,
+  BriefcaseBusiness,
+  CalendarDays,
+  CircleDollarSign,
+  ClipboardList,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Bell,
+  Monitor,
+  Moon,
+  PanelLeft,
+  Settings,
+  Sparkles,
+  UserRound,
+  SunMedium,
+  Users,
+  UserCheck,
+  Download,
+  Smartphone,
+  BookOpen,
+} from "lucide-react";
+import { CSSProperties, useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
+import { Button } from "./ui/button";
+import { InstallAppModal } from "./InstallAppModal";
+import { GuidedTutorialModal } from "./GuidedTutorialModal";
+
+const menuItems = [
+  { icon: LayoutDashboard, label: "Visão geral", path: "/app" },
+  { icon: SunMedium, label: "Meu Dia", path: "/meu-dia" },
+  { icon: CalendarDays, label: "Agenda", path: "/agenda" },
+  { icon: Users, label: "Clientes", path: "/clientes" },
+  { icon: BriefcaseBusiness, label: "Serviços", path: "/servicos" },
+  { icon: UserCheck, label: "Equipe / Parceiros", path: "/equipe" },
+  { icon: ClipboardList, label: "Solicitações", path: "/solicitacoes" },
+  { icon: Archive, label: "Orçamentos", path: "/orcamentos" },
+  { icon: CircleDollarSign, label: "Financeiro", path: "/financeiro" },
+  { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
+  { icon: UserRound, label: "Meu cartão", path: "/cartao" },
+  { icon: Sparkles, label: "Planos & Upgrade", path: "/planos" },
+  { icon: BookOpen, label: "Guia & Tutorial", path: "/guia" },
+  { icon: Settings, label: "Configurações", path: "/configuracoes" },
+];
+
+const SIDEBAR_WIDTH_KEY = "meu-autonomo-sidebar-width";
+const DEFAULT_WIDTH = 260;
+const MIN_WIDTH = 220;
+const MAX_WIDTH = 360;
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+  });
+  const { loading, user } = useAuth();
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
+  }, [sidebarWidth]);
+
+  if (loading) return <DashboardLayoutSkeleton />;
+  if (!user) return null;
+
+  return (
+    <SidebarProvider style={{ "--sidebar-width": `${sidebarWidth}px` } as CSSProperties}>
+      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>{children}</DashboardLayoutContent>
+    </SidebarProvider>
+  );
+}
+
+function DashboardLayoutContent({ children, setSidebarWidth }: { children: React.ReactNode; setSidebarWidth: (width: number) => void }) {
+  const { user, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const [location, setLocation] = useLocation();
+  const { state, toggleSidebar } = useSidebar();
+  const isCollapsed = state === "collapsed";
+  const isMobile = useIsMobile();
+  const [isResizing, setIsResizing] = useState(false);
+  const [installModalOpen, setInstallModalOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const activeMenuItem = menuItems.find(item => item.path === location);
+  const firstName = (user?.name || "profissional").split(" ")[0];
+
+  useEffect(() => {
+    const move = (event: MouseEvent) => {
+      if (!isResizing) return;
+      const left = sidebarRef.current?.getBoundingClientRect().left ?? 0;
+      const width = event.clientX - left;
+      if (width >= MIN_WIDTH && width <= MAX_WIDTH) setSidebarWidth(width);
+    };
+    const up = () => setIsResizing(false);
+    if (isResizing) {
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    }
+    return () => {
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, setSidebarWidth]);
+
+  return (
+    <>
+      <div className="relative" ref={sidebarRef}>
+        <Sidebar collapsible="icon" className="border-r-0 bg-[#132a27] text-[#f4f7f1]" disableTransition={isResizing}>
+          <SidebarHeader className="h-20 justify-center border-b border-white/10">
+            <div className="flex w-full items-center gap-2.5 px-2">
+              <button onClick={toggleSidebar} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 transition hover:bg-white/15" aria-label="Recolher menu">
+                <PanelLeft className="h-4 w-4" />
+              </button>
+              {!isCollapsed ? (
+                <Link href="/app" className="flex min-w-0 items-center py-1">
+                  <img src="/logo-light.png" alt="MeuAutônomo" className="h-12 w-auto max-w-[185px] object-contain" />
+                </Link>
+              ) : (
+                <Link href="/app" className="flex items-center justify-center">
+                  <img src="/logo-icon.png" alt="MeuAutônomo" className="h-8 w-8 object-contain" />
+                </Link>
+              )}
+            </div>
+          </SidebarHeader>
+          <SidebarContent className="gap-0 px-2 py-4">
+            <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45 group-data-[collapsible=icon]:hidden">Seu espaço</p>
+            <SidebarMenu className="gap-1">
+              {menuItems.map(item => {
+                const active = location === item.path;
+                return <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton isActive={active} onClick={() => setLocation(item.path)} tooltip={item.label} className={`h-11 rounded-xl font-medium transition ${active ? "bg-[#d9f56a] text-[#132a27] hover:bg-[#d9f56a] hover:text-[#132a27]" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
+                    <item.icon className="h-[18px] w-[18px] shrink-0" />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>;
+              })}
+            </SidebarMenu>
+          </SidebarContent>
+          <SidebarFooter className="border-t border-white/10 p-3">
+            <div className="mb-2 px-1 group-data-[collapsible=icon]:hidden">
+              <button
+                type="button"
+                onClick={() => setTutorialOpen(true)}
+                className="flex w-full items-center justify-between rounded-xl bg-[#d9f56a]/15 px-2.5 py-2 text-xs font-bold text-[#d9f56a] transition hover:bg-[#d9f56a]/25 cursor-pointer"
+                title="Como usar o MeuAutônomo"
+              >
+                <span className="flex items-center gap-2">
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Como Usar (Guia)</span>
+                </span>
+                <span className="rounded-md bg-[#d9f56a] px-1.5 py-0.2 text-[9px] font-bold text-[#132a27]">Tutorial</span>
+              </button>
+            </div>
+            <div className="mb-2 px-1 group-data-[collapsible=icon]:hidden">
+              <button
+                type="button"
+                onClick={() => setInstallModalOpen(true)}
+                className="flex w-full items-center justify-between rounded-xl bg-white/5 px-2.5 py-2 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white cursor-pointer"
+                title="Instalar no smartphone ou computador"
+              >
+                <span className="flex items-center gap-2">
+                  <Download className="h-3.5 w-3.5 text-[#d9f56a]" />
+                  <span>Instalar Aplicativo</span>
+                </span>
+                <span className="rounded-md bg-[#d9f56a]/20 px-1.5 py-0.5 text-[9px] font-bold text-[#d9f56a]">PC / Celular</span>
+              </button>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d9f56a] group-data-[collapsible=icon]:justify-center">
+                  <Avatar className="h-9 w-9 border border-white/20 bg-white/10"><AvatarFallback className="bg-[#d9f56a] text-[#132a27]">{firstName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+                  <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm font-semibold">{user?.name || "Profissional"}</p><p className="mt-0.5 truncate text-xs text-white/50">{user?.email || "Minha conta"}</p></div>
+                  <Menu className="h-4 w-4 text-white/50 group-data-[collapsible=icon]:hidden" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuItem onClick={() => setTutorialOpen(true)} className="cursor-pointer font-medium text-[#173a34]">
+                  <BookOpen className="mr-2 h-4 w-4 text-[#8aa500]" /> Guia Passo a Passo
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setInstallModalOpen(true)} className="cursor-pointer font-medium text-[#173a34]">
+                  <Download className="mr-2 h-4 w-4 text-[#8aa500]" /> Instalar no Celular ou PC
+                </DropdownMenuItem>
+                <p className="px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Aparência</p>
+                <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer"><SunMedium className="mr-2 h-4 w-4" /> Claro {theme === "light" && <span className="ml-auto text-xs text-[#8aa500]">Ativo</span>}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer"><Moon className="mr-2 h-4 w-4" /> Escuro {theme === "dark" && <span className="ml-auto text-xs text-[#8aa500]">Ativo</span>}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")} className="cursor-pointer"><Monitor className="mr-2 h-4 w-4" /> Automático {theme === "system" && <span className="ml-auto text-xs text-[#8aa500]">Ativo</span>}</DropdownMenuItem>
+                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive"><LogOut className="mr-2 h-4 w-4" /> Sair da conta</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarFooter>
+        </Sidebar>
+        <div className={`absolute right-0 top-0 z-50 h-full w-1 cursor-col-resize transition hover:bg-[#d9f56a]/40 ${isCollapsed ? "hidden" : ""}`} onMouseDown={() => setIsResizing(true)} />
+      </div>
+      <SidebarInset className="bg-[#f5f8f2]">
+        <div className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#dce5dc] bg-[#f5f7f2]/90 px-4 backdrop-blur md:px-8">
+          <div className="flex items-center gap-3"><SidebarTrigger className="h-9 w-9 rounded-xl bg-white md:hidden" /><span className="text-sm font-medium text-[#58716b]">{activeMenuItem?.label || "Visão geral"}</span></div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setTutorialOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#cbe4d1] bg-[#eef7f0] hover:bg-[#e2f0e6] text-xs font-bold text-[#173a34] transition shadow-2xs hover:shadow-xs cursor-pointer"
+              title="Abrir o Guia Passo a Passo do MeuAutônomo"
+            >
+              <BookOpen className="h-3.5 w-3.5 text-[#2d7d54]" />
+              <span className="hidden sm:inline">Guia Passo a Passo</span>
+              <span className="sm:hidden">Guia</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setInstallModalOpen(true)}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#ebf3ea] text-xs font-semibold text-[#173a34] transition shadow-2xs hover:shadow-xs cursor-pointer"
+              title="Instalar no smartphone ou computador"
+            >
+              <Download className="h-3.5 w-3.5 text-[#8aa500]" />
+              <span>Instalar App</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setInstallModalOpen(true)}
+              className="sm:hidden grid h-9 w-9 place-items-center rounded-xl text-[#58716b] transition hover:bg-white cursor-pointer"
+              aria-label="Instalar aplicativo"
+              title="Instalar no smartphone ou computador"
+            >
+              <Download className="h-4 w-4 text-[#8aa500]" />
+            </button>
+            <span className="hidden text-right text-xs text-[#58716b] sm:block">Bom dia, <strong className="text-[#173a34]">{firstName}</strong></span>
+            <NotificationsBell />
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-[#d9f56a] text-sm font-bold text-[#173a34]">{firstName.charAt(0).toUpperCase()}</div>
+          </div>
+        </div>
+        <main className="min-h-[calc(100vh-4rem)] flex-1 pb-24">{children}</main>
+        {isMobile && <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-[72px] items-center justify-around border-t border-[#dce5dc] bg-white/95 px-2 shadow-[0_-6px_20px_rgba(19,42,39,0.06)] backdrop-blur">
+          {menuItems.slice(0, 5).map(item => { const active = location === item.path; return <button key={item.path} onClick={() => setLocation(item.path)} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-semibold ${active ? "text-[#173a34]" : "text-[#8a9b95]"}`}><item.icon className={`h-5 w-5 ${active ? "text-[#8aa500]" : ""}`} /><span className="truncate">{item.label}</span></button>; })}
+        </nav>}
+        <InstallAppModal open={installModalOpen} onOpenChange={setInstallModalOpen} />
+        <GuidedTutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} />
+      </SidebarInset>
+    </>
+  );
+}
+
+function NotificationsBell() {
+  const [, setLocation] = useLocation();
+  const notifications = trpc.notification.list.useQuery();
+  const unread = trpc.notification.unreadCount.useQuery();
+  const markRead = trpc.notification.markRead.useMutation({
+    onSuccess: () => {
+      notifications.refetch();
+      unread.refetch();
+    },
+  });
+
+  const handleNotificationClick = (item: {
+    id: number;
+    read?: boolean;
+    type?: string | null;
+    title?: string | null;
+    body?: string | null;
+  }) => {
+    if (!item.read) {
+      markRead.mutate({ id: item.id });
+    }
+    const type = item.type || "";
+    const title = (item.title || "").toLowerCase();
+    const body = (item.body || "").toLowerCase();
+
+    if (
+      type === "request" ||
+      title.includes("solicitaç") ||
+      title.includes("pedido") ||
+      body.includes("solicitaç")
+    ) {
+      setLocation("/solicitacoes");
+    } else if (
+      type.startsWith("quote") ||
+      title.includes("orçamento") ||
+      title.includes("proposta") ||
+      body.includes("orçamento") ||
+      body.includes("proposta")
+    ) {
+      setLocation("/orcamentos");
+    } else if (
+      type === "appointment" ||
+      title.includes("agendamento") ||
+      title.includes("visita") ||
+      title.includes("agenda") ||
+      body.includes("agendado")
+    ) {
+      setLocation("/agenda");
+    } else if (
+      type === "payment" ||
+      title.includes("pagamento") ||
+      title.includes("fatura") ||
+      title.includes("recebimento") ||
+      body.includes("pagamento")
+    ) {
+      setLocation("/financeiro");
+    } else if (type === "client" || title.includes("cliente")) {
+      setLocation("/clientes");
+    }
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          aria-label="Notificações"
+          className="relative grid h-9 w-9 place-items-center rounded-xl text-[#58716b] transition hover:bg-white cursor-pointer"
+        >
+          <Bell className="h-4 w-4" />
+          {(unread.data || 0) > 0 && (
+            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#9c4d43]" />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <p className="px-2 py-2 text-sm font-bold text-[#173a34]">Notificações</p>
+        {notifications.data?.length ? (
+          notifications.data.map((item) => (
+            <DropdownMenuItem
+              key={item.id}
+              onClick={() => handleNotificationClick(item)}
+              className="cursor-pointer items-start gap-2 py-3 hover:bg-[#f4f7f4]"
+            >
+              <span
+                className={
+                  item.read
+                    ? "mt-1 h-2 w-2 shrink-0 rounded-full bg-[#dce5dc]"
+                    : "mt-1 h-2 w-2 shrink-0 rounded-full bg-[#d9f56a]"
+                }
+              />
+              <span className="min-w-0 flex-1">
+                <strong className="block text-xs text-[#284b42]">{item.title}</strong>
+                <span className="mt-1 block text-xs text-[#82948e]">{item.body}</span>
+              </span>
+            </DropdownMenuItem>
+          ))
+        ) : (
+          <p className="px-2 py-4 text-xs text-[#82948e]">Nenhuma notificação por enquanto.</p>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

@@ -1,0 +1,1287 @@
+import { and, desc, eq, gte, lt, ne } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import {
+  appointments,
+  availability,
+  clients,
+  expenses,
+  notifications,
+  payments,
+  professionalProfiles,
+  quoteItems,
+  quotes,
+  requestAttachments,
+  requests,
+  services,
+  teamMembers,
+  users,
+} from "../drizzle/schema";
+import { createNotification, getAllUsers, getDb, getProfileBySlug, getProfileByUserId, getUserByEmail, getUserByOpenId, upsertUser } from "./db";
+import { storagePut } from "./storage";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { getSessionCookieOptions } from "./_core/cookies";
+import { sdk } from "./_core/sdk";
+import { systemRouter } from "./_core/systemRouter";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { enviarEmail, modeloOrcamentoAprovado } from "./email";
+import { DEFAULT_ADMIN_PASSWORD, getAdminEmail, isDemoMode, setDemoMode } from "./demoConfig";
+import crypto from "node:crypto";
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  try {
+    const [salt, key] = stored.split(":");
+    if (!salt || !key) return false;
+    const hash = crypto.scryptSync(password, salt, 64).toString("hex");
+    return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(key, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+const modality = z.enum(["presencial", "endereco", "online", "hibrido"]);
+const paymentMethod = z.enum(["pix", "dinheiro", "cartao", "transferencia", "outro"]);
+const appointmentStatus = z.enum(["agendado", "confirmado", "andamento", "concluido", "cancelado", "faltou"]);
+const paymentStatus = z.enum(["pendente", "parcial", "pago"]);
+
+async function requireProfile(userId: number) {
+  const profile = await getProfileByUserId(userId);
+  if (!profile) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Finalize seu perfil para continuar." });
+  return profile;
+}
+
+async function getOwnedService(profileId: number, serviceId: number) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
+  const result = await db.select().from(services).where(and(eq(services.id, serviceId), eq(services.profileId, profileId))).limit(1);
+  if (!result[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Serviço não encontrado." });
+  return result[0];
+}
+
+async function getOwnedClient(profileId: number, clientId: number) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
+  const result = await db.select().from(clients).where(and(eq(clients.id, clientId), eq(clients.profileId, profileId))).limit(1);
+  if (!result[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado." });
+  return result[0];
+}
+
+async function getOwnedTeamMember(profileId: number, memberId: number) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
+  const result = await db.select().from(teamMembers).where(and(eq(teamMembers.id, memberId), eq(teamMembers.profileId, profileId))).limit(1);
+  if (!result[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional parceiro(a) não encontrado." });
+  return result[0];
+}
+
+function dayStart(date = new Date()) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function dayEnd(date = new Date()) {
+  const end = dayStart(date);
+  end.setDate(end.getDate() + 1);
+  return end;
+}
+
+export function isWithinAvailability(start: Date, durationMinutes: number, availabilityRow: { schedule: string; unavailableDays: string | null } | undefined) {
+  if (!availabilityRow) return true;
+  try {
+    const config = JSON.parse(availabilityRow.schedule) as {
+      days?: string[];
+      start?: string;
+      end?: string;
+      breaks?: Array<{ start: string; end: string }>;
+    };
+    const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+    const day = dayNames[start.getDay()];
+    if (config.days?.length && !config.days.includes(day)) return false;
+    const toMinutes = (value: string) => {
+      const [hours, minutes] = value.split(":").map(Number);
+      return hours * 60 + minutes;
+    };
+    const startMinutes = start.getHours() * 60 + start.getMinutes();
+    const endMinutes = startMinutes + durationMinutes;
+    if (config.start && startMinutes < toMinutes(config.start)) return false;
+    if (config.end && endMinutes > toMinutes(config.end)) return false;
+    if (config.breaks?.some(item => startMinutes < toMinutes(item.end) && endMinutes > toMinutes(item.start))) return false;
+    const unavailable = availabilityRow.unavailableDays ? JSON.parse(availabilityRow.unavailableDays) as string[] : [];
+    const dateKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+    return !unavailable.includes(dateKey);
+  } catch {
+    return true;
+  }
+}
+
+export const appRouter = router({
+  system: systemRouter,
+  auth: router({
+    me: publicProcedure.query(opts => opts.ctx.user),
+
+    register: publicProcedure
+      .input(
+        z.object({
+          name: z.string().min(2, "Informe seu nome completo ou profissional."),
+          email: z.string().email("Informe um e-mail válido."),
+          password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres."),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const normalizedEmail = input.email.trim().toLowerCase();
+        const existing = await getUserByEmail(normalizedEmail);
+        if (existing) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Já existe uma conta cadastrada com este e-mail. Faça login ou use outro e-mail.",
+          });
+        }
+
+        const passwordHash = hashPassword(input.password);
+        const openId = `user_${nanoid(12)}`;
+        const name = input.name.trim();
+
+        await upsertUser({
+          openId,
+          name,
+          email: normalizedEmail,
+          passwordHash,
+          loginMethod: "local-password",
+          role: "user",
+          lastSignedIn: new Date(),
+        });
+
+        const createdUser = await getUserByOpenId(openId);
+        if (!createdUser) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Erro ao criar conta no banco de dados.",
+          });
+        }
+
+        const sessionToken = await sdk.createSessionToken(openId, {
+          name,
+          expiresInMs: ONE_YEAR_MS,
+        });
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        return {
+          success: true,
+          sessionToken,
+          user: createdUser,
+        };
+      }),
+
+    login: publicProcedure
+      .input(
+        z.object({
+          email: z.string().email("Informe um e-mail válido."),
+          password: z.string().min(1, "Informe sua senha."),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const normalizedEmail = input.email.trim().toLowerCase();
+        const user = await getUserByEmail(normalizedEmail);
+
+        if (!user) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "E-mail ou senha incorretos.",
+          });
+        }
+
+        if (user.passwordHash) {
+          const isValid = verifyPassword(input.password, user.passwordHash);
+          if (!isValid) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "E-mail ou senha incorretos.",
+            });
+          }
+        } else if (user.openId !== "dev-user-local") {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Esta conta foi registrada com outro método de acesso.",
+          });
+        }
+
+        await upsertUser({
+          openId: user.openId,
+          lastSignedIn: new Date(),
+        });
+
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || "Profissional",
+          expiresInMs: ONE_YEAR_MS,
+        });
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        return {
+          success: true,
+          sessionToken,
+          user,
+        };
+      }),
+
+    quickLogin: publicProcedure
+      .input(z.object({ openId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!isDemoMode()) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "O acesso de teste rápido está desativado pelo administrador para proteger contas reais.",
+          });
+        }
+
+        const user = await getUserByOpenId(input.openId);
+        if (!user) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Usuário não encontrado.",
+          });
+        }
+
+        await upsertUser({
+          openId: user.openId,
+          lastSignedIn: new Date(),
+        });
+
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || "Profissional",
+          expiresInMs: ONE_YEAR_MS,
+        });
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        return {
+          success: true,
+          sessionToken,
+          user,
+        };
+      }),
+
+    listUsers: publicProcedure.query(async () => {
+      if (!isDemoMode()) {
+        return [];
+      }
+      const all = await getAllUsers();
+      return all.map(u => ({
+        id: u.id,
+        openId: u.openId,
+        name: u.name || "Sem nome",
+        email: u.email || "Sem e-mail",
+      }));
+    }),
+
+    isDemoMode: publicProcedure.query(() => isDemoMode()),
+
+    logout: publicProcedure.mutation(({ ctx }) => {
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      return { success: true } as const;
+    }),
+  }),
+
+  profile: router({
+    get: protectedProcedure.query(({ ctx }) => getProfileByUserId(ctx.user.id)),
+    upsert: protectedProcedure
+      .input(z.object({
+        displayName: z.string().min(2).max(160),
+        slug: z.string().min(3).max(100).regex(/^[a-z0-9-]+$/, "Use apenas letras minúsculas, números e hífen."),
+        professionCategory: z.string().max(100).optional(),
+        professionName: z.string().min(2).max(160),
+        bio: z.string().max(1200).optional(),
+        city: z.string().max(120).optional(),
+        serviceRegion: z.string().max(160).optional(),
+        phone: z.string().max(40).optional(),
+        whatsapp: z.string().max(40).optional(),
+        avatarUrl: z.string().max(500).optional(),
+        pixKey: z.string().max(140).optional(),
+        pixKeyType: z.string().max(30).optional(),
+        showPrices: z.boolean().default(true),
+        bookingEnabled: z.boolean().default(false),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
+        const current = await getProfileByUserId(ctx.user.id);
+        try {
+          if (current) {
+            await db.update(professionalProfiles).set({ ...input, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null }).where(eq(professionalProfiles.id, current.id));
+          } else {
+            const slugOwner = await getProfileBySlug(input.slug);
+            const slug = slugOwner && slugOwner.userId !== ctx.user.id
+              ? `${input.slug}-${nanoid(6).toLowerCase()}`.slice(0, 100)
+              : input.slug;
+            await db.insert(professionalProfiles).values({ ...input, slug, userId: ctx.user.id, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null });
+          }
+        } catch {
+          throw new TRPCError({ code: "CONFLICT", message: "Esse endereço público já está em uso." });
+        }
+        return getProfileByUserId(ctx.user.id);
+      }),
+    saveAvailability: protectedProcedure
+      .input(z.object({ schedule: z.string().min(2), unavailableDays: z.string().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const profile = await requireProfile(ctx.user.id);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const existing = await db.select().from(availability).where(eq(availability.profileId, profile.id)).limit(1);
+        if (existing[0]) await db.update(availability).set({ schedule: input.schedule, unavailableDays: input.unavailableDays ?? null }).where(eq(availability.profileId, profile.id));
+        else await db.insert(availability).values({ profileId: profile.id, schedule: input.schedule, unavailableDays: input.unavailableDays ?? null });
+        return { success: true };
+      }),
+    getAvailability: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const result = await db.select().from(availability).where(eq(availability.profileId, profile.id)).limit(1);
+      return result[0] ?? null;
+    }),
+    uploadAvatar: protectedProcedure.input(z.object({ fileName: z.string().max(180), mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]), dataUrl: z.string().max(7_000_000) })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const encoded = input.dataUrl.split(",")[1];
+      if (!encoded) throw new TRPCError({ code: "BAD_REQUEST", message: "Arquivo inválido." });
+      const buffer = Buffer.from(encoded, "base64");
+      if (buffer.length > 5_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "A foto deve ter no máximo 5 MB." });
+      const stored = await storagePut(`profiles/${profile.id}/avatar-${input.fileName}`, buffer, input.mimeType);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(professionalProfiles).set({ avatarUrl: stored.url }).where(eq(professionalProfiles.id, profile.id));
+      return { success: true, avatarUrl: stored.url };
+    }),
+  }),
+
+  service: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(services).where(eq(services.profileId, profile.id)).orderBy(desc(services.active), desc(services.createdAt));
+    }),
+    create: protectedProcedure.input(z.object({ name: z.string().min(2).max(160), description: z.string().max(1000).optional(), durationMinutes: z.number().int().min(15).max(1440), priceCents: z.number().int().min(0), modality })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(services).values({ ...input, profileId: profile.id, description: input.description ?? null });
+      return { success: true };
+    }),
+    update: protectedProcedure.input(z.object({ id: z.number(), name: z.string().min(2).max(160), description: z.string().max(1000).optional(), durationMinutes: z.number().int().min(15).max(1440), priceCents: z.number().int().min(0), modality, active: z.boolean() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      await getOwnedService(profile.id, input.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, priceCents: input.priceCents, modality: input.modality, active: input.active }).where(eq(services.id, input.id));
+      return { success: true };
+    }),
+    remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      await getOwnedService(profile.id, input.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(services).set({ active: false }).where(eq(services.id, input.id));
+      return { success: true };
+    }),
+  }),
+
+  customer: router({
+    list: protectedProcedure.input(z.object({ includeArchived: z.boolean().default(false) }).optional()).query(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions = input?.includeArchived ? eq(clients.profileId, profile.id) : and(eq(clients.profileId, profile.id), eq(clients.archived, false));
+      return db.select().from(clients).where(conditions).orderBy(desc(clients.createdAt));
+    }),
+    create: protectedProcedure.input(z.object({ name: z.string().min(2).max(160), phone: z.string().max(40).optional(), whatsapp: z.string().max(40).optional(), email: z.string().email().optional().or(z.literal("")), address: z.string().max(600).optional(), notes: z.string().max(1200).optional() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(clients).values({ ...input, profileId: profile.id, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null });
+      return { success: true };
+    }),
+    update: protectedProcedure.input(z.object({ id: z.number(), name: z.string().min(2).max(160), phone: z.string().max(40).optional(), whatsapp: z.string().max(40).optional(), email: z.string().email().optional().or(z.literal("")), address: z.string().max(600).optional(), notes: z.string().max(1200).optional(), archived: z.boolean().default(false) })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      await getOwnedClient(profile.id, input.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(clients).set({ name: input.name, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null, archived: input.archived }).where(eq(clients.id, input.id));
+      return { success: true };
+    }),
+    history: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const client = await getOwnedClient(profile.id, input.id);
+      const [clientAppointments, clientQuotes, clientPayments] = await Promise.all([
+        db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), eq(appointments.clientId, input.id))).orderBy(desc(appointments.startsAt)),
+        db.select().from(quotes).where(and(eq(quotes.profileId, profile.id), eq(quotes.clientId, input.id))).orderBy(desc(quotes.createdAt)),
+        db.select().from(payments).where(and(eq(payments.profileId, profile.id), eq(payments.clientId, input.id))).orderBy(desc(payments.createdAt)),
+      ]);
+      return { client, appointments: clientAppointments, quotes: clientQuotes, payments: clientPayments };
+    }),
+    remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await getOwnedClient(profile.id, input.id);
+      const related = await db.select({ id: appointments.id }).from(appointments).where(and(eq(appointments.profileId, profile.id), eq(appointments.clientId, input.id))).limit(1);
+      if (related[0]) {
+        await db.update(clients).set({ archived: true }).where(eq(clients.id, input.id));
+      } else {
+        await db.delete(clients).where(and(eq(clients.id, input.id), eq(clients.profileId, profile.id)));
+      }
+      return { success: true };
+    }),
+  }),
+
+  appointment: router({
+    list: protectedProcedure.input(z.object({ from: z.string().datetime().optional(), to: z.string().datetime().optional() }).optional()).query(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions = [eq(appointments.profileId, profile.id)];
+      if (input?.from) conditions.push(gte(appointments.startsAt, new Date(input.from)));
+      if (input?.to) conditions.push(lt(appointments.startsAt, new Date(input.to)));
+      return db.select().from(appointments).where(and(...conditions)).orderBy(appointments.startsAt);
+    }),
+    create: protectedProcedure.input(z.object({
+      teamMemberId: z.number().optional(),
+      clientId: z.number().optional(),
+      serviceId: z.number().optional(),
+      startsAt: z.string().datetime(),
+      durationMinutes: z.number().int().min(15).max(1440),
+      location: z.string().max(600).optional(),
+      amountCents: z.number().int().min(0),
+      status: appointmentStatus.default("agendado"),
+      notes: z.string().max(1200).optional(),
+      paymentMethod: paymentMethod.optional(),
+      paymentStatus: paymentStatus.default("pendente")
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      if (input.clientId) await getOwnedClient(profile.id, input.clientId);
+      if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      if (input.teamMemberId) await getOwnedTeamMember(profile.id, input.teamMemberId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const start = new Date(input.startsAt);
+      const availabilityRow = (await db.select().from(availability).where(eq(availability.profileId, profile.id)).limit(1))[0];
+      if (!isWithinAvailability(start, input.durationMinutes, availabilityRow)) {
+        throw new TRPCError({ code: "CONFLICT", message: "Esse horário está fora da sua disponibilidade." });
+      }
+      const end = new Date(start.getTime() + input.durationMinutes * 60_000);
+      const sameDay = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado")));
+      const conflict = sameDay.some(item => {
+        const t1 = input.teamMemberId ?? 0;
+        const t2 = item.teamMemberId ?? 0;
+        if (t1 !== t2) {
+          return false;
+        }
+        const itemStart = new Date(item.startsAt).getTime();
+        const itemEnd = itemStart + item.durationMinutes * 60_000;
+        return itemStart < end.getTime() && start.getTime() < itemEnd;
+      });
+      if (conflict) {
+        throw new TRPCError({ code: "CONFLICT", message: "Esse horário já está ocupado para este profissional." });
+      }
+      const insert = (await db.insert(appointments).values({
+        ...input,
+        profileId: profile.id,
+        teamMemberId: input.teamMemberId ?? null,
+        startsAt: start,
+        clientId: input.clientId ?? null,
+        serviceId: input.serviceId ?? null,
+        location: input.location ?? null,
+        notes: input.notes ?? null,
+        paymentMethod: input.paymentMethod ?? null
+      })) as unknown as [{ insertId: number }];
+      return { success: true, id: Number(insert[0]?.insertId) };
+    }),
+    updateStatus: protectedProcedure.input(z.object({ id: z.number(), status: appointmentStatus, paymentStatus: paymentStatus.optional(), paymentMethod: paymentMethod.optional() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const result = await db.select().from(appointments).where(and(eq(appointments.id, input.id), eq(appointments.profileId, profile.id))).limit(1);
+      if (!result[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      await db.update(appointments).set({ status: input.status, paymentStatus: input.paymentStatus ?? result[0].paymentStatus, paymentMethod: input.paymentMethod ?? result[0].paymentMethod }).where(eq(appointments.id, input.id));
+      return { success: true };
+    }),
+    update: protectedProcedure.input(z.object({ id: z.number(), clientId: z.number().optional(), serviceId: z.number().optional(), startsAt: z.string().datetime(), durationMinutes: z.number().int().min(15).max(1440), location: z.string().max(600).optional(), amountCents: z.number().int().min(0), notes: z.string().max(1200).optional() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      if (input.clientId) await getOwnedClient(profile.id, input.clientId);
+      if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const existing = (await db.select().from(appointments).where(and(eq(appointments.id, input.id), eq(appointments.profileId, profile.id))).limit(1))[0];
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Atendimento não encontrado." });
+      const start = new Date(input.startsAt);
+      const availabilityRow = (await db.select().from(availability).where(eq(availability.profileId, profile.id)).limit(1))[0];
+      if (!isWithinAvailability(start, input.durationMinutes, availabilityRow)) throw new TRPCError({ code: "CONFLICT", message: "Esse horário está fora da sua disponibilidade." });
+      const end = new Date(start.getTime() + input.durationMinutes * 60_000).getTime();
+      const sameDay = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado"), ne(appointments.id, input.id)));
+      if (sameDay.some(item => new Date(item.startsAt).getTime() < end && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 60_000)) throw new TRPCError({ code: "CONFLICT", message: "Esse horário já está ocupado." });
+      await db.update(appointments).set({ clientId: input.clientId ?? null, serviceId: input.serviceId ?? null, startsAt: start, durationMinutes: input.durationMinutes, location: input.location ?? null, amountCents: input.amountCents, notes: input.notes ?? null }).where(eq(appointments.id, input.id));
+      return { success: true };
+    }),
+    cancel: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(appointments).set({ status: "cancelado" }).where(and(eq(appointments.id, input.id), eq(appointments.profileId, profile.id)));
+      return { success: true };
+    }),
+  }),
+
+  request: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(requests).where(eq(requests.profileId, profile.id)).orderBy(desc(requests.createdAt));
+      return Promise.all(rows.map(async request => ({ ...request, attachments: await db.select().from(requestAttachments).where(eq(requestAttachments.requestId, request.id)) })));
+    }),
+    createPublic: publicProcedure.input(z.object({ slug: z.string(), requesterName: z.string().min(2).max(160), requesterPhone: z.string().min(8).max(40), requesterEmail: z.string().email().optional().or(z.literal("")), serviceId: z.number().optional(), description: z.string().min(10).max(3000), address: z.string().max(600).optional(), desiredAt: z.string().datetime().optional(), preferredTime: z.string().max(80).optional(), attachments: z.array(z.object({ name: z.string().max(180), mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]), size: z.number().int().positive().max(5_000_000), dataUrl: z.string().max(7_000_000) })).max(3).optional() })).mutation(async ({ input }) => {
+      const profile = await getProfileBySlug(input.slug);
+      if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
+      if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const existingClient = await db.select().from(clients).where(and(eq(clients.profileId, profile.id), eq(clients.phone, input.requesterPhone))).limit(1);
+      let clientId = existingClient[0]?.id;
+      if (!clientId) {
+        const insert = (await db.insert(clients).values({ profileId: profile.id, name: input.requesterName, phone: input.requesterPhone, email: input.requesterEmail || null })) as unknown as [{ insertId: number }];
+        clientId = Number(insert[0].insertId);
+      }
+      const secureToken = nanoid(32);
+      const insert = (await db.insert(requests).values({ profileId: profile.id, clientId, requesterName: input.requesterName, requesterPhone: input.requesterPhone, requesterEmail: input.requesterEmail || null, serviceId: input.serviceId ?? null, description: input.description, address: input.address ?? null, desiredAt: input.desiredAt ? new Date(input.desiredAt) : null, preferredTime: input.preferredTime ?? null, secureToken })) as unknown as [{ insertId: number }];
+      const requestId = Number(insert[0].insertId);
+      for (const attachment of input.attachments ?? []) {
+        const encoded = attachment.dataUrl.split(",")[1];
+        if (!encoded) continue;
+        const buffer = Buffer.from(encoded, "base64");
+        if (buffer.length > 5_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "Cada anexo deve ter no máximo 5 MB." });
+        const stored = await storagePut(`requests/${profile.id}/${requestId}/${attachment.name}`, buffer, attachment.mimeType);
+        await db.insert(requestAttachments).values({ requestId, fileName: attachment.name, fileUrl: stored.url, mimeType: attachment.mimeType, fileSize: buffer.length });
+      }
+      await createNotification(profile.id, "Nova solicitação", `${input.requesterName} enviou um pedido de serviço.`, "request");
+      return { success: true, id: requestId, token: secureToken };
+    }),
+    updateStatus: protectedProcedure.input(z.object({ id: z.number(), status: z.enum(["nova", "em_analise", "orcamento_enviado", "agendada", "arquivada"]) })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(requests).set({ status: input.status }).where(and(eq(requests.id, input.id), eq(requests.profileId, profile.id)));
+      return { success: true };
+    }),
+    convertToClient: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const request = (await db.select().from(requests).where(and(eq(requests.id, input.id), eq(requests.profileId, profile.id))).limit(1))[0];
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitação não encontrada." });
+      if (request.clientId) return { success: true, clientId: request.clientId };
+      const inserted = (await db.insert(clients).values({ profileId: profile.id, name: request.requesterName, phone: request.requesterPhone, email: request.requesterEmail, address: request.address })) as unknown as [{ insertId: number }];
+      const clientId = Number(inserted[0].insertId);
+      await db.update(requests).set({ clientId }).where(eq(requests.id, request.id));
+      return { success: true, clientId };
+    }),
+    convertToAppointment: protectedProcedure.input(z.object({ id: z.number(), startsAt: z.string().datetime().optional() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const request = (await db.select().from(requests).where(and(eq(requests.id, input.id), eq(requests.profileId, profile.id))).limit(1))[0];
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitação não encontrada." });
+      if (!request.clientId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Converta a solicitação em cliente antes de agendar." });
+      if (!input.startsAt && !request.desiredAt) throw new TRPCError({ code: "BAD_REQUEST", message: "Informe uma data para o atendimento." });
+      const service = request.serviceId ? await getOwnedService(profile.id, request.serviceId) : undefined;
+      const start = new Date(input.startsAt ?? request.desiredAt!);
+      const durationMinutes = service?.durationMinutes ?? 60;
+      const availabilityRow = (await db.select().from(availability).where(eq(availability.profileId, profile.id)).limit(1))[0];
+      if (!isWithinAvailability(start, durationMinutes, availabilityRow)) throw new TRPCError({ code: "CONFLICT", message: "Esse horário está fora da sua disponibilidade." });
+      const conflictRows = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado")));
+      if (conflictRows.some(item => new Date(item.startsAt).getTime() < start.getTime() + durationMinutes * 60_000 && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 60_000)) throw new TRPCError({ code: "CONFLICT", message: "Esse horário já está ocupado." });
+      const inserted = (await db.insert(appointments).values({ profileId: profile.id, clientId: request.clientId, serviceId: request.serviceId, startsAt: start, durationMinutes, location: request.address, amountCents: service?.priceCents ?? 0, notes: request.description, status: "agendado", paymentStatus: "pendente" })) as unknown as [{ insertId: number }];
+      await db.update(requests).set({ status: "agendada" }).where(eq(requests.id, request.id));
+      return { success: true, appointmentId: Number(inserted[0].insertId) };
+    }),
+    convertToQuote: protectedProcedure.input(z.object({ id: z.number(), discountCents: z.number().int().min(0).default(0), sendNow: z.boolean().default(true) })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const request = (await db.select().from(requests).where(and(eq(requests.id, input.id), eq(requests.profileId, profile.id))).limit(1))[0];
+      if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitação não encontrada." });
+      const service = request.serviceId ? await getOwnedService(profile.id, request.serviceId) : undefined;
+      const item = { description: service?.name || "Serviço solicitado", quantity: 1, unitPriceCents: service?.priceCents || 0 };
+      const secureToken = nanoid(32);
+      const insert = (await db.insert(quotes).values({
+        profileId: profile.id,
+        clientId: request.clientId ?? null,
+        requestId: request.id,
+        serviceId: request.serviceId ?? null,
+        description: request.description,
+        subtotalCents: item.unitPriceCents,
+        discountCents: input.discountCents,
+        totalCents: Math.max(0, item.unitPriceCents - input.discountCents),
+        notes: request.address ? `Endereço: ${request.address}` : null,
+        clientName: request.requesterName || null,
+        clientEmail: request.requesterEmail || null,
+        validUntil: null,
+        secureToken,
+        status: input.sendNow ? "enviado" : "rascunho",
+      })) as unknown as [{ insertId: number }];
+      await db.insert(quoteItems).values({ quoteId: Number(insert[0].insertId), ...item, totalCents: item.unitPriceCents });
+      await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(eq(requests.id, request.id));
+      return { success: true, quoteId: Number(insert[0].insertId), token: secureToken };
+    }),
+  }),
+
+  quote: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(quotes).where(eq(quotes.profileId, profile.id)).orderBy(desc(quotes.createdAt));
+      return Promise.all(
+        rows.map(async (q) => {
+          let clientName = q.clientName;
+          let clientEmail = q.clientEmail;
+          let clientPhone: string | null = null;
+
+          if (q.clientId) {
+            const c = (await db.select().from(clients).where(eq(clients.id, q.clientId)).limit(1))[0];
+            if (c) {
+              clientName = clientName || c.name;
+              clientEmail = clientEmail || c.email;
+              clientPhone = c.phone || null;
+            }
+          }
+          if (q.requestId) {
+            const r = (await db.select().from(requests).where(eq(requests.id, q.requestId)).limit(1))[0];
+            if (r) {
+              clientName = clientName || r.requesterName;
+              clientEmail = clientEmail || r.requesterEmail;
+              clientPhone = clientPhone || r.requesterPhone;
+            }
+          }
+
+          return {
+            ...q,
+            clientName: clientName || null,
+            clientEmail: clientEmail || null,
+            clientPhone: clientPhone || null,
+            items: await db.select().from(quoteItems).where(eq(quoteItems.quoteId, q.id)),
+          };
+        })
+      );
+    }),
+
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const profile = await requireProfile(ctx.user.id);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const existing = (
+          await db
+            .select()
+            .from(quotes)
+            .where(and(eq(quotes.id, input.id), eq(quotes.profileId, profile.id)))
+            .limit(1)
+        )[0];
+        if (!existing) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Orçamento não encontrado." });
+        }
+
+        await db.delete(quoteItems).where(eq(quoteItems.quoteId, input.id));
+        await db.delete(quotes).where(and(eq(quotes.id, input.id), eq(quotes.profileId, profile.id)));
+
+        if (existing.requestId) {
+          try {
+            await db
+              .update(requests)
+              .set({ status: "em_analise" })
+              .where(and(eq(requests.id, existing.requestId), eq(requests.profileId, profile.id)));
+          } catch (e) {
+            // ignore
+          }
+        }
+        return { success: true };
+      }),
+    create: protectedProcedure.input(z.object({ clientId: z.number().optional(), requestId: z.number().optional(), serviceId: z.number().optional(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(false), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().int().min(1).max(100), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      if (input.clientId) await getOwnedClient(profile.id, input.clientId);
+      if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const subtotalCents = input.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
+      const totalCents = Math.max(0, subtotalCents - input.discountCents);
+      const secureToken = nanoid(32);
+      const insert = (await db.insert(quotes).values({ profileId: profile.id, clientId: input.clientId ?? null, requestId: input.requestId ?? null, serviceId: input.serviceId ?? null, description: input.description ?? null, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? null, paymentTerms: input.paymentTerms ?? null, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : null, secureToken, status: input.sendNow ? "enviado" : "rascunho" })) as unknown as [{ insertId: number }];
+      const quoteId = Number(insert[0].insertId);
+      await db.insert(quoteItems).values(input.items.map(item => ({ quoteId, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
+      if (input.requestId) await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(and(eq(requests.id, input.requestId), eq(requests.profileId, profile.id)));
+      if (input.sendNow) await createNotification(profile.id, "Orçamento enviado", "Seu orçamento está disponível por um link público.", "quote");
+      return { success: true, quoteId, token: secureToken };
+    }),
+    update: protectedProcedure.input(z.object({ id: z.number(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(true), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().int().min(1).max(100), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const existing = (await db.select().from(quotes).where(and(eq(quotes.id, input.id), eq(quotes.profileId, profile.id))).limit(1))[0];
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Orçamento não encontrado." });
+      const subtotalCents = input.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
+      const totalCents = Math.max(0, subtotalCents - input.discountCents);
+      await db.delete(quoteItems).where(eq(quoteItems.quoteId, input.id));
+      await db.insert(quoteItems).values(input.items.map(item => ({ quoteId: input.id, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
+      await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : existing.status, respondedAt: null }).where(eq(quotes.id, input.id));
+      if (input.sendNow) await createNotification(profile.id, "Orçamento revisado e reenviado", "A proposta atualizada está disponível no link do cliente.", "quote");
+      return { success: true, token: existing.secureToken };
+    }),
+    getPublic: publicProcedure.input(z.object({ token: z.string().min(10) })).query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const quote = (await db.select().from(quotes).where(eq(quotes.secureToken, input.token)).limit(1))[0];
+      if (!quote) throw new TRPCError({ code: "NOT_FOUND", message: "Orçamento não encontrado." });
+      const profile = (await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, quote.profileId)).limit(1))[0];
+      const items = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quote.id));
+      return { quote, profile, items };
+    }),
+    respondPublic: publicProcedure.input(z.object({ token: z.string().min(10), action: z.enum(["aceito", "recusado", "alteracao_solicitada"]), clientName: z.string().optional(), clientEmail: z.string().email().optional().or(z.literal("")), changeRequestText: z.string().max(1200).optional() })).mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const quote = (await db.select().from(quotes).where(eq(quotes.secureToken, input.token)).limit(1))[0];
+      if (!quote) throw new TRPCError({ code: "NOT_FOUND", message: "Orçamento não encontrado." });
+      const updateData: Record<string, unknown> = { status: input.action, respondedAt: new Date() };
+      if (input.action === "alteracao_solicitada" && input.changeRequestText) {
+        updateData.changeRequest = input.changeRequestText;
+        await createNotification(quote.profileId, "Alteração solicitada no Orçamento", `O cliente pediu ajuste: "${input.changeRequestText}". Acesse para revisar e reenviar a proposta.`, "quote_change_requested");
+      } else if (input.action === "aceito") {
+        if (input.clientName) updateData.clientName = input.clientName;
+        if (input.clientEmail) updateData.clientEmail = input.clientEmail;
+        if (!quote.clientId && input.clientName) {
+          try {
+            const inserted = (await db.insert(clients).values({
+              profileId: quote.profileId,
+              name: input.clientName,
+              email: input.clientEmail || null,
+            })) as unknown as [{ insertId: number }];
+            if (inserted?.[0]?.insertId) {
+              updateData.clientId = inserted[0].insertId;
+            }
+          } catch (e) {
+            console.error("Erro ao registrar cliente no aceite do orçamento:", e);
+          }
+        }
+        await createNotification(
+          quote.profileId,
+          "🎉 Orçamento APROVADO!",
+          `${input.clientName || "O cliente"} aceitou o orçamento de R$ ${(quote.totalCents / 100).toFixed(2).replace(".", ",")}. Comprovante registrado para ${input.clientEmail || "o cliente"}.`,
+          "quote_accepted"
+        );
+
+        // Disparo automático do e-mail de comprovação ao cliente (mesmo esquema do Catecismo com Resend)
+        if (input.clientEmail) {
+          try {
+            const profile = (await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, quote.profileId)).limit(1))[0];
+            const items = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quote.id));
+            const publicUrl = process.env.PUBLIC_URL || "https://meuautonome-vmrf8enk.manus.space";
+            const linkProposta = `${publicUrl}/orcamento/${quote.secureToken}`;
+
+            const emailData = modeloOrcamentoAprovado({
+              clienteNome: input.clientName || "Cliente",
+              clienteEmail: input.clientEmail,
+              profissionalNome: profile?.displayName || "Profissional",
+              profissionalProfissao: profile?.professionName || undefined,
+              profissionalWhatsapp: profile?.whatsapp || undefined,
+              orcamentoId: quote.id,
+              totalCents: quote.totalCents,
+              paymentTerms: quote.paymentTerms || undefined,
+              notes: quote.notes || undefined,
+              items: items.map(it => ({
+                description: it.description,
+                quantity: it.quantity,
+                unitPriceCents: it.unitPriceCents,
+                totalCents: it.totalCents,
+              })),
+              linkProposta,
+            });
+
+            await enviarEmail({
+              para: input.clientEmail,
+              assunto: emailData.assunto,
+              texto: emailData.texto,
+              html: emailData.html,
+            });
+          } catch (emailErr) {
+            console.error("[Email] Erro ao enviar e-mail de confirmação:", emailErr);
+          }
+        }
+      } else {
+        await createNotification(quote.profileId, "Orçamento recusado", "O cliente recusou a proposta.", "quote_response");
+      }
+      await db.update(quotes).set(updateData).where(eq(quotes.id, quote.id));
+      return { success: true };
+    }),
+  }),
+
+  payment: router({
+    list: protectedProcedure.input(z.object({ from: z.string().datetime().optional(), to: z.string().datetime().optional() }).optional()).query(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions = [eq(payments.profileId, profile.id)];
+      if (input?.from) conditions.push(gte(payments.createdAt, new Date(input.from)));
+      if (input?.to) conditions.push(lt(payments.createdAt, new Date(input.to)));
+      return db.select().from(payments).where(and(...conditions)).orderBy(desc(payments.createdAt));
+    }),
+    create: protectedProcedure.input(z.object({
+      appointmentId: z.number().optional(),
+      clientId: z.number().optional(),
+      serviceId: z.number().optional(),
+      teamMemberId: z.number().optional(),
+      amountCents: z.number().int().positive(),
+      method: paymentMethod,
+      status: paymentStatus,
+      note: z.string().max(600).optional(),
+      paidAt: z.string().datetime().optional()
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      if (input.clientId) await getOwnedClient(profile.id, input.clientId);
+      if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      
+      let commissionPercent = 0;
+      let commissionAmountCents = 0;
+      let studioAmountCents = input.amountCents;
+
+      if (input.teamMemberId) {
+        const member = await getOwnedTeamMember(profile.id, input.teamMemberId);
+        commissionPercent = member.commissionPercent;
+        commissionAmountCents = Math.round((input.amountCents * commissionPercent) / 100);
+        studioAmountCents = input.amountCents - commissionAmountCents;
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(payments).values({
+        profileId: profile.id,
+        teamMemberId: input.teamMemberId ?? null,
+        appointmentId: input.appointmentId ?? null,
+        clientId: input.clientId ?? null,
+        serviceId: input.serviceId ?? null,
+        amountCents: input.amountCents,
+        commissionPercent: commissionPercent || null,
+        commissionAmountCents,
+        studioAmountCents,
+        commissionPaid: false,
+        method: input.method,
+        status: input.status,
+        note: input.note ?? null,
+        paidAt: input.paidAt ? new Date(input.paidAt) : input.status === "pago" ? new Date() : null
+      });
+      if (input.appointmentId) {
+        await db.update(appointments).set({
+          paymentStatus: input.status,
+          teamMemberId: input.teamMemberId ?? undefined
+        }).where(and(eq(appointments.id, input.appointmentId), eq(appointments.profileId, profile.id)));
+      }
+      return { success: true };
+    }),
+  }),
+
+  team: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(teamMembers).where(eq(teamMembers.profileId, profile.id)).orderBy(desc(teamMembers.createdAt));
+    }),
+
+    create: protectedProcedure.input(z.object({
+      name: z.string().min(2, "Nome deve ter ao menos 2 caracteres").max(160),
+      role: z.string().min(2, "Função/especialidade é obrigatória").max(120),
+      phone: z.string().max(40).optional(),
+      email: z.string().email("E-mail inválido").max(320).optional().or(z.literal("")),
+      pixKey: z.string().max(140).optional(),
+      pixKeyType: z.string().max(30).optional(),
+      commissionPercent: z.number().int().min(0).max(100).default(50),
+      color: z.string().max(30).optional(),
+      notes: z.string().max(600).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const insert = (await db.insert(teamMembers).values({
+        profileId: profile.id,
+        name: input.name.trim(),
+        role: input.role.trim(),
+        phone: input.phone?.trim() || null,
+        email: input.email ? input.email.trim() : null,
+        pixKey: input.pixKey?.trim() || null,
+        pixKeyType: input.pixKeyType || null,
+        commissionPercent: input.commissionPercent,
+        color: input.color || "#e11d48",
+        notes: input.notes?.trim() || null,
+        active: true,
+      })) as unknown as [{ insertId: number }];
+      return { success: true, id: Number(insert[0]?.insertId) };
+    }),
+
+    update: protectedProcedure.input(z.object({
+      id: z.number(),
+      name: z.string().min(2).max(160),
+      role: z.string().min(2).max(120),
+      phone: z.string().max(40).optional(),
+      email: z.string().email().max(320).optional().or(z.literal("")),
+      pixKey: z.string().max(140).optional(),
+      pixKeyType: z.string().max(30).optional(),
+      commissionPercent: z.number().int().min(0).max(100),
+      color: z.string().max(30).optional(),
+      notes: z.string().max(600).optional(),
+      active: z.boolean().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      await getOwnedTeamMember(profile.id, input.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(teamMembers).set({
+        name: input.name.trim(),
+        role: input.role.trim(),
+        phone: input.phone?.trim() || null,
+        email: input.email ? input.email.trim() : null,
+        pixKey: input.pixKey?.trim() || null,
+        pixKeyType: input.pixKeyType || null,
+        commissionPercent: input.commissionPercent,
+        color: input.color || "#e11d48",
+        notes: input.notes?.trim() || null,
+        active: input.active !== undefined ? input.active : true,
+      }).where(and(eq(teamMembers.id, input.id), eq(teamMembers.profileId, profile.id)));
+      return { success: true };
+    }),
+
+    toggleActive: protectedProcedure.input(z.object({ id: z.number(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      await getOwnedTeamMember(profile.id, input.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(teamMembers).set({ active: input.active }).where(and(eq(teamMembers.id, input.id), eq(teamMembers.profileId, profile.id)));
+      return { success: true };
+    }),
+
+    remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      await getOwnedTeamMember(profile.id, input.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(teamMembers).where(and(eq(teamMembers.id, input.id), eq(teamMembers.profileId, profile.id)));
+      return { success: true };
+    }),
+
+    report: protectedProcedure.input(z.object({
+      from: z.string().datetime().optional(),
+      to: z.string().datetime().optional(),
+      teamMemberId: z.number().optional(),
+    }).optional()).query(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const members = await db.select().from(teamMembers).where(eq(teamMembers.profileId, profile.id));
+
+      const payConditions = [eq(payments.profileId, profile.id)];
+      if (input?.from) payConditions.push(gte(payments.createdAt, new Date(input.from)));
+      if (input?.to) payConditions.push(lt(payments.createdAt, new Date(input.to)));
+      if (input?.teamMemberId) payConditions.push(eq(payments.teamMemberId, input.teamMemberId));
+
+      const periodPayments = await db.select().from(payments).where(and(...payConditions)).orderBy(desc(payments.createdAt));
+
+      const expConditions = [eq(expenses.profileId, profile.id)];
+      if (input?.from) expConditions.push(gte(expenses.occurredAt, new Date(input.from)));
+      if (input?.to) expConditions.push(lt(expenses.occurredAt, new Date(input.to)));
+      const periodExpenses = await db.select().from(expenses).where(and(...expConditions));
+
+      const totalExpensesCents = periodExpenses.reduce((sum, e) => sum + e.amountCents, 0);
+
+      // Agrupar por parceiro
+      const breakdown = members.map(m => {
+        const mPayments = periodPayments.filter(p => p.teamMemberId === m.id);
+        const grossCents = mPayments.reduce((sum, p) => sum + p.amountCents, 0);
+        const receivedCents = mPayments.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+        
+        const commissionCents = mPayments.filter(p => p.status === "pago").reduce((sum, p) => {
+          if (p.commissionAmountCents > 0) return sum + p.commissionAmountCents;
+          return sum + Math.round((p.amountCents * m.commissionPercent) / 100);
+        }, 0);
+
+        const studioCents = receivedCents - commissionCents;
+        const count = mPayments.length;
+
+        return {
+          member: m,
+          count,
+          grossCents,
+          receivedCents,
+          commissionCents,
+          studioCents,
+          commissionPercent: m.commissionPercent,
+        };
+      });
+
+      const totalGrossCents = periodPayments.reduce((sum, p) => sum + p.amountCents, 0);
+      const totalReceivedCents = periodPayments.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      const totalCommissionCents = breakdown.reduce((sum, b) => sum + b.commissionCents, 0);
+      const totalStudioNetCents = totalReceivedCents - totalCommissionCents;
+      const finalProfitCents = totalStudioNetCents - totalExpensesCents;
+
+      return {
+        totalGrossCents,
+        totalReceivedCents,
+        totalCommissionCents,
+        totalStudioNetCents,
+        totalExpensesCents,
+        finalProfitCents,
+        breakdown,
+        payments: periodPayments,
+      };
+    }),
+  }),
+
+  expense: router({
+    list: protectedProcedure.input(z.object({ from: z.string().datetime().optional(), to: z.string().datetime().optional() }).optional()).query(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions = [eq(expenses.profileId, profile.id)];
+      if (input?.from) conditions.push(gte(expenses.occurredAt, new Date(input.from)));
+      if (input?.to) conditions.push(lt(expenses.occurredAt, new Date(input.to)));
+      return db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.occurredAt));
+    }),
+    create: protectedProcedure.input(z.object({ description: z.string().min(2).max(180), category: z.string().max(100).optional(), amountCents: z.number().int().positive(), occurredAt: z.string().datetime().optional(), note: z.string().max(600).optional() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(expenses).values({ profileId: profile.id, description: input.description, category: input.category ?? null, amountCents: input.amountCents, occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date(), note: input.note ?? null });
+      return { success: true };
+    }),
+    remove: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(expenses).where(and(eq(expenses.id, input.id), eq(expenses.profileId, profile.id)));
+      return { success: true };
+    }),
+  }),
+
+  notification: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db.select().from(notifications).where(eq(notifications.profileId, profile.id)).orderBy(desc(notifications.createdAt)).limit(30);
+    }),
+    markRead: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(notifications).set({ read: true }).where(and(eq(notifications.id, input.id), eq(notifications.profileId, profile.id)));
+      return { success: true };
+    }),
+    unreadCount: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select({ id: notifications.id }).from(notifications).where(and(eq(notifications.profileId, profile.id), eq(notifications.read, false)));
+      return rows.length;
+    }),
+  }),
+
+  reports: router({
+    summary: protectedProcedure.input(z.object({ from: z.string().datetime().optional(), to: z.string().datetime().optional() }).optional()).query(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const now = new Date();
+      const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+      const from = input?.from ? new Date(input.from) : defaultFrom;
+      const to = input?.to ? new Date(input.to) : new Date(now.getTime() + 1);
+      const [periodAppointments, periodPayments, periodClients, profileServices] = await Promise.all([
+        db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, from), lt(appointments.startsAt, to), ne(appointments.status, "cancelado"))),
+        db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, from), lt(payments.createdAt, to))),
+        db.select().from(clients).where(and(eq(clients.profileId, profile.id), gte(clients.createdAt, from), lt(clients.createdAt, to))),
+        db.select().from(services).where(eq(services.profileId, profile.id)),
+      ]);
+      const receivedCents = periodPayments.filter(item => item.status === "pago").reduce((sum, item) => sum + item.amountCents, 0);
+      const pendingCents = periodPayments.filter(item => item.status !== "pago").reduce((sum, item) => sum + item.amountCents, 0);
+      const counts = new Map<number, number>();
+      for (const item of periodAppointments) if (item.serviceId) counts.set(item.serviceId, (counts.get(item.serviceId) || 0) + 1);
+      const topServices = Array.from(counts.entries()).map(([serviceId, count]) => ({ serviceId, count, name: profileServices.find(service => service.id === serviceId)?.name || "Serviço" })).sort((a, b) => b.count - a.count).slice(0, 5);
+      const allClientAppointments = await db.select({ clientId: appointments.clientId }).from(appointments).where(and(eq(appointments.profileId, profile.id), ne(appointments.status, "cancelado")));
+      const clientVisitCounts = new Map<number, number>();
+      for (const item of allClientAppointments) if (item.clientId) clientVisitCounts.set(item.clientId, (clientVisitCounts.get(item.clientId) || 0) + 1);
+      const recurringClientIds = Array.from(clientVisitCounts.values()).filter(count => count > 1).length;
+      return { from, to, revenueCents: receivedCents + pendingCents, receivedCents, pendingCents, appointmentCount: periodAppointments.length, newClients: periodClients.length, recurringClients: recurringClientIds, topServices };
+    }),
+  }),
+
+  dashboard: router({
+    summary: protectedProcedure.input(z.object({ from: z.string().datetime().optional(), to: z.string().datetime().optional() }).optional()).query(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const today = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart()), lt(appointments.startsAt, dayEnd()))).orderBy(appointments.startsAt);
+      const recentRequests = await db.select().from(requests).where(and(eq(requests.profileId, profile.id), ne(requests.status, "arquivada"))).orderBy(desc(requests.createdAt)).limit(4);
+      const pendingQuotes = await db.select().from(quotes).where(and(eq(quotes.profileId, profile.id), eq(quotes.status, "enviado"))).orderBy(desc(quotes.createdAt)).limit(4);
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+      const periodFrom = input?.from ? new Date(input.from) : monthStart;
+      const periodTo = input?.to ? new Date(input.to) : new Date();
+      const monthPayments = await db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lt(payments.createdAt, periodTo)));
+      const monthExpenses = await db.select().from(expenses).where(and(eq(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lt(expenses.occurredAt, periodTo)));
+      const received = monthPayments.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      const pending = monthPayments.filter(p => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      const expensesCents = monthExpenses.reduce((sum, item) => sum + item.amountCents, 0);
+      const projected = today.reduce((sum, item) => sum + item.amountCents, 0);
+      const seriesMap = new Map<string, { date: string; receitas: number; pendentes: number; despesas: number }>();
+      const ensureDay = (date: Date) => { const key = date.toISOString().slice(0, 10); if (!seriesMap.has(key)) seriesMap.set(key, { date: key, receitas: 0, pendentes: 0, despesas: 0 }); return seriesMap.get(key)!; };
+      for (const payment of monthPayments) { const day = ensureDay(new Date(payment.createdAt)); if (payment.status === "pago") day.receitas += payment.amountCents; else day.pendentes += payment.amountCents; }
+      for (const expense of monthExpenses) { const day = ensureDay(new Date(expense.occurredAt)); day.despesas += expense.amountCents; }
+      const monthlySeries = Array.from(seriesMap.values()).sort((a, b) => a.date.localeCompare(b.date)).map((day, index, rows) => ({ ...day, saldo: rows.slice(0, index + 1).reduce((sum, item) => sum + item.receitas - item.despesas, 0) }));
+      return { profile, today, recentRequests, pendingQuotes, monthlySeries, metrics: { todayCount: today.filter(a => a.status !== "cancelado").length, todayProjectedCents: projected, receivedCents: received, pendingCents: pending, monthRevenueCents: received + pending, expensesCents, balanceCents: received - expensesCents } };
+    }),
+  }),
+
+  publicProfile: router({
+    bySlug: publicProcedure.input(z.object({ slug: z.string() })).query(async ({ input }) => {
+      const profile = await getProfileBySlug(input.slug);
+      if (!profile) throw new TRPCError({ code: "NOT_FOUND", message: "Profissional não encontrado." });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const profileServices = await db.select().from(services).where(and(eq(services.profileId, profile.id), eq(services.active, true))).orderBy(services.name);
+      return { profile, services: profileServices };
+    }),
+  }),
+
+  database: router({
+    reset: protectedProcedure.mutation(async () => {
+      const { resetMockDb } = await import("./mockDb");
+      resetMockDb();
+      return { success: true };
+    }),
+  }),
+
+  admin: router({
+    login: publicProcedure
+      .input(z.object({ email: z.string().email(), password: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        const adminEmail = getAdminEmail().toLowerCase();
+        if (input.email.trim().toLowerCase() !== adminEmail || input.password !== DEFAULT_ADMIN_PASSWORD) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Credenciais de administrador incorretas." });
+        }
+        const openId = "admin_master";
+        await upsertUser({
+          openId,
+          name: "Administrador Geral",
+          email: adminEmail,
+          role: "admin",
+          loginMethod: "admin-panel",
+          lastSignedIn: new Date(),
+        });
+        const sessionToken = await sdk.createSessionToken(openId, {
+          name: "Administrador",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        return { success: true, email: adminEmail };
+      }),
+
+    getMetrics: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const allUsers = await db.select().from(users);
+      const allProfiles = await db.select().from(professionalProfiles);
+      const allQuotes = await db.select().from(quotes);
+      const allClients = await db.select().from(clients);
+      const allAppointments = await db.select().from(appointments);
+      const allServices = await db.select().from(services);
+
+      const totalQuotedCents = allQuotes.reduce((acc, q) => acc + (q.totalCents || 0), 0);
+      const acceptedQuotes = allQuotes.filter(q => q.status === "aceito");
+      const acceptedQuotedCents = acceptedQuotes.reduce((acc, q) => acc + (q.totalCents || 0), 0);
+
+      return {
+        usersCount: allUsers.length,
+        profilesCount: allProfiles.length,
+        quotesCount: allQuotes.length,
+        acceptedQuotesCount: acceptedQuotes.length,
+        totalQuotedCents,
+        acceptedQuotedCents,
+        clientsCount: allClients.length,
+        appointmentsCount: allAppointments.length,
+        servicesCount: allServices.length,
+        demoMode: isDemoMode(),
+      };
+    }),
+
+    listUsers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+      const allProfiles = await db.select().from(professionalProfiles);
+
+      return allUsers.map(u => {
+        const prof = allProfiles.find(p => p.userId === u.id);
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          loginMethod: u.loginMethod,
+          createdAt: u.createdAt,
+          lastSignedIn: u.lastSignedIn,
+          profileName: prof?.displayName,
+          profession: prof?.professionName,
+          city: prof?.city,
+          slug: prof?.slug,
+        };
+      });
+    }),
+
+    resetDatabase: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const { resetMockDb } = await import("./mockDb");
+      resetMockDb();
+      return { success: true, message: "Banco de teste reiniciado com sucesso!" };
+    }),
+
+    setDemoMode: protectedProcedure
+      .input(z.object({ enabled: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+        }
+        setDemoMode(input.enabled);
+        return { success: true, demoMode: isDemoMode() };
+      }),
+  }),
+});
+
+export type AppRouter = typeof appRouter;

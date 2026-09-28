@@ -1,0 +1,265 @@
+import { SERVICE_CATALOG } from "../data/servicesCatalog";
+
+// Dicionário de erros e correções ortográficas comuns em português para serviços
+const COMMON_TYPOS: Record<string, string> = {
+  // Estética, Beleza, Unhas, Sobrancelhas e Cílios
+  "sombrancelha": "sobrancelha",
+  "sombrancelhas": "sobrancelhas",
+  "sobranselha": "sobrancelha",
+  "sobranselhas": "sobrancelhas",
+  "desing": "design",
+  "dizaine": "design",
+  "rena": "henna",
+  "hena": "henna",
+  "jel": "gel",
+  "alongameto": "alongamento",
+  "alongamentos": "alongamentos",
+  "micropigmentacao": "micropigmentação",
+  "micropigmentaçao": "micropigmentação",
+  "micropigmentasao": "micropigmentação",
+  "microblading": "microblading",
+  "microbleding": "microblading",
+  "esmaltacao": "esmaltação",
+  "esmaltecao": "esmaltação",
+  "esmaltassao": "esmaltação",
+  "esmalte": "esmalte",
+  "manicuri": "manicure",
+  "manicuree": "manicure",
+  "pedicuri": "pedicure",
+  "pedicuree": "pedicure",
+  "cutilajem": "cutilagem",
+  "cutilagem": "cutilagem",
+  "podolojia": "podologia",
+  "podolojista": "podologista",
+  "lash lifiting": "lash lifting",
+  "lash lift": "lash lifting",
+  "liftin": "lifting",
+  "depilacao": "depilação",
+  "depilassao": "depilação",
+  "depilacão": "depilação",
+  "depilaçao": "depilação",
+  "massajem": "massagem",
+  "massajens": "massagens",
+  "massagen": "massagem",
+  "drenajem": "drenagem",
+  "drenajens": "drenagens",
+  "drenagen": "drenagem",
+  "maquiajem": "maquiagem",
+  "maquiagen": "maquiagem",
+  "maquiadora": "maquiadora",
+  "maquiador": "maquiador",
+  "progresiva": "progressiva",
+  "progressiva": "progressiva",
+  "hidratacao": "hidratação",
+  "hidratassao": "hidratação",
+  "cauterizacao": "cauterização",
+  "selagem": "selagem",
+  "selajem": "selagem",
+  "cilios": "cílios",
+  "cilio": "cílio",
+  "extencao": "extensão",
+  "extensao": "extensão",
+  "limpesa": "limpeza",
+  "limpesas": "limpezas",
+  "limpessa": "limpeza",
+
+  // Reformas, Elétrica, Hidráulica, Reparos e Serviços Gerais
+  "concerto": "conserto",
+  "concertos": "consertos",
+  "pedrero": "pedreiro",
+  "pedreros": "pedreiros",
+  "chuvero": "chuveiro",
+  "chuveros": "chuveiros",
+  "instalacao": "instalação",
+  "instalassao": "instalação",
+  "instalacão": "instalação",
+  "instalasaõ": "instalação",
+  "manutencao": "manutenção",
+  "manutensao": "manutenção",
+  "manutencão": "manutenção",
+  "higienizacao": "higienização",
+  "higienizassao": "higienização",
+  "higienisacao": "higienização",
+  "idraulica": "hidráulica",
+  "idraulico": "hidráulico",
+  "montajem": "montagem",
+  "montajens": "montagens",
+  "lavajem": "lavagem",
+  "desentupimeto": "desentupimento",
+  "desentupisao": "desentupimento",
+  "recidencial": "residencial",
+  "residensial": "residencial",
+  "comerçial": "comercial",
+  "eletrica": "elétrica",
+  "eletrico": "elétrico",
+  "eletrecista": "eletricista",
+  "revisao": "revisão",
+  "reparacao": "reparação",
+  "orcamento": "orçamento",
+  "formatacao": "formatação",
+  "porcelenato": "porcelanato",
+  "impermeabilizacao": "impermeabilização",
+  "impermeabilisacao": "impermeabilização",
+  "arcondicionado": "ar-condicionado",
+  "ar condicionado": "ar-condicionado",
+  "computado": "computador",
+  "tecnico": "técnico",
+  "mecanico": "mecânico",
+  "mecanica": "mecânica",
+  "estetica": "estética",
+  "domestica": "doméstica",
+  "domestico": "doméstico",
+  "veiculo": "veículo",
+  "veiculos": "veículos",
+  "automovel": "automóvel",
+  "automoveis": "automóveis",
+  "jardinajem": "jardinagem",
+  "vidracaria": "vidraçaria",
+  "serralharia": "serralheria",
+  "tornera": "torneira",
+  "chavero": "chaveiro",
+  "fumilheiro": "funileiro",
+  "funelaria": "funilaria",
+  "cristalizacao": "cristalização",
+  "vitrificacao": "vitrificação",
+  "nutricao": "nutrição",
+};
+
+// Distância de Levenshtein para calcular similaridade
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+// Lista plana de todos os serviços do catálogo para sugestão
+export const ALL_CATALOG_SERVICES = SERVICE_CATALOG.flatMap((cat) =>
+  cat.services.map((s) => ({
+    name: s.name,
+    description: s.description,
+    profession: cat.label,
+    emoji: cat.emoji,
+  }))
+);
+
+export interface SpellcheckResult {
+  hasCorrection: boolean;
+  correctedText: string;
+  originalText: string;
+  explanation?: string;
+  catalogSuggestion?: {
+    name: string;
+    description: string;
+    profession: string;
+  };
+}
+
+export function checkServiceSpelling(input: string): SpellcheckResult {
+  const trimmed = input.trim();
+  if (!trimmed || trimmed.length < 3) {
+    return {
+      hasCorrection: false,
+      correctedText: input,
+      originalText: input,
+    };
+  }
+
+  // 1. Correção palavra por palavra baseada em dicionário
+  const words = trimmed.split(/(\s+)/);
+  let changed = false;
+
+  const correctedWords = words.map((w) => {
+    // Se for espaço em branco, mantém
+    if (/^\s+$/.test(w)) return w;
+
+    const lower = w.toLowerCase().replace(/[.,;:!?]/g, "");
+    const punctuation = w.slice(lower.length);
+
+    if (COMMON_TYPOS[lower]) {
+      const fixed = COMMON_TYPOS[lower];
+      if (fixed.toLowerCase() !== lower) {
+        changed = true;
+        // Preserva primeira letra maiúscula se o original tinha
+        if (w.charAt(0) === w.charAt(0).toUpperCase()) {
+          return fixed.charAt(0).toUpperCase() + fixed.slice(1) + punctuation;
+        }
+        return fixed + punctuation;
+      }
+    }
+    return w;
+  });
+
+  let wordCorrected = correctedWords.join("");
+
+  // Ajusta primeira letra para maiúscula
+  if (wordCorrected.length > 0 && wordCorrected.charAt(0) !== wordCorrected.charAt(0).toUpperCase()) {
+    wordCorrected = wordCorrected.charAt(0).toUpperCase() + wordCorrected.slice(1);
+    if (wordCorrected !== trimmed) {
+      changed = true;
+    }
+  }
+
+  // 2. Busca no catálogo de serviços para verificar se é muito similar a um serviço padrão
+  const lowerInput = trimmed.toLowerCase();
+  let bestCatalogMatch: (typeof ALL_CATALOG_SERVICES)[0] | null = null;
+  let minDistance = 999;
+
+  for (const catService of ALL_CATALOG_SERVICES) {
+    const catLower = catService.name.toLowerCase();
+    
+    // Se for exatamente igual, não precisa sugerir catálogo
+    if (catLower === lowerInput) {
+      bestCatalogMatch = null;
+      break;
+    }
+
+    // Se o usuário digitou uma frase de 5+ letras parecida com o serviço
+    const dist = levenshteinDistance(lowerInput, catLower);
+    const maxLen = Math.max(lowerInput.length, catLower.length);
+    const similarity = 1 - dist / maxLen;
+
+    if (similarity >= 0.75 && dist < minDistance && dist <= 4) {
+      minDistance = dist;
+      bestCatalogMatch = catService;
+    }
+  }
+
+  const hasCorrection = changed && wordCorrected.toLowerCase() !== trimmed.toLowerCase();
+
+  let explanation = "";
+  if (hasCorrection) {
+    explanation = "Correção ortográfica e acentuação detectadas";
+  }
+
+  return {
+    hasCorrection,
+    correctedText: wordCorrected,
+    originalText: input,
+    explanation,
+    catalogSuggestion: bestCatalogMatch
+      ? {
+          name: bestCatalogMatch.name,
+          description: bestCatalogMatch.description,
+          profession: bestCatalogMatch.profession,
+        }
+      : undefined,
+  };
+}

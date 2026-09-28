@@ -1,0 +1,171 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "openId": "dev-user-local",
+      "name": "Meu Perfil Profissional",
+      "email": "contato@meuautonomo.com.br",
+      "loginMethod": "local-dev",
+      "role": "admin",
+      "createdAt": "2026-09-27T19:01:13.881Z",
+      "updatedAt": "2026-09-27T19:03:22.835Z",
+      "lastSignedIn": "2026-09-27T19:03:22.834Z"
+    },
+    {
+      "id": 2,
+      "openId": "user_murilo",
+      "name": "Murilo Silva",
+      "email": "olirumdev1@gmail.com",
+      "loginMethod": "local-password",
+      "passwordHash": "95baf1482029d051ad76fdd7dfafdef2:eb47f0b260707c3069a1997a069ada00206456af8679b0e650268d0fb17af1ed35bbcaff5b39289ddf3d2ef72f868d2dc5be0e121e3848cda87b83e9f9142c06",
+      "role": "admin",
+      "createdAt": "2026-09-27T19:01:13.881Z",
+      "updatedAt": "2026-09-28T20:51:54.701Z",
+      "lastSignedIn": "2026-09-28T20:51:54.701Z"
+    },
+    {
+      "openId": "user_GteKu9qTp7AB",
+      "name": "Murilo Teste",
+      "email": "olirumsilva@gmail.com",
+      "loginMethod": "local-password",
+      "passwordHash": "178a246349d82a62548a62ad0f0f1020:6557871362db4e3c0dca3ad74482fb72d51285f95dd9292c0bcd3c3690316a2aa8d9ed0a6c0c6e65fdcb76393ae1fadbaddba80f6399a1b75e5ac2b06d13fb40",
+      "lastSignedIn": "2026-09-28T20:51:09.147Z",
+      "role": "user",
+      "id": 3,
+      "createdAt": "2026-09-28T00:56:29.864Z",
+      "updatedAt": "2026-09-28T20:51:09.147Z"
+    },
+    {
+      "openId": "admin_master",
+      "name": "Administrador Geral",
+      "email": "admin@meuautonomo.com.br",
+      "loginMethod": "admin-panel",
+      "lastSignedIn": "2026-09-28T20:02:48.288Z",
+      "role": "admin",
+      "id": 4,
+      "createdAt": "2026-09-28T09:05:17.173Z",
+      "updatedAt": "2026-09-28T20:02:48.289Z"
+    }
+  ],
+  "professionalProfiles": [
+    {
+      "id": 1,
+      "userId": 1,
+      "displayName": "Meu Perfil Profissional",
+      "slug": "meu-perfil",
+      "professionCategory": "Serviços Gerais",
+      "professionName": "Profissional Autônomo",
+      "bio": "Serviços profissionais com qualidade, transparência e pontualidade.",
+      "city": "São Paulo - SP",
+      "serviceRegion": "São Paulo e Região",
+      "phone": "(11) 99999-9999",
+      "whatsapp": "(11) 99999-9999",
+      "avatarUrl": null,
+      "pixKey": null,
+      "pixKeyType": null,
+      "showPrices": true,
+      "bookingEnabled": true,
+      "createdAt": "2026-09-27T19:01:13.881Z",
+      "updatedAt": "2026-09-27T19:01:13.881Z"
+    },
+    {
+      "id": 2,
+      "userId": 2,
+      "displayName": "Murilo Silva",
+      "slug": "murilo-silva",
+      "professionCategory": "Estética & Beleza",
+      "professionName": "Estúdio & Beleza",
+      "bio": "Atendimento profissional com hora marcada, qualidade e atenção aos detalhes.",
+      "city": "São Paulo - SP",
+      "serviceRegion": "São Paulo e Região",
+      "phone": "(11) 99999-9999",
+      "whatsapp": "(11) 99999-9999",
+      "avatarUrl": null,
+      "pixKey": null,
+      "pixKeyType": null,
+      "showPrices": true,
+      "bookingEnabled": true,
+      "createdAt": "2026-09-27T19:01:13.881Z",
+      "updatedAt": "2026-09-27T19:01:13.881Z"
+    },
+    {
+      "displayName": "Murilo Teste",
+      "slug": "murilo-teste",
+      "professionCategory": "Casa e Manutenção",
+      "professionName": "Marido de Aluguel",
+      "bio": "Elétrica, hidraulica e reparos rápidos",
+      "city": "São Bernardo do Campo - SP",
+      "serviceRegion": "São Bernardo do Campo - SP e região",
+      "showPrices": true,
+      "bookingEnabled": false,
+      "userId": 3,
+      "phone": null,
+      "whatsapp": null,
+      "pixKey": null,
+      "pixKeyType": null,
+      "id": 3,
+      "createdAt": "2026-09-28T00:58:30.938Z",
+      "updatedAt": "2026-09-28T00:59:31.170Z"
+    }
+  ],
+  "availability": [
+    {
+      "id": 1,
+      "profileId": 1,
+      "schedule": "{\"days\":[\"mon\",\"tue\",\"wed\",\"thu\",\"fri\",\"sat\"],\"start\":\"08:00\",\"end\":\"18:00\",\"breaks\":[{\"start\":\"12:00\",\"end\":\"13:00\"}]}",
+      "timezone": "America/Sao_Paulo",
+      "unavailableDays": null,
+      "createdAt": "2026-09-27T19:01:13.881Z",
+      "updatedAt": "2026-09-27T19:01:13.881Z"
+    },
+    {
+      "profileId": 3,
+      "schedule": "{\"days\":[\"mon\",\"tue\",\"wed\",\"thu\",\"fri\"],\"start\":\"08:00\",\"end\":\"18:00\"}",
+      "unavailableDays": "[]",
+      "id": 2,
+      "createdAt": "2026-09-28T01:02:11.804Z",
+      "updatedAt": "2026-09-28T01:02:11.804Z"
+    }
+  ],
+  "services": [
+    {
+      "name": "Reparos residenciais rápidos",
+      "description": null,
+      "durationMinutes": 60,
+      "priceCents": 15000,
+      "modality": "endereco",
+      "profileId": 3,
+      "id": 1,
+      "createdAt": "2026-09-28T01:02:05.311Z",
+      "updatedAt": "2026-09-28T01:18:58.125Z",
+      "active": true
+    }
+  ],
+  "clients": [],
+  "appointments": [],
+  "requests": [],
+  "requestAttachments": [],
+  "quotes": [],
+  "quoteItems": [],
+  "payments": [],
+  "expenses": [],
+  "notifications": [],
+  "teamMembers": [
+    {
+      "profileId": 2,
+      "name": "Adriana Mamãe",
+      "role": "Super Mamãe",
+      "phone": "(11) 97575-3762",
+      "email": null,
+      "pixKey": "ozzymusabarto@gmail.com",
+      "pixKeyType": "email",
+      "commissionPercent": 40,
+      "color": "#28564d",
+      "notes": "Todos os dias se ferrou",
+      "active": true,
+      "id": 1,
+      "createdAt": "2026-09-28T20:05:06.864Z",
+      "updatedAt": "2026-09-28T20:05:06.864Z"
+    }
+  ]
+}
