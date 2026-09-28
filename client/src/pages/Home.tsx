@@ -24,7 +24,7 @@ export default function Home() {
 
   return <div className="min-h-screen overflow-hidden bg-[#f5f7f2] text-[#173a34]">
     <header className="relative z-20 border-b border-[#dce5dc] bg-[#f5f7f2]/90 backdrop-blur">
-      <div className="container flex h-20 sm:h-24 items-center justify-between">
+      <div className="container mx-auto px-4 sm:px-6 flex h-20 sm:h-24 items-center justify-between">
         <a href="#top" className="flex items-center py-1"><img src="/logo.png" alt="MeuAutônomo" className="h-13 sm:h-16 w-auto object-contain" /></a>
         <nav className="hidden items-center gap-4 text-sm font-semibold text-[#5c756d] md:flex">
           <a href="#como-funciona" className="transition hover:text-[#173a34]">Como funciona</a>
@@ -68,7 +68,7 @@ export default function Home() {
     <main id="top">
       <section className="relative">
         <div className="absolute -right-36 -top-28 h-[480px] w-[480px] rounded-full bg-[#d9f56a]/40 blur-3xl" />
-        <div className="container relative grid items-center gap-14 py-16 md:grid-cols-[1.05fr_0.95fr] md:py-24 lg:gap-20">
+        <div className="container mx-auto px-4 sm:px-6 relative grid items-center gap-14 py-16 md:grid-cols-[1.05fr_0.95fr] md:py-24 lg:gap-20">
           <div>
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#ccdc9b] bg-[#f1f7dd] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.13em] text-[#6e8313]">
               <span className="h-2 w-2 rounded-full bg-[#9ab41d]" /> Feito para quem faz acontecer
@@ -146,7 +146,7 @@ export default function Home() {
         </div>
       </section>
       <section id="como-funciona" className="border-y border-[#dce5dc] bg-white">
-        <div className="container py-16 md:py-20">
+        <div className="container mx-auto px-4 sm:px-6 py-16 md:py-20">
           <div className="max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">Menos burocracia, mais utilidade</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-[#173a34] sm:text-4xl">Um espaço que entende o seu dia.</h2>
@@ -163,7 +163,7 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <section className="container py-16 md:py-24">
+      <section className="container mx-auto px-4 sm:px-6 py-16 md:py-24">
         <div className="rounded-[30px] bg-[#173a34] p-7 text-white sm:p-12 lg:flex lg:items-center lg:justify-between lg:gap-10">
           <div className="max-w-xl">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#d9f56a]">Pronto para simplificar?</p>
@@ -177,7 +177,7 @@ export default function Home() {
       </section>
     </main>
     <footer className="border-t border-[#dce5dc] py-8">
-      <div className="container flex flex-col justify-between items-center gap-3 text-sm text-[#82948e] sm:flex-row">
+      <div className="container mx-auto px-4 sm:px-6 flex flex-col justify-between items-center gap-3 text-sm text-[#82948e] sm:flex-row">
         <img src="/logo.png" alt="MeuAutônomo" className="h-8 w-auto object-contain" />
         <span>Feito para profissionais que fazem acontecer.</span>
       </div>

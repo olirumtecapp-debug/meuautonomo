@@ -94,7 +94,7 @@ export function InstallAppModal({ open, onOpenChange }: InstallAppModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-3xl p-6 sm:p-8 bg-white border border-[#dce5dc] shadow-2xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto max-w-lg rounded-3xl p-6 sm:p-8 bg-white border border-[#dce5dc] shadow-2xl">
         <DialogHeader className="text-left space-y-3">
           <div className="flex items-center justify-between">
             <img src="/logo.png" alt="MeuAutônomo" className="h-10 w-auto object-contain" />

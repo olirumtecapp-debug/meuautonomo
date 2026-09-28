@@ -33,7 +33,7 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md rounded-[24px] p-6">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto rounded-[24px] p-6">
         <DialogHeader className="gap-2">
           <div className="flex items-center gap-3">
             {variant === "danger" && (

@@ -405,7 +405,7 @@ export default function PlansPage() {
 
       {/* MODAL DE CHECKOUT PIX (ASAAS) */}
       <Dialog open={pixModalOpen} onOpenChange={setPixModalOpen}>
-        <DialogContent className="rounded-[28px] max-w-md p-6 bg-white border border-[#dce5dc]">
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[28px] max-w-md p-6 bg-white border border-[#dce5dc]">
           <DialogHeader>
             <DialogTitle className="text-xl font-black text-[#173a34] flex items-center gap-2">
               <span>💳 Ativação Instantânea via PIX</span>
