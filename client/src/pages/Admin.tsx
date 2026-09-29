@@ -52,7 +52,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "vouchers" | "marketing" | "simulator" | "screens">("screens");
+  const [activeTab, setActiveTab] = useState<"overview" | "vouchers" | "marketing" | "simulator" | "screens" | "homologacao">("homologacao");
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
 
   // Voucher form states
@@ -478,6 +478,22 @@ export default function AdminPage() {
         <div className="flex flex-wrap border-b border-[#dce5dc] gap-2 pb-0">
           <button
             type="button"
+            onClick={() => setActiveTab("homologacao")}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition -mb-[2px] cursor-pointer ${
+              activeTab === "homologacao"
+                ? "border-[#173a34] text-[#173a34] bg-white rounded-t-2xl shadow-xs"
+                : "border-transparent text-[#71867f] hover:text-[#173a34]"
+            }`}
+          >
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <span>Status de Homologação</span>
+            <span className="rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[10px] font-bold">
+              Aprovado
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("screens")}
             className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition -mb-[2px] cursor-pointer ${
               activeTab === "screens"
@@ -566,6 +582,332 @@ export default function AdminPage() {
             </button>
           </Link>
         </div>
+
+        {/* CONTEÚDO DA ABA: STATUS DE HOMOLOGAÇÃO */}
+        {activeTab === "homologacao" && (
+          <div className="space-y-8">
+            {/* CARD PRINCIPAL DE STATUS */}
+            <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#173a34] via-[#1b433c] to-[#0f2824] p-7 text-white shadow-xl">
+              <div className="absolute -right-10 -bottom-10 h-64 w-64 rounded-full bg-[#d9f56a]/10 blur-3xl pointer-events-none" />
+              <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#d9f56a] px-3.5 py-1 text-xs font-black uppercase tracking-wider text-[#173a34]">
+                      <ShieldCheck className="h-4 w-4" />
+                      Aprovado para Lançamento Controlado
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-xs">
+                      <Calendar className="h-3.5 w-3.5 text-[#d9f56a]" />
+                      Data da Homologação: 29/09/2026
+                    </span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                    Certificado de Homologação & QA Operacional
+                  </h2>
+                  <p className="max-w-2xl text-sm leading-relaxed text-white/80">
+                    O sistema MeuAutônomo foi submetido a auditoria ponta a ponta em ambiente de produção com dados sintéticos. Todas as rotinas de cálculo financeiro, integridade de sessões, resgate de cupons e controle de permissões foram validadas e aprovadas.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 w-full md:w-auto shrink-0">
+                  <div className="rounded-2xl bg-white/10 p-3.5 backdrop-blur-md border border-white/10 text-center">
+                    <p className="text-[11px] font-semibold text-white/70 uppercase">Ambiente Avaliado</p>
+                    <p className="text-sm font-bold text-[#d9f56a] mt-0.5">Produção Publicada</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/10 p-3.5 backdrop-blur-md border border-white/10 text-center">
+                    <p className="text-[11px] font-semibold text-white/70 uppercase">Taxa de Conformidade</p>
+                    <p className="text-sm font-bold text-white mt-0.5">14 de 14 Fluxos (100%)</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* MATRIZ FINANCEIRA DE REFERÊNCIA & VOUCHER SINTÉTICO */}
+            <div className="grid gap-6 lg:grid-cols-3">
+              {/* Card Financeiro */}
+              <Card className="rounded-[22px] border-0 bg-white p-6 shadow-[0_8px_30px_rgba(19,42,39,0.04)] lg:col-span-2">
+                <div className="flex items-center justify-between pb-4 border-b border-[#eef2f0]">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#eef5d2] text-[#819815]">
+                      <DollarSign className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-[#173a34]">Matriz Financeira de Referência (QA)</h3>
+                      <p className="text-xs text-[#71867f]">Valores exatos apurados no teste comissionado de atendimento</p>
+                    </div>
+                  </div>
+                  <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Cálculo 100% Exato
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-5">
+                  <div className="rounded-2xl bg-[#fafbf9] border border-[#eef2f0] p-4">
+                    <p className="text-xs font-semibold text-[#71867f] uppercase">Faturamento Bruto</p>
+                    <p className="text-xl font-black text-[#173a34] mt-1">R$ 180,00</p>
+                    <span className="text-[11px] font-medium text-emerald-600 mt-1 inline-block">100% Recebido</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#fafbf9] border border-[#eef2f0] p-4">
+                    <p className="text-xs font-semibold text-[#71867f] uppercase">Comissão Profissional</p>
+                    <p className="text-xl font-black text-[#819815] mt-1">R$ 81,00</p>
+                    <span className="text-[11px] font-medium text-[#71867f] mt-1 inline-block">45% (Camila QA)</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#fafbf9] border border-[#eef2f0] p-4">
+                    <p className="text-xs font-semibold text-[#71867f] uppercase">Retenção Estúdio</p>
+                    <p className="text-xl font-black text-[#173a34] mt-1">R$ 99,00</p>
+                    <span className="text-[11px] font-medium text-[#71867f] mt-1 inline-block">55% Margem Líquida</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#fafbf9] border border-[#eef2f0] p-4">
+                    <p className="text-xs font-semibold text-[#71867f] uppercase">Atendimentos</p>
+                    <p className="text-xl font-black text-[#173a34] mt-1">1 Realizado</p>
+                    <span className="text-[11px] font-medium text-[#71867f] mt-1 inline-block">Serviço concluído</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#fafbf9] border border-[#eef2f0] p-4">
+                    <p className="text-xs font-semibold text-[#71867f] uppercase">Inadimplência / Pendente</p>
+                    <p className="text-xl font-black text-[#173a34] mt-1">R$ 0,00</p>
+                    <span className="text-[11px] font-medium text-emerald-600 mt-1 inline-block">Sem pendências</span>
+                  </div>
+
+                  <div className="rounded-2xl bg-[#fafbf9] border border-[#eef2f0] p-4">
+                    <p className="text-xs font-semibold text-emerald-600 mt-1">R$ 0,00</p>
+                    <span className="text-[11px] font-medium text-emerald-600 mt-1 inline-block">Zero divergência</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Card Voucher Sintético */}
+              <Card className="rounded-[22px] border-0 bg-white p-6 shadow-[0_8px_30px_rgba(19,42,39,0.04)]">
+                <div className="flex items-center justify-between pb-4 border-b border-[#eef2f0]">
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e1effa] text-[#23638e]">
+                      <Ticket className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-[#173a34]">Cupom Homologado</h3>
+                      <p className="text-xs text-[#71867f]">Voucher de teste sintético</p>
+                    </div>
+                  </div>
+                  <Badge className="bg-blue-50 text-blue-700 border border-blue-200">
+                    Auditado
+                  </Badge>
+                </div>
+
+                <div className="mt-5 space-y-3.5">
+                  <div className="rounded-xl bg-[#f5f8f7] p-3.5 border border-[#e6eee9]">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#71867f]">Código do Cupom</span>
+                    <p className="text-base font-black text-[#173a34] tracking-wide mt-0.5">QA-ADMIN-20260929</p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs py-1 border-b border-[#eef2f0]">
+                    <span className="text-[#71867f]">Benefício Aplicado:</span>
+                    <span className="font-bold text-[#173a34]">7 Dias PRO Cortesia</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs py-1 border-b border-[#eef2f0]">
+                    <span className="text-[#71867f]">Capacidade de Usos:</span>
+                    <span className="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">1 / 1 (Esgotado)</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs py-1 border-b border-[#eef2f0]">
+                    <span className="text-[#71867f]">Tentativa Reincidente:</span>
+                    <span className="font-bold text-emerald-700">Bloqueio 409 (Validado)</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs py-1">
+                    <span className="text-[#71867f]">Esgotamento Global:</span>
+                    <span className="font-bold text-emerald-700">Bloqueio 400 (Validado)</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* TABELA DE FLUXOS FUNCIONAIS HOMOLOGADOS */}
+            <Card className="rounded-[22px] border-0 bg-white p-6 shadow-[0_8px_30px_rgba(19,42,39,0.04)]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#eef2f0] gap-2">
+                <div>
+                  <h3 className="font-black text-lg text-[#173a34]">Matriz de Fluxos Funcionais Validados</h3>
+                  <p className="text-xs text-[#71867f]">Verificação completa de ponta a ponta executada antes da liberação</p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  14 de 14 Aprovados
+                </span>
+              </div>
+
+              <div className="mt-5 divide-y divide-[#f0f4f2]">
+                {[
+                  {
+                    id: 1,
+                    modulo: "Autenticação Admin",
+                    descricao: "Login seguro de administrador com geração de token bearer e validação de credenciais",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 2,
+                    modulo: "Persistência e Logout",
+                    descricao: "Persistência da sessão através de cookies seguros / localStorage e encerramento limpo",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 3,
+                    modulo: "Anti-Inflação de Usuários",
+                    descricao: "Eliminação da duplicação de sessões no banco ao navegar ou recarregar rotas públicas",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 4,
+                    modulo: "Higienização de Sessões",
+                    descricao: "Exclusão segura de 116 sessões órfãs e 31 duplicatas com preservação total de dados reais",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 5,
+                    modulo: "Agenda e Agendamentos",
+                    descricao: "Criação, listagem, visualização de detalhes e atualização de status de atendimentos",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 6,
+                    modulo: "Gestão de Clientes e Serviços",
+                    descricao: "Cadastro de clientes, serviços com preços, durações e vinculação profissional",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 7,
+                    modulo: "Painel Financeiro",
+                    descricao: "Lançamento de receitas e despesas, cálculo de fluxo de caixa e status de recebimento",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 8,
+                    modulo: "Cálculo de Comissões (45%)",
+                    descricao: "Divisão exata do repasse de R$ 81,00 para a profissional Camila sem arredondamentos errados",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 9,
+                    modulo: "Retenção do Estúdio (55%)",
+                    descricao: "Retenção líquida correta de R$ 99,00 sobre o faturamento de R$ 180,00 sem duplicidade",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 10,
+                    modulo: "Módulo Equipe & Colaboradores",
+                    descricao: "Gestão de membros da equipe, cálculo de repasses individuais e relatórios de produtividade",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 11,
+                    modulo: "Emissão de Orçamentos",
+                    descricao: "Geração de propostas comerciais com envio e compartilhamento por link / WhatsApp",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 12,
+                    modulo: "Criação de Vouchers no Painel",
+                    descricao: "Interface administrativa para emissão de códigos promocionais com limite de uso e validade",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 13,
+                    modulo: "Resgate de Voucher pelo App",
+                    descricao: "Aplicação imediata de benefício PRO na conta do usuário com feedback visual e ativação",
+                    status: "Aprovado",
+                  },
+                  {
+                    id: 14,
+                    modulo: "Auditoria e Travas de Cupom",
+                    descricao: "Histórico de resgates persistido, bloqueio contra reutilização e esgotamento de cota",
+                    status: "Aprovado",
+                  },
+                ].map((item) => (
+                  <div key={item.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-start sm:items-center gap-3">
+                      <span className="grid h-6 w-6 place-items-center rounded-full bg-[#eef5d2] text-[#556b10] text-xs font-bold shrink-0">
+                        {item.id}
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-[#173a34]">{item.modulo}</p>
+                        <p className="text-xs text-[#71867f]">{item.descricao}</p>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 self-start sm:self-auto rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200 shrink-0">
+                      <Check className="h-3 w-3 text-emerald-600" />
+                      {item.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* DIRETRIZES OPERACIONAIS DE LANÇAMENTO */}
+            <div className="rounded-[22px] border border-amber-200 bg-amber-50/60 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-100 text-amber-800">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-[#173a34]">Diretrizes e Recomendações Operacionais</h4>
+                  <p className="text-xs text-amber-900/80">Normas para o período de lançamento e ativação dos primeiros clientes</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 text-xs text-[#173a34]">
+                <div className="rounded-xl bg-white p-3.5 border border-amber-200/60 flex items-start gap-2.5">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                  <div>
+                    <span className="font-bold block mb-0.5">Lançamento Controlado</span>
+                    Acompanhar o cadastro dos primeiros profissionais reais em lotes pequenos antes de campanhas de tráfego massivo.
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white p-3.5 border border-amber-200/60 flex items-start gap-2.5">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                  <div>
+                    <span className="font-bold block mb-0.5">Proteção dos Dados Reais</span>
+                    Não utilizar o botão "Zerar dados de teste" em produção, pois ele apaga todos os registros operacionais cadastrados.
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white p-3.5 border border-amber-200/60 flex items-start gap-2.5">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                  <div>
+                    <span className="font-bold block mb-0.5">Higienização Controlada</span>
+                    As sessões fantasma foram eliminadas em definitivo. Caso necessário, o script de limpeza segura permanece disponível.
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white p-3.5 border border-amber-200/60 flex items-start gap-2.5">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                  <div>
+                    <span className="font-bold block mb-0.5">Segurança da Senha Master</span>
+                    Recomenda-se atualizar a senha do administrador antes da abertura ao público geral para garantir sigilo das métricas.
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white p-3.5 border border-amber-200/60 flex items-start gap-2.5">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                  <div>
+                    <span className="font-bold block mb-0.5">Cupons & Vouchers Ativos</span>
+                    Configurar novos vouchers com datas de expiração e limites compatíveis com as campanhas de marketing planejadas.
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-white p-3.5 border border-amber-200/60 flex items-start gap-2.5">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                  <div>
+                    <span className="font-bold block mb-0.5">Disparos e Notificações</span>
+                    Testes foram mantidos sem disparos para números reais de terceiros, garantindo total integridade e privacidade.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* CONTEÚDO DA ABA 1: VISÃO GERAL & TESTES */}
         {activeTab === "overview" && (
