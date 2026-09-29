@@ -35,6 +35,11 @@ import {
   Ticket,
   Crown,
   Plus,
+  ExternalLink,
+  Globe,
+  BookOpen,
+  Gift,
+  ArrowUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -46,7 +51,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState("admin@123456");
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "vouchers" | "marketing" | "simulator">("vouchers");
+  const [activeTab, setActiveTab] = useState<"overview" | "vouchers" | "marketing" | "simulator" | "screens">("screens");
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
 
   // Voucher form states
@@ -256,12 +261,29 @@ export default function AdminPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Link href="/app">
-              <Button variant="outline" className="h-9 rounded-xl border-[#dce5dc] text-xs font-semibold text-[#38584f]">
-                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> Ir para Meu Espaço
-              </Button>
-            </Link>
+          <div className="flex items-center gap-2">
+            <a
+              href="/planos"
+              target="_blank"
+              rel="noreferrer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#d9f56a] bg-[#f7fbe8] hover:bg-[#edf7d7] text-xs font-bold text-[#173a34] transition shadow-2xs"
+              title="Abrir página de Planos e Checkout PIX em nova aba"
+            >
+              <CreditCard className="h-3.5 w-3.5 text-[#8aa500]" />
+              <span>Ver Planos</span>
+              <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+            </a>
+            <a
+              href="/app"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f2f7f0] text-xs font-semibold text-[#173a34] transition shadow-2xs"
+              title="Abrir área de trabalho do autônomo em nova aba"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5 text-[#2d7d54]" />
+              <span>Meu Espaço</span>
+              <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+            </a>
             <Button
               variant="ghost"
               onClick={() => logoutMutation.mutate()}
@@ -281,7 +303,7 @@ export default function AdminPage() {
               Painel de Controle e Gestão
             </h1>
             <p className="mt-1 text-sm text-[#71867f]">
-              Monitore métricas de teste, zere dados quando necessário e consulte o roteiro de vendas da plataforma.
+              Monitore métricas de teste, zere dados quando necessário, gerencie cupons e acesse qualquer tela da plataforma.
             </p>
           </div>
 
@@ -322,8 +344,125 @@ export default function AdminPage() {
           )}
         </div>
 
+        {/* BANNER DE ACESSO RÁPIDO A TODAS AS JANELAS */}
+        <div className="rounded-2xl border border-[#dce5dc] bg-white p-4 shadow-xs">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eef5d2] text-[#819815]">
+                <Globe className="h-4 w-4" />
+              </span>
+              <div>
+                <span className="text-xs font-bold text-[#173a34] block">
+                  Central de Acesso Rápido às Janelas do Aplicativo
+                </span>
+                <span className="text-[11px] text-[#71867f]">
+                  Clique para abrir qualquer parte do sistema diretamente em uma nova aba:
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+              <a
+                href="/planos"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#d9f56a] bg-[#f7fbe8] hover:bg-[#edf7d7] text-[#173a34] transition shadow-2xs"
+              >
+                <CreditCard className="h-3.5 w-3.5 text-[#8aa500]" />
+                <span>Planos & PIX</span>
+                <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+              </a>
+              <a
+                href="/app"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f2f7f0] text-[#173a34] transition shadow-2xs"
+              >
+                <LayoutDashboard className="h-3.5 w-3.5 text-[#2d7d54]" />
+                <span>Meu Espaço</span>
+                <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+              </a>
+              <a
+                href="/agenda"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f2f7f0] text-[#173a34] transition shadow-2xs"
+              >
+                <Calendar className="h-3.5 w-3.5 text-[#2d7d54]" />
+                <span>Agenda</span>
+                <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+              </a>
+              <a
+                href="/orcamentos"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f2f7f0] text-[#173a34] transition shadow-2xs"
+              >
+                <FileText className="h-3.5 w-3.5 text-[#2d7d54]" />
+                <span>Orçamentos</span>
+                <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+              </a>
+              <a
+                href="/financeiro"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f2f7f0] text-[#173a34] transition shadow-2xs"
+              >
+                <DollarSign className="h-3.5 w-3.5 text-[#2d7d54]" />
+                <span>Financeiro</span>
+                <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+              </a>
+              <a
+                href="/cartao"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f2f7f0] text-[#173a34] transition shadow-2xs"
+              >
+                <Smartphone className="h-3.5 w-3.5 text-[#2d7d54]" />
+                <span>Cartão Digital</span>
+                <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+              </a>
+              <a
+                href="/demo"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f2f7f0] text-[#173a34] transition shadow-2xs"
+              >
+                <Video className="h-3.5 w-3.5 text-[#2d7d54]" />
+                <span>Vídeo Demo</span>
+                <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+              </a>
+              <a
+                href="/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f2f7f0] text-[#173a34] transition shadow-2xs"
+              >
+                <Globe className="h-3.5 w-3.5 text-[#2d7d54]" />
+                <span>Página Inicial</span>
+                <ArrowUpRight className="h-3 w-3 text-[#71867f]" />
+              </a>
+            </div>
+          </div>
+        </div>
+
         {/* NAVEGAÇÃO ENTRE ABAS */}
         <div className="flex flex-wrap border-b border-[#dce5dc] gap-2 pb-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab("screens")}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition -mb-[2px] cursor-pointer ${
+              activeTab === "screens"
+                ? "border-[#173a34] text-[#173a34] bg-white rounded-t-2xl shadow-xs"
+                : "border-transparent text-[#71867f] hover:text-[#173a34]"
+            }`}
+          >
+            <Globe className="h-4 w-4 text-[#8aa500]" />
+            <span>Janelas & Telas do Sistema</span>
+            <span className="rounded-full bg-[#173a34] px-2 py-0.5 text-[10px] font-bold text-[#d9f56a]">
+              Todas
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => setActiveTab("simulator")}
@@ -1402,6 +1541,225 @@ Quer ativar para experimentar no seu próximo serviço?`}
 
         {/* CONTEÚDO DA ABA 3: SIMULADOR VISUAL DE EXPERIÊNCIA */}
         {activeTab === "simulator" && <SimulatorTour />}
+
+        {/* CONTEÚDO DA ABA: TODAS AS JANELAS & TELAS DO SISTEMA */}
+        {activeTab === "screens" && (
+          <div className="space-y-6">
+            <div className="rounded-[28px] border border-[#d2e4b8] bg-linear-to-r from-[#f7fbe8] via-[#f0f8df] to-[#e6f3d0] p-6 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#173a34] text-[#d9f56a] shadow-sm">
+                    <Globe className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#173a34]">
+                      Central Executiva de Janelas e Telas do MeuAutônomo
+                    </h3>
+                    <p className="text-xs text-[#526d64] mt-0.5 max-w-2xl">
+                      Acesse, teste e inspecione diretamente qualquer tela da aplicação com um único clique. Todos os links estão prontos e operacionais em produção.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/planos"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#173a34] hover:bg-[#28564d] text-white text-xs font-bold transition shadow-xs cursor-pointer"
+                  >
+                    <CreditCard className="h-4 w-4 text-[#d9f56a]" />
+                    <span>Ver Página de Planos</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 text-white/60" />
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* GRID DAS JANELAS */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                {
+                  title: "Planos & Upgrade (Checkout PIX)",
+                  path: "/planos",
+                  badge: "Monetização",
+                  badgeColor: "bg-[#d9f56a] text-[#173a34]",
+                  icon: CreditCard,
+                  desc: "Página oficial de planos: Grátis (R$ 0), PRO Solo (R$ 49,90 vitalício) e PRO Equipe (R$ 89,90), com resgate de voucher e simulação de webhook do Asaas.",
+                },
+                {
+                  title: "Simulador Visual dos Fluxos",
+                  action: () => setActiveTab("simulator"),
+                  isInternal: true,
+                  badge: "Demonstração",
+                  badgeColor: "bg-[#e1f5ec] text-[#1c784e]",
+                  icon: Sparkles,
+                  desc: "Simula o fluxo completo da plataforma: do orçamento no WhatsApp à aprovação com QR Code PIX e recibo digital.",
+                },
+                {
+                  title: "Visão Geral (Meu Espaço)",
+                  path: "/app",
+                  badge: "Área Logada",
+                  badgeColor: "bg-blue-100 text-blue-900",
+                  icon: LayoutDashboard,
+                  desc: "Painel central do autônomo com resumo diário, faturamento do mês, próximos clientes e atalhos rápidos.",
+                },
+                {
+                  title: "Meu Dia (Operacional)",
+                  path: "/meu-dia",
+                  badge: "Rotina Diária",
+                  badgeColor: "bg-amber-100 text-amber-900",
+                  icon: Clock,
+                  desc: "Tela otimizada para o celular focada exclusivamente nos atendimentos e tarefas marcadas para hoje.",
+                },
+                {
+                  title: "Agenda de Atendimentos",
+                  path: "/agenda",
+                  badge: "Calendário",
+                  badgeColor: "bg-emerald-100 text-emerald-900",
+                  icon: Calendar,
+                  desc: "Calendário de compromissos com controle de status (agendado, confirmado, concluído) e configuração de disponibilidade.",
+                },
+                {
+                  title: "Orçamentos & Propostas",
+                  path: "/orcamentos",
+                  badge: "Vendas",
+                  badgeColor: "bg-purple-100 text-purple-900",
+                  icon: FileText,
+                  desc: "Emissor de orçamentos com fotos, itens, totais, link público para o cliente aprovar e chave PIX automática.",
+                },
+                {
+                  title: "Controle Financeiro",
+                  path: "/financeiro",
+                  badge: "Fluxo de Caixa",
+                  badgeColor: "bg-emerald-100 text-emerald-900",
+                  icon: DollarSign,
+                  desc: "Gestão de receitas, custos com materiais, lucro líquido do mês, pendências e histórico financeiro.",
+                },
+                {
+                  title: "Gestão de Clientes",
+                  path: "/clientes",
+                  badge: "CRM Simples",
+                  badgeColor: "bg-slate-100 text-slate-800",
+                  icon: Users,
+                  desc: "Cadastro completo de clientes com histórico de serviços prestados, orçamentos e botão de WhatsApp direto.",
+                },
+                {
+                  title: "Catálogo de Serviços",
+                  path: "/servicos",
+                  badge: "Tabela de Preços",
+                  badgeColor: "bg-sky-100 text-sky-900",
+                  icon: Target,
+                  desc: "Lista de serviços prestados com nome, preço, tempo de execução e permissão de agendamento online.",
+                },
+                {
+                  title: "Equipe & Parceiros (Salões)",
+                  path: "/equipe",
+                  badge: "Plano Equipe",
+                  badgeColor: "bg-pink-100 text-pink-900",
+                  icon: Users,
+                  desc: "Gestão de colaboradoras com divisão de comissão, sem expor faturamento do dono e com link seguro individual.",
+                },
+                {
+                  title: "Cartão de Visitas Digital & Bio",
+                  path: "/cartao",
+                  badge: "Marketing",
+                  badgeColor: "bg-lime-100 text-lime-900",
+                  icon: Smartphone,
+                  desc: "Página pública com foto, bio, botões de WhatsApp, localização e QR Code pronto para impressão em balcão.",
+                },
+                {
+                  title: "Guia Passo a Passo (Tutorial)",
+                  path: "/guia",
+                  badge: "Tutorial",
+                  badgeColor: "bg-yellow-100 text-yellow-900",
+                  icon: BookOpen,
+                  desc: "Manual interativo ensinando o profissional a usar cada função do sistema em poucos minutos.",
+                },
+                {
+                  title: "Vídeo / Reels de Demonstração",
+                  path: "/demo",
+                  badge: "Pitch Comercial",
+                  badgeColor: "bg-rose-100 text-rose-900",
+                  icon: Video,
+                  desc: "Vídeo vertical para redes sociais demonstrando as vantagens práticas do aplicativo para atrair novos profissionais.",
+                },
+                {
+                  title: "Página Inicial Pública",
+                  path: "/",
+                  badge: "Landing Page",
+                  badgeColor: "bg-teal-100 text-teal-900",
+                  icon: Globe,
+                  desc: "Página de entrada da plataforma com proposta de valor, apresentação de recursos e formulário de cadastro.",
+                },
+              ].map((screen, idx) => (
+                <Card
+                  key={idx}
+                  className="rounded-[24px] border border-[#dce5dc] bg-white p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#f4f7f1] text-[#173a34]">
+                        <screen.icon className="h-5 w-5 text-[#2d7d54]" />
+                      </div>
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${screen.badgeColor}`}>
+                        {screen.badge}
+                      </span>
+                    </div>
+
+                    <h4 className="text-base font-bold text-[#173a34]">
+                      {screen.title}
+                    </h4>
+
+                    {screen.path && (
+                      <p className="font-mono text-[11px] text-[#7a961f] font-semibold mt-0.5">
+                        {screen.path}
+                      </p>
+                    )}
+
+                    <p className="text-xs text-[#6e857e] mt-2 leading-relaxed">
+                      {screen.desc}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-[#edf1eb] flex items-center justify-between gap-2">
+                    {screen.isInternal ? (
+                      <Button
+                        type="button"
+                        onClick={screen.action}
+                        className="w-full h-10 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] text-xs font-bold shadow-2xs cursor-pointer"
+                      >
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#d9f56a]" />
+                        Abrir Simulador Agora
+                      </Button>
+                    ) : (
+                      <>
+                        <a
+                          href={screen.path}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-[#173a34] hover:bg-[#28564d] text-white text-xs font-bold transition shadow-2xs"
+                        >
+                          <span>Abrir em Nova Aba</span>
+                          <ArrowUpRight className="h-3.5 w-3.5 text-white/70" />
+                        </a>
+                        <Link href={screen.path!}>
+                          <Button
+                            variant="outline"
+                            className="h-10 px-3 rounded-xl border-[#dce5dc] text-xs font-semibold text-[#38584f]"
+                            title="Navegar diretamente"
+                          >
+                            Ir
+                          </Button>
+                        </Link>
+                      </>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* MODAL DE CONFIRMAÇÃO DE RESET SEGURO */}
