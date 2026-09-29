@@ -1829,6 +1829,199 @@ function modeloOrcamentoAprovado(params) {
 
 // server/routers.ts
 import crypto2 from "node:crypto";
+
+// server/billingRules.ts
+function isBillableAppointment(status) {
+  return status !== "cancelado" && status !== "faltou";
+}
+function isCountableAppointment(status) {
+  return status !== "cancelado" && status !== "faltou";
+}
+function isCommissionEligible(status) {
+  return status !== "cancelado" && status !== "faltou";
+}
+function calculateCommissionAndStudio(amountCents, commissionPercent) {
+  const safePercent = Math.max(0, Math.min(100, Math.round(commissionPercent)));
+  const commissionCents = Math.round(amountCents * safePercent / 100);
+  const studioCents = amountCents - commissionCents;
+  return { commissionCents, studioCents };
+}
+function calculateDeduplicatedMetrics(appointments2, payments2, expenses2 = []) {
+  const billableApps = appointments2.filter((a) => isBillableAppointment(a.status));
+  const appointmentCount = appointments2.filter((a) => isCountableAppointment(a.status)).length;
+  const paymentsByAppId = /* @__PURE__ */ new Map();
+  const unlinkedPayments = [];
+  const explicitlyLinkedPaymentIds = /* @__PURE__ */ new Set();
+  for (const pay of payments2) {
+    if (pay.appointmentId) {
+      if (!paymentsByAppId.has(pay.appointmentId)) {
+        paymentsByAppId.set(pay.appointmentId, []);
+      }
+      paymentsByAppId.get(pay.appointmentId).push(pay);
+      explicitlyLinkedPaymentIds.add(pay.id);
+    }
+  }
+  for (const pay of payments2) {
+    if (explicitlyLinkedPaymentIds.has(pay.id)) continue;
+    let matchedApp;
+    if (pay.clientId) {
+      matchedApp = billableApps.find(
+        (a) => a.clientId === pay.clientId && (!paymentsByAppId.has(a.id) || paymentsByAppId.get(a.id).length === 0) && (pay.serviceId ? a.serviceId === pay.serviceId : true)
+      );
+    }
+    if (matchedApp) {
+      if (!paymentsByAppId.has(matchedApp.id)) {
+        paymentsByAppId.set(matchedApp.id, []);
+      }
+      paymentsByAppId.get(matchedApp.id).push(pay);
+    } else {
+      unlinkedPayments.push(pay);
+    }
+  }
+  let faturamentoCents = 0;
+  let recebidoCents = 0;
+  let pendenteCents = 0;
+  for (const app2 of billableApps) {
+    const appGross = app2.amountCents || 0;
+    faturamentoCents += appGross;
+    const linkedPays = paymentsByAppId.get(app2.id) || [];
+    if (linkedPays.length > 0) {
+      const paidSum = linkedPays.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      const appReceived = Math.min(appGross, paidSum);
+      recebidoCents += appReceived;
+      pendenteCents += Math.max(0, appGross - appReceived);
+    } else {
+      if (app2.paymentStatus === "pago" || app2.status === "concluido") {
+        recebidoCents += appGross;
+      } else {
+        pendenteCents += appGross;
+      }
+    }
+  }
+  for (const pay of unlinkedPayments) {
+    faturamentoCents += pay.amountCents;
+    if (pay.status === "pago") {
+      recebidoCents += pay.amountCents;
+    } else {
+      pendenteCents += pay.amountCents;
+    }
+  }
+  const despesasCents = expenses2.reduce((sum, e) => sum + (e.amountCents || 0), 0);
+  const saldoCents = recebidoCents - despesasCents;
+  return {
+    faturamentoCents,
+    recebidoCents,
+    pendenteCents,
+    despesasCents,
+    saldoCents,
+    appointmentCount
+  };
+}
+function calculateTeamReport(members, appointments2, payments2, expenses2 = []) {
+  const billableApps = appointments2.filter((a) => isCommissionEligible(a.status));
+  const paymentsByAppId = /* @__PURE__ */ new Map();
+  const unlinkedPayments = [];
+  const explicitlyLinkedPaymentIds = /* @__PURE__ */ new Set();
+  for (const pay of payments2) {
+    if (pay.appointmentId) {
+      if (!paymentsByAppId.has(pay.appointmentId)) {
+        paymentsByAppId.set(pay.appointmentId, []);
+      }
+      paymentsByAppId.get(pay.appointmentId).push(pay);
+      explicitlyLinkedPaymentIds.add(pay.id);
+    }
+  }
+  for (const pay of payments2) {
+    if (explicitlyLinkedPaymentIds.has(pay.id)) continue;
+    let matchedApp;
+    if (pay.clientId) {
+      matchedApp = billableApps.find(
+        (a) => a.clientId === pay.clientId && (!paymentsByAppId.has(a.id) || paymentsByAppId.get(a.id).length === 0) && (pay.serviceId ? a.serviceId === pay.serviceId : true)
+      );
+    }
+    if (matchedApp) {
+      if (!paymentsByAppId.has(matchedApp.id)) {
+        paymentsByAppId.set(matchedApp.id, []);
+      }
+      paymentsByAppId.get(matchedApp.id).push(pay);
+    } else {
+      unlinkedPayments.push(pay);
+    }
+  }
+  const consolidatedPayments = [];
+  for (const app2 of billableApps) {
+    const linkedPays = paymentsByAppId.get(app2.id) || [];
+    const effectiveTeamMemberId = app2.teamMemberId || linkedPays.find((p) => p.teamMemberId)?.teamMemberId || null;
+    const member = members.find((m) => m.id === effectiveTeamMemberId);
+    const commPct = member?.commissionPercent ?? 50;
+    const commAmount = Math.round((app2.amountCents || 0) * commPct / 100);
+    const studioAmount = (app2.amountCents || 0) - commAmount;
+    let isPaid = app2.paymentStatus === "pago" || app2.status === "concluido";
+    let paidSum = 0;
+    if (linkedPays.length > 0) {
+      paidSum = linkedPays.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      isPaid = isPaid || paidSum >= app2.amountCents;
+    }
+    consolidatedPayments.push({
+      id: linkedPays[0]?.id || -app2.id,
+      profileId: app2.profileId,
+      appointmentId: app2.id,
+      clientId: app2.clientId,
+      serviceId: app2.serviceId,
+      teamMemberId: effectiveTeamMemberId,
+      amountCents: app2.amountCents,
+      commissionPercent: commPct,
+      commissionAmountCents: commAmount,
+      studioAmountCents: studioAmount,
+      status: isPaid ? "pago" : "pendente",
+      method: linkedPays[0]?.method || app2.paymentMethod || "pix",
+      createdAt: linkedPays[0]?.createdAt || app2.startsAt
+    });
+  }
+  for (const pay of unlinkedPayments) {
+    consolidatedPayments.push(pay);
+  }
+  const breakdown = members.map((m) => {
+    const memberItems = consolidatedPayments.filter((p) => p.teamMemberId === m.id);
+    const grossCents = memberItems.reduce((sum, p) => sum + (p.amountCents || 0), 0);
+    const receivedCents = memberItems.filter((p) => p.status === "pago").reduce((sum, p) => sum + (p.amountCents || 0), 0);
+    const commissionCents = memberItems.reduce((sum, p) => {
+      if (p.commissionAmountCents !== void 0 && p.commissionAmountCents !== null && p.commissionAmountCents > 0) {
+        return sum + p.commissionAmountCents;
+      }
+      return sum + Math.round((p.amountCents || 0) * m.commissionPercent / 100);
+    }, 0);
+    const studioCents = grossCents - commissionCents;
+    const count = memberItems.filter((p) => p.appointmentId).length;
+    return {
+      member: m,
+      count,
+      grossCents,
+      receivedCents,
+      commissionCents,
+      studioCents,
+      commissionPercent: m.commissionPercent
+    };
+  });
+  const totalGrossCents = breakdown.reduce((sum, b) => sum + b.grossCents, 0);
+  const totalReceivedCents = breakdown.reduce((sum, b) => sum + b.receivedCents, 0);
+  const totalCommissionCents = breakdown.reduce((sum, b) => sum + b.commissionCents, 0);
+  const totalStudioNetCents = totalGrossCents - totalCommissionCents;
+  const totalExpensesCents = expenses2.reduce((sum, e) => sum + (e.amountCents || 0), 0);
+  const finalProfitCents = totalStudioNetCents - totalExpensesCents;
+  return {
+    totalGrossCents,
+    totalReceivedCents,
+    totalCommissionCents,
+    totalStudioNetCents,
+    totalExpensesCents,
+    finalProfitCents,
+    breakdown,
+    payments: consolidatedPayments
+  };
+}
+
+// server/routers.ts
 function hashPassword(password) {
   const salt = crypto2.randomBytes(16).toString("hex");
   const hash = crypto2.scryptSync(password, salt, 64).toString("hex");
@@ -2523,7 +2716,7 @@ var appRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const quote = (await db.select().from(quotes).where(eq3(quotes.secureToken, input.token)).limit(1))[0];
-      if (!quote) throw new TRPCError3({ code: "NOT_FOUND", message: "Or\xE7amento n\xE3o encontrado." });
+      if (!quote || quote.status === "rascunho") throw new TRPCError3({ code: "FORBIDDEN", message: "Este or\xE7amento est\xE1 em rascunho e n\xE3o pode receber respostas p\xFAblicas." });
       const updateData = { status: input.action, respondedAt: /* @__PURE__ */ new Date() };
       if (input.action === "alteracao_solicitada" && input.changeRequestText) {
         updateData.changeRequest = input.changeRequestText;
@@ -2600,7 +2793,18 @@ var appRouter = router({
       const conditions = [eq3(payments.profileId, profile.id)];
       if (input?.from) conditions.push(gte(payments.createdAt, new Date(input.from)));
       if (input?.to) conditions.push(lt(payments.createdAt, new Date(input.to)));
-      return db.select().from(payments).where(and2(...conditions)).orderBy(desc2(payments.createdAt));
+      const [rows, profileClients, profileServices] = await Promise.all([
+        db.select().from(payments).where(and2(...conditions)).orderBy(desc2(payments.createdAt)),
+        db.select({ id: clients.id, name: clients.name }).from(clients).where(eq3(clients.profileId, profile.id)),
+        db.select({ id: services.id, name: services.name }).from(services).where(eq3(services.profileId, profile.id))
+      ]);
+      const clientMap = new Map(profileClients.map((c) => [c.id, c.name]));
+      const serviceMap = new Map(profileServices.map((s) => [s.id, s.name]));
+      return rows.map((r) => ({
+        ...r,
+        clientName: r.clientId ? clientMap.get(r.clientId) || null : null,
+        serviceName: r.serviceId ? serviceMap.get(r.serviceId) || null : null
+      }));
     }),
     create: protectedProcedure.input(z2.object({
       appointmentId: z2.number().optional(),
@@ -2614,25 +2818,50 @@ var appRouter = router({
       paidAt: z2.string().datetime().optional()
     })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       if (input.clientId) await getOwnedClient(profile.id, input.clientId);
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      let resolvedAppointmentId = input.appointmentId ?? null;
+      let resolvedClientId = input.clientId ?? null;
+      let resolvedServiceId = input.serviceId ?? null;
+      let resolvedTeamMemberId = input.teamMemberId ?? null;
+      if (resolvedAppointmentId) {
+        const appRow = (await db.select().from(appointments).where(and2(eq3(appointments.id, resolvedAppointmentId), eq3(appointments.profileId, profile.id))).limit(1))[0];
+        if (appRow) {
+          if (!resolvedClientId && appRow.clientId) resolvedClientId = appRow.clientId;
+          if (!resolvedServiceId && appRow.serviceId) resolvedServiceId = appRow.serviceId;
+          if (!resolvedTeamMemberId && appRow.teamMemberId) resolvedTeamMemberId = appRow.teamMemberId;
+        }
+      } else if (resolvedClientId) {
+        const candidateApps = await db.select().from(appointments).where(and2(
+          eq3(appointments.profileId, profile.id),
+          eq3(appointments.clientId, resolvedClientId),
+          ne(appointments.status, "cancelado")
+        )).orderBy(desc2(appointments.startsAt));
+        const matched = candidateApps.find((a) => (resolvedServiceId ? a.serviceId === resolvedServiceId : true) && a.amountCents === input.amountCents && a.paymentStatus !== "pago") || candidateApps.find((a) => (resolvedServiceId ? a.serviceId === resolvedServiceId : true) && a.paymentStatus !== "pago") || candidateApps.find((a) => a.paymentStatus !== "pago");
+        if (matched) {
+          resolvedAppointmentId = matched.id;
+          if (!resolvedServiceId && matched.serviceId) resolvedServiceId = matched.serviceId;
+          if (!resolvedTeamMemberId && matched.teamMemberId) resolvedTeamMemberId = matched.teamMemberId;
+        }
+      }
       let commissionPercent = 0;
       let commissionAmountCents = 0;
       let studioAmountCents = input.amountCents;
-      if (input.teamMemberId) {
-        const member = await getOwnedTeamMember(profile.id, input.teamMemberId);
+      if (resolvedTeamMemberId) {
+        const member = await getOwnedTeamMember(profile.id, resolvedTeamMemberId);
         commissionPercent = member.commissionPercent;
-        commissionAmountCents = Math.round(input.amountCents * commissionPercent / 100);
-        studioAmountCents = input.amountCents - commissionAmountCents;
+        const comm = calculateCommissionAndStudio(input.amountCents, commissionPercent);
+        commissionAmountCents = comm.commissionCents;
+        studioAmountCents = comm.studioCents;
       }
-      const db = await getDb();
-      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       await db.insert(payments).values({
         profileId: profile.id,
-        teamMemberId: input.teamMemberId ?? null,
-        appointmentId: input.appointmentId ?? null,
-        clientId: input.clientId ?? null,
-        serviceId: input.serviceId ?? null,
+        teamMemberId: resolvedTeamMemberId,
+        appointmentId: resolvedAppointmentId,
+        clientId: resolvedClientId,
+        serviceId: resolvedServiceId,
         amountCents: input.amountCents,
         commissionPercent: commissionPercent || null,
         commissionAmountCents,
@@ -2643,11 +2872,12 @@ var appRouter = router({
         note: input.note ?? null,
         paidAt: input.paidAt ? new Date(input.paidAt) : input.status === "pago" ? /* @__PURE__ */ new Date() : null
       });
-      if (input.appointmentId) {
+      if (resolvedAppointmentId) {
         await db.update(appointments).set({
           paymentStatus: input.status,
-          teamMemberId: input.teamMemberId ?? void 0
-        }).where(and2(eq3(appointments.id, input.appointmentId), eq3(appointments.profileId, profile.id)));
+          paymentMethod: input.method,
+          teamMemberId: resolvedTeamMemberId ?? void 0
+        }).where(and2(eq3(appointments.id, resolvedAppointmentId), eq3(appointments.profileId, profile.id)));
       }
       return { success: true };
     })
@@ -2754,74 +2984,17 @@ var appRouter = router({
       if (input?.to) appConditions.push(lt(appointments.startsAt, new Date(input.to)));
       if (input?.teamMemberId) appConditions.push(eq3(appointments.teamMemberId, input.teamMemberId));
       const periodAppointments = await db.select().from(appointments).where(and2(...appConditions));
-      const linkedAppIds = new Set(periodPayments.map((p) => p.appointmentId).filter(Boolean));
-      const combinedPayments = [...periodPayments];
-      for (const app2 of periodAppointments) {
-        if (app2.teamMemberId && !linkedAppIds.has(app2.id) && app2.amountCents > 0) {
-          const member = members.find((m) => m.id === app2.teamMemberId);
-          const commPct = member?.commissionPercent ?? 50;
-          const commAmount = Math.round(app2.amountCents * commPct / 100);
-          combinedPayments.push({
-            id: -app2.id,
-            profileId: profile.id,
-            teamMemberId: app2.teamMemberId,
-            appointmentId: app2.id,
-            clientId: app2.clientId,
-            serviceId: app2.serviceId,
-            amountCents: app2.amountCents,
-            commissionPercent: commPct,
-            commissionAmountCents: commAmount,
-            studioAmountCents: app2.amountCents - commAmount,
-            commissionPaid: false,
-            method: app2.paymentMethod || "pix",
-            status: app2.paymentStatus === "pago" || app2.status === "concluido" ? "pago" : "pendente",
-            note: app2.notes || null,
-            paidAt: app2.paymentStatus === "pago" ? new Date(app2.startsAt) : null,
-            createdAt: new Date(app2.startsAt),
-            updatedAt: new Date(app2.startsAt)
-          });
-        }
-      }
       const expConditions = [eq3(expenses.profileId, profile.id)];
       if (input?.from) expConditions.push(gte(expenses.occurredAt, new Date(input.from)));
       if (input?.to) expConditions.push(lt(expenses.occurredAt, new Date(input.to)));
       const periodExpenses = await db.select().from(expenses).where(and2(...expConditions));
-      const totalExpensesCents = periodExpenses.reduce((sum, e) => sum + e.amountCents, 0);
-      const breakdown = members.map((m) => {
-        const mPayments = combinedPayments.filter((p) => p.teamMemberId === m.id);
-        const grossCents = mPayments.reduce((sum, p) => sum + p.amountCents, 0);
-        const receivedCents = mPayments.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
-        const commissionCents = mPayments.filter((p) => p.status === "pago").reduce((sum, p) => {
-          if (p.commissionAmountCents > 0) return sum + p.commissionAmountCents;
-          return sum + Math.round(p.amountCents * m.commissionPercent / 100);
-        }, 0);
-        const studioCents = receivedCents - commissionCents;
-        const count = mPayments.length;
-        return {
-          member: m,
-          count,
-          grossCents,
-          receivedCents,
-          commissionCents,
-          studioCents,
-          commissionPercent: m.commissionPercent
-        };
-      });
-      const totalGrossCents = combinedPayments.reduce((sum, p) => sum + p.amountCents, 0);
-      const totalReceivedCents = combinedPayments.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
-      const totalCommissionCents = breakdown.reduce((sum, b) => sum + b.commissionCents, 0);
-      const totalStudioNetCents = totalReceivedCents - totalCommissionCents;
-      const finalProfitCents = totalStudioNetCents - totalExpensesCents;
-      return {
-        totalGrossCents,
-        totalReceivedCents,
-        totalCommissionCents,
-        totalStudioNetCents,
-        totalExpensesCents,
-        finalProfitCents,
-        breakdown,
-        payments: combinedPayments
-      };
+      const targetMembers = input?.teamMemberId ? members.filter((m) => m.id === input.teamMemberId) : members;
+      return calculateTeamReport(
+        targetMembers,
+        periodAppointments,
+        periodPayments,
+        periodExpenses
+      );
     })
   }),
   expense: router({
@@ -2886,18 +3059,7 @@ var appRouter = router({
         db.select().from(clients).where(and2(eq3(clients.profileId, profile.id), gte(clients.createdAt, from), lt(clients.createdAt, to))),
         db.select().from(services).where(eq3(services.profileId, profile.id))
       ]);
-      const linkedAppIds = new Set(periodPayments.map((p) => p.appointmentId).filter(Boolean));
-      let receivedCents = periodPayments.filter((item) => item.status === "pago").reduce((sum, item) => sum + item.amountCents, 0);
-      let pendingCents = periodPayments.filter((item) => item.status !== "pago").reduce((sum, item) => sum + item.amountCents, 0);
-      for (const app2 of periodAppointments) {
-        if (!linkedAppIds.has(app2.id) && app2.amountCents > 0) {
-          if (app2.paymentStatus === "pago" || app2.status === "concluido") {
-            receivedCents += app2.amountCents;
-          } else {
-            pendingCents += app2.amountCents;
-          }
-        }
-      }
+      const metrics = calculateDeduplicatedMetrics(periodAppointments, periodPayments);
       const counts = /* @__PURE__ */ new Map();
       for (const item of periodAppointments) if (item.serviceId) counts.set(item.serviceId, (counts.get(item.serviceId) || 0) + 1);
       const topServices = Array.from(counts.entries()).map(([serviceId, count]) => ({ serviceId, count, name: profileServices.find((service) => service.id === serviceId)?.name || "Servi\xE7o" })).sort((a, b) => b.count - a.count).slice(0, 5);
@@ -2905,7 +3067,7 @@ var appRouter = router({
       const clientVisitCounts = /* @__PURE__ */ new Map();
       for (const item of allClientAppointments) if (item.clientId) clientVisitCounts.set(item.clientId, (clientVisitCounts.get(item.clientId) || 0) + 1);
       const recurringClientIds = Array.from(clientVisitCounts.values()).filter((count) => count > 1).length;
-      return { from, to, revenueCents: receivedCents + pendingCents, receivedCents, pendingCents, appointmentCount: periodAppointments.length, newClients: periodClients.length, recurringClients: recurringClientIds, topServices };
+      return { from, to, revenueCents: metrics.faturamentoCents, receivedCents: metrics.recebidoCents, pendingCents: metrics.pendenteCents, appointmentCount: metrics.appointmentCount, newClients: periodClients.length, recurringClients: recurringClientIds, topServices };
     })
   }),
   dashboard: router({
@@ -2924,33 +3086,22 @@ var appRouter = router({
       const monthAppointments = await db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, periodFrom), lt(appointments.startsAt, periodTo), ne(appointments.status, "cancelado")));
       const monthPayments = await db.select().from(payments).where(and2(eq3(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lt(payments.createdAt, periodTo)));
       const monthExpenses = await db.select().from(expenses).where(and2(eq3(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lt(expenses.occurredAt, periodTo)));
-      const linkedAppIds = new Set(monthPayments.map((p) => p.appointmentId).filter(Boolean));
-      let received = monthPayments.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
-      let pending = monthPayments.filter((p) => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0);
-      for (const app2 of monthAppointments) {
-        if (!linkedAppIds.has(app2.id) && app2.amountCents > 0) {
-          if (app2.paymentStatus === "pago" || app2.status === "concluido") {
-            received += app2.amountCents;
-          } else {
-            pending += app2.amountCents;
-          }
-        }
-      }
-      const expensesCents = monthExpenses.reduce((sum, item) => sum + item.amountCents, 0);
-      const projected = today.reduce((sum, item) => sum + item.amountCents, 0);
+      const metrics = calculateDeduplicatedMetrics(monthAppointments, monthPayments, monthExpenses);
+      const projected = today.reduce((sum, item) => sum + (isBillableAppointment(item.status) ? item.amountCents : 0), 0);
       const seriesMap = /* @__PURE__ */ new Map();
       const ensureDay = (date) => {
         const key = date.toISOString().slice(0, 10);
         if (!seriesMap.has(key)) seriesMap.set(key, { date: key, receitas: 0, pendentes: 0, despesas: 0 });
         return seriesMap.get(key);
       };
+      const linkedAppIds = new Set(monthPayments.map((p) => p.appointmentId).filter(Boolean));
       for (const payment of monthPayments) {
         const day = ensureDay(new Date(payment.createdAt));
         if (payment.status === "pago") day.receitas += payment.amountCents;
         else day.pendentes += payment.amountCents;
       }
       for (const app2 of monthAppointments) {
-        if (!linkedAppIds.has(app2.id) && app2.amountCents > 0) {
+        if (!linkedAppIds.has(app2.id) && isBillableAppointment(app2.status) && app2.amountCents > 0) {
           const day = ensureDay(new Date(app2.startsAt));
           if (app2.paymentStatus === "pago" || app2.status === "concluido") day.receitas += app2.amountCents;
           else day.pendentes += app2.amountCents;
@@ -2961,7 +3112,22 @@ var appRouter = router({
         day.despesas += expense.amountCents;
       }
       const monthlySeries = Array.from(seriesMap.values()).sort((a, b) => a.date.localeCompare(b.date)).map((day, index, rows) => ({ ...day, saldo: rows.slice(0, index + 1).reduce((sum, item) => sum + item.receitas - item.despesas, 0) }));
-      return { profile, today, recentRequests, pendingQuotes, monthlySeries, metrics: { todayCount: today.filter((a) => a.status !== "cancelado").length, todayProjectedCents: projected, receivedCents: received, pendingCents: pending, monthRevenueCents: received + pending, expensesCents, balanceCents: received - expensesCents } };
+      return {
+        profile,
+        today,
+        recentRequests,
+        pendingQuotes,
+        monthlySeries,
+        metrics: {
+          todayCount: today.filter((a) => isCountableAppointment(a.status)).length,
+          todayProjectedCents: projected,
+          receivedCents: metrics.recebidoCents,
+          pendingCents: metrics.pendenteCents,
+          monthRevenueCents: metrics.faturamentoCents,
+          expensesCents: metrics.despesasCents,
+          balanceCents: metrics.saldoCents
+        }
+      };
     })
   }),
   publicProfile: router({
