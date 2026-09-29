@@ -739,7 +739,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 
 // server/_core/env.ts
 var ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
+  appId: process.env.VITE_APP_ID || "meuautonomo",
   cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "meuautonomo-jwt-secret-key-super-secure-min-32-chars-fallback",
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
@@ -1024,8 +1024,8 @@ var SDKServer = class {
     return this.signSession(
       {
         openId,
-        appId: ENV.appId,
-        name: options.name || ""
+        appId: ENV.appId || "meuautonomo",
+        name: options.name || "Profissional"
       },
       options
     );
@@ -1037,13 +1037,12 @@ var SDKServer = class {
     const secretKey = this.getSessionSecret();
     return new SignJWT({
       openId: payload.openId,
-      appId: payload.appId,
-      name: payload.name
+      appId: payload.appId || ENV.appId || "meuautonomo",
+      name: payload.name || "Profissional"
     }).setProtectedHeader({ alg: "HS256", typ: "JWT" }).setExpirationTime(expirationSeconds).sign(secretKey);
   }
   async verifySession(cookieValue) {
     if (!cookieValue) {
-      console.warn("[Auth] Missing session cookie");
       return null;
     }
     try {
@@ -1052,14 +1051,14 @@ var SDKServer = class {
         algorithms: ["HS256"]
       });
       const { openId, appId, name } = payload;
-      if (!isNonEmptyString(openId) || !isNonEmptyString(appId) || !isNonEmptyString(name)) {
-        console.warn("[Auth] Session payload missing required fields");
+      if (!isNonEmptyString(openId)) {
+        console.warn("[Auth] Session payload missing openId");
         return null;
       }
       return {
         openId,
-        appId,
-        name
+        appId: typeof appId === "string" && appId.length > 0 ? appId : ENV.appId || "meuautonomo",
+        name: typeof name === "string" && name.length > 0 ? name : "Profissional"
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
