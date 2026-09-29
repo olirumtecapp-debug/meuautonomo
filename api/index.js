@@ -24,7 +24,9 @@ __export(schema_exports, {
   requests: () => requests,
   services: () => services,
   teamMembers: () => teamMembers,
-  users: () => users
+  users: () => users,
+  voucherRedemptions: () => voucherRedemptions,
+  vouchers: () => vouchers
 });
 import {
   boolean,
@@ -35,7 +37,7 @@ import {
   timestamp,
   varchar
 } from "drizzle-orm/mysql-core";
-var users, professionalProfiles, availability, services, clients, teamMembers, appointments, requests, requestAttachments, quotes, quoteItems, payments, expenses, notifications;
+var users, professionalProfiles, availability, services, clients, teamMembers, appointments, requests, requestAttachments, quotes, quoteItems, payments, expenses, notifications, vouchers, voucherRedemptions;
 var init_schema = __esm({
   "drizzle/schema.ts"() {
     "use strict";
@@ -70,6 +72,12 @@ var init_schema = __esm({
       bookingEnabled: boolean("bookingEnabled").default(false).notNull(),
       plan: mysqlEnum("plan", ["free", "pro", "team"]).default("free").notNull(),
       isPro: boolean("isPro").default(false).notNull(),
+      isVip: boolean("isVip").default(false).notNull(),
+      planExpiresAt: timestamp("planExpiresAt"),
+      referralCode: varchar("referralCode", { length: 50 }),
+      referredBy: varchar("referredBy", { length: 50 }),
+      referralCount: int("referralCount").default(0).notNull(),
+      bonusDaysEarned: int("bonusDaysEarned").default(0).notNull(),
       quotesThisMonth: int("quotesThisMonth").default(0).notNull(),
       asaasCustomerId: varchar("asaasCustomerId", { length: 120 }),
       asaasPaymentId: varchar("asaasPaymentId", { length: 120 }),
@@ -235,6 +243,30 @@ var init_schema = __esm({
       read: boolean("read").default(false).notNull(),
       createdAt: timestamp("createdAt").defaultNow().notNull()
     });
+    vouchers = mysqlTable("vouchers", {
+      id: int("id").autoincrement().primaryKey(),
+      code: varchar("code", { length: 50 }).notNull().unique(),
+      description: varchar("description", { length: 255 }),
+      days: int("days").default(0).notNull(),
+      // Quantidade de dias adicionados ao plano
+      plan: mysqlEnum("plan", ["pro", "team"]).default("pro").notNull(),
+      isVipTotal: boolean("isVipTotal").default(false).notNull(),
+      // VIP Total Vitalício
+      maxUses: int("maxUses").default(1).notNull(),
+      // -1 para ilimitado
+      usedCount: int("usedCount").default(0).notNull(),
+      expiresAt: timestamp("expiresAt"),
+      active: boolean("active").default(true).notNull(),
+      createdAt: timestamp("createdAt").defaultNow().notNull()
+    });
+    voucherRedemptions = mysqlTable("voucherRedemptions", {
+      id: int("id").autoincrement().primaryKey(),
+      voucherId: int("voucherId").notNull(),
+      userId: int("userId").notNull(),
+      profileId: int("profileId").notNull(),
+      voucherCode: varchar("voucherCode", { length: 50 }).notNull(),
+      redeemedAt: timestamp("redeemedAt").defaultNow().notNull()
+    });
   }
 });
 
@@ -344,7 +376,18 @@ function createCleanStore() {
     payments: [],
     expenses: [],
     notifications: [],
-    teamMembers: []
+    teamMembers: [],
+    vouchers: [
+      { id: 1, code: "VIP20DIAS", description: "Degusta\xE7\xE3o VIP 20 Dias para Testadora Beta", days: 20, plan: "pro", isVipTotal: false, maxUses: 100, usedCount: 0, active: true },
+      { id: 2, code: "BETA20", description: "Acesso Beta de 20 Dias Gr\xE1tis", days: 20, plan: "pro", isVipTotal: false, maxUses: 100, usedCount: 0, active: true },
+      { id: 3, code: "TESTE20", description: "Teste Especial 20 Dias", days: 20, plan: "pro", isVipTotal: false, maxUses: 100, usedCount: 0, active: true },
+      { id: 4, code: "PRO10", description: "B\xF4nus 10 Dias Plano PRO", days: 10, plan: "pro", isVipTotal: false, maxUses: 50, usedCount: 0, active: true },
+      { id: 5, code: "PRO15", description: "B\xF4nus 15 Dias Plano PRO", days: 15, plan: "pro", isVipTotal: false, maxUses: 50, usedCount: 0, active: true },
+      { id: 6, code: "PRO30", description: "B\xF4nus 30 Dias (1 M\xEAs Gr\xE1tis)", days: 30, plan: "pro", isVipTotal: false, maxUses: 50, usedCount: 0, active: true },
+      { id: 7, code: "VIPTOTAL", description: "Acesso VIP Total Vital\xEDcio", days: 0, plan: "team", isVipTotal: true, maxUses: 10, usedCount: 0, active: true },
+      { id: 8, code: "VIP-MEUAUTONOMO", description: "VIP Vital\xEDcio Fundador / Embaixador", days: 0, plan: "team", isVipTotal: true, maxUses: 10, usedCount: 0, active: true }
+    ],
+    voucherRedemptions: []
   };
 }
 function saveStoreToFile(data) {
@@ -1993,7 +2036,20 @@ var appRouter = router({
     })
   }),
   profile: router({
-    get: protectedProcedure.query(({ ctx }) => getProfileByUserId(ctx.user.id)),
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await getProfileByUserId(ctx.user.id);
+      if (!profile) return null;
+      if (profile.plan !== "free" && !profile.isVip && profile.planExpiresAt) {
+        if (/* @__PURE__ */ new Date() > new Date(profile.planExpiresAt)) {
+          const db = await getDb();
+          if (db) {
+            await db.update(professionalProfiles).set({ plan: "free", isPro: false }).where(eq3(professionalProfiles.id, profile.id));
+          }
+          return { ...profile, plan: "free", isPro: false };
+        }
+      }
+      return profile;
+    }),
     upsert: protectedProcedure.input(z2.object({
       displayName: z2.string().min(2).max(160),
       slug: z2.string().min(3).max(100).regex(/^[a-z0-9-]+$/, "Use apenas letras min\xFAsculas, n\xFAmeros e h\xEDfen."),
@@ -2019,7 +2075,8 @@ var appRouter = router({
         } else {
           const slugOwner = await getProfileBySlug(input.slug);
           const slug = slugOwner && slugOwner.userId !== ctx.user.id ? `${input.slug}-${nanoid(6).toLowerCase()}`.slice(0, 100) : input.slug;
-          await db.insert(professionalProfiles).values({ ...input, slug, userId: ctx.user.id, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null });
+          const refCode = `${slug.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase()}-${nanoid(4).toUpperCase()}`;
+          await db.insert(professionalProfiles).values({ ...input, slug, userId: ctx.user.id, referralCode: refCode, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null });
         }
       } catch {
         throw new TRPCError3({ code: "CONFLICT", message: "Esse endere\xE7o p\xFAblico j\xE1 est\xE1 em uso." });
@@ -2908,9 +2965,27 @@ var appRouter = router({
       if (ctx.user.role !== "admin") {
         throw new TRPCError3({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
       }
+      const db = await getDb();
+      if (db && process.env.DATABASE_URL) {
+        await db.delete(quoteItems);
+        await db.delete(quotes);
+        await db.delete(requestAttachments);
+        await db.delete(requests);
+        await db.delete(appointments);
+        await db.delete(payments);
+        await db.delete(expenses);
+        await db.delete(teamMembers);
+        await db.delete(services);
+        await db.delete(availability);
+        await db.delete(clients);
+        await db.delete(notifications);
+        await db.delete(voucherRedemptions);
+        await db.delete(professionalProfiles);
+        await db.delete(users).where(ne(users.id, ctx.user.id));
+      }
       const { resetMockDb: resetMockDb2 } = await Promise.resolve().then(() => (init_mockDb(), mockDb_exports));
       resetMockDb2();
-      return { success: true, message: "Banco de teste reiniciado com sucesso!" };
+      return { success: true, message: "Banco de dados zerado com sucesso! Sua conta de administrador foi preservada." };
     }),
     setDemoMode: protectedProcedure.input(z2.object({ enabled: z2.boolean() })).mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") {
@@ -2918,6 +2993,182 @@ var appRouter = router({
       }
       setDemoMode(input.enabled);
       return { success: true, demoMode: isDemoMode() };
+    })
+  }),
+  voucher: router({
+    redeem: protectedProcedure.input(z2.object({ code: z2.string().min(2, "Digite o c\xF3digo do voucher.") })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel." });
+      const cleanCode = input.code.trim().toUpperCase();
+      const found = await db.select().from(vouchers).where(eq3(vouchers.code, cleanCode)).limit(1);
+      const voucher = found[0];
+      if (!voucher || !voucher.active) {
+        throw new TRPCError3({ code: "NOT_FOUND", message: "Voucher n\xE3o encontrado ou inativo. Verifique o c\xF3digo digitado." });
+      }
+      if (voucher.expiresAt && /* @__PURE__ */ new Date() > new Date(voucher.expiresAt)) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "Este voucher j\xE1 expirou." });
+      }
+      if (voucher.maxUses !== -1 && voucher.usedCount >= voucher.maxUses) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "Este voucher atingiu o limite m\xE1ximo de resgates." });
+      }
+      const alreadyRedeemed = await db.select().from(voucherRedemptions).where(and2(eq3(voucherRedemptions.voucherId, voucher.id), eq3(voucherRedemptions.userId, ctx.user.id))).limit(1);
+      if (alreadyRedeemed[0]) {
+        throw new TRPCError3({ code: "CONFLICT", message: "Voc\xEA j\xE1 resgatou este voucher anteriormente." });
+      }
+      if (voucher.isVipTotal) {
+        await db.update(professionalProfiles).set({
+          isPro: true,
+          isVip: true,
+          plan: voucher.plan || "pro",
+          planExpiresAt: null
+        }).where(eq3(professionalProfiles.id, profile.id));
+        await db.insert(voucherRedemptions).values({
+          voucherId: voucher.id,
+          userId: ctx.user.id,
+          profileId: profile.id,
+          voucherCode: cleanCode
+        });
+        await db.update(vouchers).set({ usedCount: voucher.usedCount + 1 }).where(eq3(vouchers.id, voucher.id));
+        await createNotification(
+          profile.id,
+          "\u2B50 VIP Total Ativado!",
+          "Voc\xEA resgatou o voucher VIP Total. Todos os recursos do MeuAut\xF4nomo est\xE3o liberados vitaliciamente para voc\xEA!",
+          "voucher"
+        );
+        return {
+          success: true,
+          isVipTotal: true,
+          message: "Parab\xE9ns! VIP Total Vital\xEDcio ativado! Todos os recursos est\xE3o liberados para voc\xEA para sempre."
+        };
+      }
+      const days = voucher.days || 15;
+      const now = Date.now();
+      let newExpiresAt;
+      if (profile.planExpiresAt && new Date(profile.planExpiresAt).getTime() > now) {
+        newExpiresAt = new Date(new Date(profile.planExpiresAt).getTime() + days * 864e5);
+      } else {
+        newExpiresAt = new Date(now + days * 864e5);
+      }
+      await db.update(professionalProfiles).set({
+        isPro: true,
+        plan: voucher.plan || "pro",
+        planExpiresAt: newExpiresAt
+      }).where(eq3(professionalProfiles.id, profile.id));
+      await db.insert(voucherRedemptions).values({
+        voucherId: voucher.id,
+        userId: ctx.user.id,
+        profileId: profile.id,
+        voucherCode: cleanCode
+      });
+      await db.update(vouchers).set({ usedCount: voucher.usedCount + 1 }).where(eq3(vouchers.id, voucher.id));
+      await createNotification(
+        profile.id,
+        `\u{1F389} Voucher de ${days} Dias Ativado!`,
+        `Voc\xEA ganhou ${days} dias de degusta\xE7\xE3o do Plano PRO. Aproveite todos os recursos avan\xE7ados!`,
+        "voucher"
+      );
+      return {
+        success: true,
+        isVipTotal: false,
+        days,
+        planExpiresAt: newExpiresAt,
+        message: `Voucher aplicado com sucesso! Voc\xEA ganhou ${days} dias de degusta\xE7\xE3o gratuita do Plano PRO.`
+      };
+    }),
+    getStatus: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await getProfileByUserId(ctx.user.id);
+      if (!profile) return null;
+      const isVip = Boolean(profile.isVip);
+      const isPro = Boolean(profile.isPro);
+      const expiresAt = profile.planExpiresAt ? new Date(profile.planExpiresAt) : null;
+      let daysRemaining = null;
+      let isExpired = false;
+      if (!isVip && expiresAt) {
+        const diffMs = expiresAt.getTime() - Date.now();
+        daysRemaining = Math.max(0, Math.ceil(diffMs / (1e3 * 60 * 60 * 24)));
+        if (diffMs <= 0) {
+          isExpired = true;
+        }
+      }
+      return {
+        plan: profile.plan,
+        isPro,
+        isVip,
+        planExpiresAt: expiresAt,
+        daysRemaining,
+        isExpired
+      };
+    })
+  }),
+  referral: router({
+    getInfo: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      let code = profile.referralCode;
+      if (!code) {
+        code = `${profile.slug.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase()}-${nanoid(4).toUpperCase()}`;
+        await db.update(professionalProfiles).set({ referralCode: code }).where(eq3(professionalProfiles.id, profile.id));
+      }
+      const appBaseUrl = process.env.PUBLIC_URL || "https://meuautonomo.vercel.app";
+      const referralLink = `${appBaseUrl}/r/${code}`;
+      return {
+        referralCode: code,
+        referralLink,
+        referralCount: profile.referralCount || 0,
+        bonusDaysEarned: profile.bonusDaysEarned || 0
+      };
+    }),
+    applyCode: protectedProcedure.input(z2.object({ code: z2.string().min(3) })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      if (profile.referredBy) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "Voc\xEA j\xE1 utilizou um c\xF3digo de indica\xE7\xE3o anteriormente." });
+      }
+      const cleanCode = input.code.trim().toUpperCase();
+      if (cleanCode === profile.referralCode) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "Voc\xEA n\xE3o pode utilizar seu pr\xF3prio c\xF3digo de indica\xE7\xE3o." });
+      }
+      const referrer = await db.select().from(professionalProfiles).where(eq3(professionalProfiles.referralCode, cleanCode)).limit(1);
+      if (!referrer[0]) {
+        throw new TRPCError3({ code: "NOT_FOUND", message: "C\xF3digo de indica\xE7\xE3o n\xE3o encontrado. Verifique com seu colega." });
+      }
+      const bonusDays = 15;
+      const now = Date.now();
+      const newExpires = profile.planExpiresAt && new Date(profile.planExpiresAt).getTime() > now ? new Date(new Date(profile.planExpiresAt).getTime() + bonusDays * 864e5) : new Date(now + bonusDays * 864e5);
+      await db.update(professionalProfiles).set({
+        referredBy: cleanCode,
+        isPro: true,
+        plan: "pro",
+        planExpiresAt: newExpires
+      }).where(eq3(professionalProfiles.id, profile.id));
+      await createNotification(
+        profile.id,
+        "\u{1F381} B\xF4nus de Indica\xE7\xE3o Ativado!",
+        `Voc\xEA ganhou 15 dias de Plano PRO gr\xE1tis pela indica\xE7\xE3o de ${referrer[0].displayName}!`,
+        "referral"
+      );
+      const refNewExpires = referrer[0].planExpiresAt && new Date(referrer[0].planExpiresAt).getTime() > now ? new Date(new Date(referrer[0].planExpiresAt).getTime() + bonusDays * 864e5) : new Date(now + bonusDays * 864e5);
+      await db.update(professionalProfiles).set({
+        isPro: true,
+        plan: referrer[0].plan === "team" ? "team" : "pro",
+        planExpiresAt: referrer[0].isVip ? null : refNewExpires,
+        referralCount: (referrer[0].referralCount || 0) + 1,
+        bonusDaysEarned: (referrer[0].bonusDaysEarned || 0) + bonusDays
+      }).where(eq3(professionalProfiles.id, referrer[0].id));
+      await createNotification(
+        referrer[0].id,
+        "\u{1F389} Amigo Indicado!",
+        `${profile.displayName} se cadastrou pelo seu link! Voc\xEA ganhou +15 dias de Plano PRO gr\xE1tis!`,
+        "referral"
+      );
+      return {
+        success: true,
+        message: `C\xF3digo de indica\xE7\xE3o aceito! Voc\xEA e ${referrer[0].displayName} ganharam 15 dias de Plano PRO gr\xE1tis!`,
+        planExpiresAt: newExpires
+      };
     })
   })
 });

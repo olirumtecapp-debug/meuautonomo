@@ -16,6 +16,9 @@ import {
   DollarSign,
   HeartHandshake,
   CheckCircle2,
+  Ticket,
+  Gift,
+  Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,10 +33,12 @@ import {
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
+import { VoucherRedeemModal } from "@/components/VoucherRedeemModal";
 
 export default function PlansPage() {
   const [selectedPlan, setSelectedPlan] = useState<"solo" | "team" | null>(null);
   const [pixModalOpen, setPixModalOpen] = useState(false);
+  const [voucherModalOpen, setVoucherModalOpen] = useState(false);
   const [simulatingPayment, setSimulatingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
@@ -118,6 +123,34 @@ export default function PlansPage() {
             <p className="mt-3 text-sm sm:text-base text-[#617770] leading-relaxed">
               Comece 100% grátis com 10 orçamentos por mês. Quando seu negócio crescer, desbloqueie o acesso vitalício com taxa única e garantia incondicional de 7 dias.
             </p>
+          </div>
+
+          {/* BANNER DE VOUCHER / DEGUSTAÇÃO */}
+          <div className="rounded-2xl border border-[#d2e4b8] bg-linear-to-r from-[#f7fbe8] via-[#f0f8df] to-[#e6f3d0] p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3.5">
+              <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#173a34] text-[#d9f56a] shadow-sm">
+                <Ticket className="h-6 w-6" />
+              </div>
+              <div>
+                <h4 className="text-sm sm:text-base font-bold text-[#173a34] flex items-center gap-2">
+                  Possui um Cupom ou Voucher de Teste?
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider bg-[#173a34] text-[#d9f56a] px-2 py-0.5 rounded-full">
+                    Ativação Imediata
+                  </span>
+                </h4>
+                <p className="text-xs text-[#58716b] mt-0.5">
+                  Recebeu um convite de teste ou código promocional? Digite aqui para liberar dias gratuitos de Plano PRO ou acesso VIP.
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={() => setVoucherModalOpen(true)}
+              className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] font-bold text-xs shrink-0 cursor-pointer shadow-xs"
+            >
+              <Ticket className="mr-2 h-4 w-4 text-[#d9f56a]" />
+              Digitar Código do Voucher
+            </Button>
           </div>
 
           {/* CARDS COMPARATIVOS */}
@@ -488,6 +521,7 @@ export default function PlansPage() {
           )}
         </DialogContent>
       </Dialog>
+      <VoucherRedeemModal open={voucherModalOpen} onOpenChange={setVoucherModalOpen} />
     </DashboardLayout>
   );
 }

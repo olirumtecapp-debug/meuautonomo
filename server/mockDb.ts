@@ -17,6 +17,8 @@ export interface MockStore {
   expenses: any[];
   notifications: any[];
   teamMembers: any[];
+  vouchers: any[];
+  voucherRedemptions: any[];
 }
 
 const DATA_DIR = path.resolve(process.cwd(), "server", "data");
@@ -120,6 +122,17 @@ function createCleanStore(): MockStore {
     expenses: [],
     notifications: [],
     teamMembers: [],
+    vouchers: [
+      { id: 1, code: "VIP20DIAS", description: "Degustação VIP 20 Dias para Testadora Beta", days: 20, plan: "pro", isVipTotal: false, maxUses: 100, usedCount: 0, active: true },
+      { id: 2, code: "BETA20", description: "Acesso Beta de 20 Dias Grátis", days: 20, plan: "pro", isVipTotal: false, maxUses: 100, usedCount: 0, active: true },
+      { id: 3, code: "TESTE20", description: "Teste Especial 20 Dias", days: 20, plan: "pro", isVipTotal: false, maxUses: 100, usedCount: 0, active: true },
+      { id: 4, code: "PRO10", description: "Bônus 10 Dias Plano PRO", days: 10, plan: "pro", isVipTotal: false, maxUses: 50, usedCount: 0, active: true },
+      { id: 5, code: "PRO15", description: "Bônus 15 Dias Plano PRO", days: 15, plan: "pro", isVipTotal: false, maxUses: 50, usedCount: 0, active: true },
+      { id: 6, code: "PRO30", description: "Bônus 30 Dias (1 Mês Grátis)", days: 30, plan: "pro", isVipTotal: false, maxUses: 50, usedCount: 0, active: true },
+      { id: 7, code: "VIPTOTAL", description: "Acesso VIP Total Vitalício", days: 0, plan: "team", isVipTotal: true, maxUses: 10, usedCount: 0, active: true },
+      { id: 8, code: "VIP-MEUAUTONOMO", description: "VIP Vitalício Fundador / Embaixador", days: 0, plan: "team", isVipTotal: true, maxUses: 10, usedCount: 0, active: true }
+    ],
+    voucherRedemptions: [],
   };
 }
 

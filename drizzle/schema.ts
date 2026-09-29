@@ -40,6 +40,12 @@ export const professionalProfiles = mysqlTable("professionalProfiles", {
   bookingEnabled: boolean("bookingEnabled").default(false).notNull(),
   plan: mysqlEnum("plan", ["free", "pro", "team"]).default("free").notNull(),
   isPro: boolean("isPro").default(false).notNull(),
+  isVip: boolean("isVip").default(false).notNull(),
+  planExpiresAt: timestamp("planExpiresAt"),
+  referralCode: varchar("referralCode", { length: 50 }),
+  referredBy: varchar("referredBy", { length: 50 }),
+  referralCount: int("referralCount").default(0).notNull(),
+  bonusDaysEarned: int("bonusDaysEarned").default(0).notNull(),
   quotesThisMonth: int("quotesThisMonth").default(0).notNull(),
   asaasCustomerId: varchar("asaasCustomerId", { length: 120 }),
   asaasPaymentId: varchar("asaasPaymentId", { length: 120 }),
@@ -218,6 +224,29 @@ export const notifications = mysqlTable("notifications", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const vouchers = mysqlTable("vouchers", {
+  id: int("id").autoincrement().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  description: varchar("description", { length: 255 }),
+  days: int("days").default(0).notNull(), // Quantidade de dias adicionados ao plano
+  plan: mysqlEnum("plan", ["pro", "team"]).default("pro").notNull(),
+  isVipTotal: boolean("isVipTotal").default(false).notNull(), // VIP Total Vitalício
+  maxUses: int("maxUses").default(1).notNull(), // -1 para ilimitado
+  usedCount: int("usedCount").default(0).notNull(),
+  expiresAt: timestamp("expiresAt"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const voucherRedemptions = mysqlTable("voucherRedemptions", {
+  id: int("id").autoincrement().primaryKey(),
+  voucherId: int("voucherId").notNull(),
+  userId: int("userId").notNull(),
+  profileId: int("profileId").notNull(),
+  voucherCode: varchar("voucherCode", { length: 50 }).notNull(),
+  redeemedAt: timestamp("redeemedAt").defaultNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type ProfessionalProfile = typeof professionalProfiles.$inferSelect;
@@ -231,3 +260,5 @@ export type Quote = typeof quotes.$inferSelect;
 export type QuoteItem = typeof quoteItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
+export type Voucher = typeof vouchers.$inferSelect;
+export type VoucherRedemption = typeof voucherRedemptions.$inferSelect;

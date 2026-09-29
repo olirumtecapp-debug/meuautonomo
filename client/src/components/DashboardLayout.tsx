@@ -45,13 +45,19 @@ import {
   Download,
   Smartphone,
   BookOpen,
+  Gift,
+  Ticket,
+  Crown,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { toast } from "sonner";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
 import { InstallAppModal } from "./InstallAppModal";
 import { GuidedTutorialModal } from "./GuidedTutorialModal";
+import { VoucherRedeemModal } from "./VoucherRedeemModal";
+import { ReferralModal } from "./ReferralModal";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Visão geral", path: "/app" },
@@ -66,6 +72,7 @@ const menuItems = [
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
   { icon: UserRound, label: "Meu cartão", path: "/cartao" },
   { icon: Sparkles, label: "Planos & Upgrade", path: "/planos" },
+  { icon: Gift, label: "Indique e Ganhe", path: "/indique" },
   { icon: BookOpen, label: "Guia & Tutorial", path: "/guia" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
 ];
@@ -106,9 +113,31 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
   const [isResizing, setIsResizing] = useState(false);
   const [installModalOpen, setInstallModalOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [voucherModalOpen, setVoucherModalOpen] = useState(false);
+  const [referralModalOpen, setReferralModalOpen] = useState(false);
+  const voucherStatusQuery = trpc.voucher.getStatus.useQuery();
+  const voucherStatus = voucherStatusQuery.data;
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = menuItems.find(item => item.path === location);
   const firstName = (user?.name || "profissional").split(" ")[0];
+
+  const applyReferralMutation = trpc.referral.applyCode.useMutation({
+    onSuccess: (res) => {
+      toast.success(res.message || "🎁 Indicação ativada! Você ganhou 15 dias de PRO grátis!");
+      localStorage.removeItem("meuautonomo_referral_code");
+      voucherStatusQuery.refetch();
+    },
+    onError: () => {
+      localStorage.removeItem("meuautonomo_referral_code");
+    }
+  });
+
+  useEffect(() => {
+    const savedRef = localStorage.getItem("meuautonomo_referral_code");
+    if (savedRef && voucherStatus && !voucherStatus.isVip) {
+      applyReferralMutation.mutate({ code: savedRef });
+    }
+  }, [voucherStatus?.isVip]);
 
   useEffect(() => {
     const move = (event: MouseEvent) => {
@@ -157,8 +186,15 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
             <SidebarMenu className="gap-1">
               {menuItems.map(item => {
                 const active = location === item.path;
+                const handleItemClick = () => {
+                  if (item.path === "/indique") {
+                    setReferralModalOpen(true);
+                    return;
+                  }
+                  setLocation(item.path);
+                };
                 return <SidebarMenuItem key={item.path}>
-                  <SidebarMenuButton isActive={active} onClick={() => setLocation(item.path)} tooltip={item.label} className={`h-11 rounded-xl font-medium transition ${active ? "bg-[#d9f56a] text-[#132a27] hover:bg-[#d9f56a] hover:text-[#132a27]" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
+                  <SidebarMenuButton isActive={active} onClick={handleItemClick} tooltip={item.label} className={`h-11 rounded-xl font-medium transition ${active ? "bg-[#d9f56a] text-[#132a27] hover:bg-[#d9f56a] hover:text-[#132a27]" : "text-white/70 hover:bg-white/10 hover:text-white"}`}>
                     <item.icon className="h-[18px] w-[18px] shrink-0" />
                     <span>{item.label}</span>
                   </SidebarMenuButton>
@@ -253,17 +289,108 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
             >
               <Download className="h-4 w-4 text-[#8aa500]" />
             </button>
+            <button
+              type="button"
+              onClick={() => setReferralModalOpen(true)}
+              className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#d2e4b8] bg-[#f7fbe8] hover:bg-[#edf7d7] text-xs font-bold text-[#173a34] transition shadow-2xs hover:shadow-xs cursor-pointer"
+              title="Indique colegas e ganhe 15 dias de PRO grátis"
+            >
+              <Gift className="h-3.5 w-3.5 text-[#8aa500]" />
+              <span>Indique & Ganhe</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setVoucherModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f0f4ef] text-xs font-semibold text-[#173a34] transition shadow-2xs cursor-pointer"
+              title="Resgatar cupom de teste ou voucher"
+            >
+              <Ticket className="h-3.5 w-3.5 text-[#8aa500]" />
+              <span className="hidden sm:inline">Cupom / Voucher</span>
+              <span className="sm:hidden">Cupom</span>
+            </button>
             <span className="hidden text-right text-xs text-[#58716b] sm:block">Bom dia, <strong className="text-[#173a34]">{firstName}</strong></span>
             <NotificationsBell />
             <div className="grid h-9 w-9 place-items-center rounded-full bg-[#d9f56a] text-sm font-bold text-[#173a34]">{firstName.charAt(0).toUpperCase()}</div>
           </div>
         </div>
+
+        {voucherStatus?.isVip ? (
+          <div className="bg-gradient-to-r from-[#173a34] via-[#1e4b43] to-[#173a34] text-white px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 border-b border-[#2d685c] shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="bg-[#d9f56a] text-[#132a27] font-extrabold px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider flex items-center gap-1">
+                <Crown className="h-3 w-3" /> VIP TOTAL
+              </span>
+              <span className="font-medium">Parabéns! Sua conta tem acesso vitalício com todos os recursos liberados.</span>
+            </div>
+            <button
+              onClick={() => setReferralModalOpen(true)}
+              className="text-[#d9f56a] hover:underline font-bold text-xs flex items-center gap-1 cursor-pointer"
+            >
+              <Gift className="h-3.5 w-3.5" /> Presentear um Colega
+            </button>
+          </div>
+        ) : voucherStatus?.isPro && voucherStatus.daysRemaining !== null ? (
+          voucherStatus.daysRemaining <= 3 ? (
+            <div className="bg-[#fef3e2] text-[#8a4b08] border-b border-[#fed7aa] px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <span className="bg-[#ea580c] text-white font-extrabold px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider">
+                  ⏳ DEGUSTAÇÃO EXPIRANDO
+                </span>
+                <span>
+                  Seu teste PRO encerra em <strong>{voucherStatus.daysRemaining} dia(s)</strong>. Mantenha orçamentos e agendamentos ilimitados!
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setReferralModalOpen(true)}
+                  className="text-[#8a4b08] underline font-semibold cursor-pointer"
+                >
+                  Ganhar +15 dias indicando
+                </button>
+                <button
+                  onClick={() => setLocation("/planos")}
+                  className="bg-[#ea580c] text-white px-3 py-1 rounded-lg font-bold hover:bg-[#c2410c] cursor-pointer"
+                >
+                  Assinar Plano
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-[#eef7e6] text-[#173a34] border-b border-[#cde5bf] px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <span className="bg-[#173a34] text-[#d9f56a] font-extrabold px-2 py-0.5 rounded-full text-[10px] uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> PRO DEGUSTAÇÃO
+                </span>
+                <span>
+                  Você tem <strong>{voucherStatus.daysRemaining} dias restantes</strong> de Plano PRO gratuito. Aproveite!
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setVoucherModalOpen(true)}
+                  className="text-[#58716b] hover:text-[#173a34] underline cursor-pointer font-medium"
+                >
+                  Inserir outro voucher
+                </button>
+                <button
+                  onClick={() => setReferralModalOpen(true)}
+                  className="bg-[#173a34] text-white px-2.5 py-1 rounded-lg font-bold hover:bg-[#28564d] cursor-pointer flex items-center gap-1"
+                >
+                  <Gift className="h-3 w-3 text-[#d9f56a]" /> Ganhar +15 dias
+                </button>
+              </div>
+            </div>
+          )
+        ) : null}
+
         <main className="min-h-[calc(100vh-4rem)] flex-1 pb-24">{children}</main>
         {isMobile && <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-[72px] items-center justify-around border-t border-[#dce5dc] bg-white/95 px-2 shadow-[0_-6px_20px_rgba(19,42,39,0.06)] backdrop-blur">
           {menuItems.slice(0, 5).map(item => { const active = location === item.path; return <button key={item.path} onClick={() => setLocation(item.path)} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-semibold ${active ? "text-[#173a34]" : "text-[#8a9b95]"}`}><item.icon className={`h-5 w-5 ${active ? "text-[#8aa500]" : ""}`} /><span className="truncate">{item.label}</span></button>; })}
         </nav>}
         <InstallAppModal open={installModalOpen} onOpenChange={setInstallModalOpen} />
         <GuidedTutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} />
+        <VoucherRedeemModal open={voucherModalOpen} onOpenChange={setVoucherModalOpen} />
+        <ReferralModal open={referralModalOpen} onOpenChange={setReferralModalOpen} />
       </SidebarInset>
     </>
   );

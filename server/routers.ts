@@ -17,6 +17,8 @@ import {
   services,
   teamMembers,
   users,
+  voucherRedemptions,
+  vouchers,
 } from "../drizzle/schema";
 import { createNotification, getAllUsers, getDb, getProfileBySlug, getProfileByUserId, getUserByEmail, getUserByOpenId, upsertUser } from "./db";
 import { storagePut } from "./storage";
@@ -296,7 +298,20 @@ export const appRouter = router({
   }),
 
   profile: router({
-    get: protectedProcedure.query(({ ctx }) => getProfileByUserId(ctx.user.id)),
+    get: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await getProfileByUserId(ctx.user.id);
+      if (!profile) return null;
+      if (profile.plan !== "free" && !profile.isVip && profile.planExpiresAt) {
+        if (new Date() > new Date(profile.planExpiresAt)) {
+          const db = await getDb();
+          if (db) {
+            await db.update(professionalProfiles).set({ plan: "free", isPro: false }).where(eq(professionalProfiles.id, profile.id));
+          }
+          return { ...profile, plan: "free" as const, isPro: false };
+        }
+      }
+      return profile;
+    }),
     upsert: protectedProcedure
       .input(z.object({
         displayName: z.string().min(2).max(160),
@@ -326,7 +341,8 @@ export const appRouter = router({
             const slug = slugOwner && slugOwner.userId !== ctx.user.id
               ? `${input.slug}-${nanoid(6).toLowerCase()}`.slice(0, 100)
               : input.slug;
-            await db.insert(professionalProfiles).values({ ...input, slug, userId: ctx.user.id, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null });
+            const refCode = `${slug.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase()}-${nanoid(4).toUpperCase()}`;
+            await db.insert(professionalProfiles).values({ ...input, slug, userId: ctx.user.id, referralCode: refCode, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null });
           }
         } catch {
           throw new TRPCError({ code: "CONFLICT", message: "Esse endereço público já está em uso." });
@@ -1267,9 +1283,27 @@ export const appRouter = router({
       if (ctx.user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
       }
+      const db = await getDb();
+      if (db && process.env.DATABASE_URL) {
+        await db.delete(quoteItems);
+        await db.delete(quotes);
+        await db.delete(requestAttachments);
+        await db.delete(requests);
+        await db.delete(appointments);
+        await db.delete(payments);
+        await db.delete(expenses);
+        await db.delete(teamMembers);
+        await db.delete(services);
+        await db.delete(availability);
+        await db.delete(clients);
+        await db.delete(notifications);
+        await db.delete(voucherRedemptions);
+        await db.delete(professionalProfiles);
+        await db.delete(users).where(ne(users.id, ctx.user.id));
+      }
       const { resetMockDb } = await import("./mockDb");
       resetMockDb();
-      return { success: true, message: "Banco de teste reiniciado com sucesso!" };
+      return { success: true, message: "Banco de dados zerado com sucesso! Sua conta de administrador foi preservada." };
     }),
 
     setDemoMode: protectedProcedure
@@ -1280,6 +1314,255 @@ export const appRouter = router({
         }
         setDemoMode(input.enabled);
         return { success: true, demoMode: isDemoMode() };
+      }),
+  }),
+
+  voucher: router({
+    redeem: protectedProcedure
+      .input(z.object({ code: z.string().min(2, "Digite o código do voucher.") }))
+      .mutation(async ({ ctx, input }) => {
+        const profile = await requireProfile(ctx.user.id);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível." });
+
+        const cleanCode = input.code.trim().toUpperCase();
+        const found = await db.select().from(vouchers).where(eq(vouchers.code, cleanCode)).limit(1);
+        const voucher = found[0];
+
+        if (!voucher || !voucher.active) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Voucher não encontrado ou inativo. Verifique o código digitado." });
+        }
+
+        if (voucher.expiresAt && new Date() > new Date(voucher.expiresAt)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este voucher já expirou." });
+        }
+
+        if (voucher.maxUses !== -1 && voucher.usedCount >= voucher.maxUses) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este voucher atingiu o limite máximo de resgates." });
+        }
+
+        const alreadyRedeemed = await db
+          .select()
+          .from(voucherRedemptions)
+          .where(and(eq(voucherRedemptions.voucherId, voucher.id), eq(voucherRedemptions.userId, ctx.user.id)))
+          .limit(1);
+
+        if (alreadyRedeemed[0]) {
+          throw new TRPCError({ code: "CONFLICT", message: "Você já resgatou este voucher anteriormente." });
+        }
+
+        if (voucher.isVipTotal) {
+          await db
+            .update(professionalProfiles)
+            .set({
+              isPro: true,
+              isVip: true,
+              plan: voucher.plan || "pro",
+              planExpiresAt: null,
+            })
+            .where(eq(professionalProfiles.id, profile.id));
+
+          await db.insert(voucherRedemptions).values({
+            voucherId: voucher.id,
+            userId: ctx.user.id,
+            profileId: profile.id,
+            voucherCode: cleanCode,
+          });
+
+          await db
+            .update(vouchers)
+            .set({ usedCount: voucher.usedCount + 1 })
+            .where(eq(vouchers.id, voucher.id));
+
+          await createNotification(
+            profile.id,
+            "⭐ VIP Total Ativado!",
+            "Você resgatou o voucher VIP Total. Todos os recursos do MeuAutônomo estão liberados vitaliciamente para você!",
+            "voucher"
+          );
+
+          return {
+            success: true,
+            isVipTotal: true,
+            message: "Parabéns! VIP Total Vitalício ativado! Todos os recursos estão liberados para você para sempre.",
+          };
+        }
+
+        const days = voucher.days || 15;
+        const now = Date.now();
+        let newExpiresAt: Date;
+
+        if (profile.planExpiresAt && new Date(profile.planExpiresAt).getTime() > now) {
+          newExpiresAt = new Date(new Date(profile.planExpiresAt).getTime() + days * 86400000);
+        } else {
+          newExpiresAt = new Date(now + days * 86400000);
+        }
+
+        await db
+          .update(professionalProfiles)
+          .set({
+            isPro: true,
+            plan: voucher.plan || "pro",
+            planExpiresAt: newExpiresAt,
+          })
+          .where(eq(professionalProfiles.id, profile.id));
+
+        await db.insert(voucherRedemptions).values({
+          voucherId: voucher.id,
+          userId: ctx.user.id,
+          profileId: profile.id,
+          voucherCode: cleanCode,
+        });
+
+        await db
+          .update(vouchers)
+          .set({ usedCount: voucher.usedCount + 1 })
+          .where(eq(vouchers.id, voucher.id));
+
+        await createNotification(
+          profile.id,
+          `🎉 Voucher de ${days} Dias Ativado!`,
+          `Você ganhou ${days} dias de degustação do Plano PRO. Aproveite todos os recursos avançados!`,
+          "voucher"
+        );
+
+        return {
+          success: true,
+          isVipTotal: false,
+          days,
+          planExpiresAt: newExpiresAt,
+          message: `Voucher aplicado com sucesso! Você ganhou ${days} dias de degustação gratuita do Plano PRO.`,
+        };
+      }),
+
+    getStatus: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await getProfileByUserId(ctx.user.id);
+      if (!profile) return null;
+
+      const isVip = Boolean(profile.isVip);
+      const isPro = Boolean(profile.isPro);
+      const expiresAt = profile.planExpiresAt ? new Date(profile.planExpiresAt) : null;
+      let daysRemaining: number | null = null;
+      let isExpired = false;
+
+      if (!isVip && expiresAt) {
+        const diffMs = expiresAt.getTime() - Date.now();
+        daysRemaining = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+        if (diffMs <= 0) {
+          isExpired = true;
+        }
+      }
+
+      return {
+        plan: profile.plan,
+        isPro,
+        isVip,
+        planExpiresAt: expiresAt,
+        daysRemaining,
+        isExpired,
+      };
+    }),
+  }),
+
+  referral: router({
+    getInfo: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      let code = profile.referralCode;
+      if (!code) {
+        code = `${profile.slug.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase()}-${nanoid(4).toUpperCase()}`;
+        await db.update(professionalProfiles).set({ referralCode: code }).where(eq(professionalProfiles.id, profile.id));
+      }
+
+      const appBaseUrl = process.env.PUBLIC_URL || "https://meuautonomo.vercel.app";
+      const referralLink = `${appBaseUrl}/r/${code}`;
+
+      return {
+        referralCode: code,
+        referralLink,
+        referralCount: profile.referralCount || 0,
+        bonusDaysEarned: profile.bonusDaysEarned || 0,
+      };
+    }),
+
+    applyCode: protectedProcedure
+      .input(z.object({ code: z.string().min(3) }))
+      .mutation(async ({ ctx, input }) => {
+        const profile = await requireProfile(ctx.user.id);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        if (profile.referredBy) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Você já utilizou um código de indicação anteriormente." });
+        }
+
+        const cleanCode = input.code.trim().toUpperCase();
+        if (cleanCode === profile.referralCode) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Você não pode utilizar seu próprio código de indicação." });
+        }
+
+        const referrer = await db
+          .select()
+          .from(professionalProfiles)
+          .where(eq(professionalProfiles.referralCode, cleanCode))
+          .limit(1);
+
+        if (!referrer[0]) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Código de indicação não encontrado. Verifique com seu colega." });
+        }
+
+        const bonusDays = 15;
+        const now = Date.now();
+        const newExpires = profile.planExpiresAt && new Date(profile.planExpiresAt).getTime() > now
+          ? new Date(new Date(profile.planExpiresAt).getTime() + bonusDays * 86400000)
+          : new Date(now + bonusDays * 86400000);
+
+        await db
+          .update(professionalProfiles)
+          .set({
+            referredBy: cleanCode,
+            isPro: true,
+            plan: "pro",
+            planExpiresAt: newExpires,
+          })
+          .where(eq(professionalProfiles.id, profile.id));
+
+        await createNotification(
+          profile.id,
+          "🎁 Bônus de Indicação Ativado!",
+          `Você ganhou 15 dias de Plano PRO grátis pela indicação de ${referrer[0].displayName}!`,
+          "referral"
+        );
+
+        const refNewExpires = referrer[0].planExpiresAt && new Date(referrer[0].planExpiresAt).getTime() > now
+          ? new Date(new Date(referrer[0].planExpiresAt).getTime() + bonusDays * 86400000)
+          : new Date(now + bonusDays * 86400000);
+
+        await db
+          .update(professionalProfiles)
+          .set({
+            isPro: true,
+            plan: referrer[0].plan === "team" ? "team" : "pro",
+            planExpiresAt: referrer[0].isVip ? null : refNewExpires,
+            referralCount: (referrer[0].referralCount || 0) + 1,
+            bonusDaysEarned: (referrer[0].bonusDaysEarned || 0) + bonusDays,
+          })
+          .where(eq(professionalProfiles.id, referrer[0].id));
+
+        await createNotification(
+          referrer[0].id,
+          "🎉 Amigo Indicado!",
+          `${profile.displayName} se cadastrou pelo seu link! Você ganhou +15 dias de Plano PRO grátis!`,
+          "referral"
+        );
+
+        return {
+          success: true,
+          message: `Código de indicação aceito! Você e ${referrer[0].displayName} ganharam 15 dias de Plano PRO grátis!`,
+          planExpiresAt: newExpires,
+        };
       }),
   }),
 });
