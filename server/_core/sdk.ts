@@ -316,10 +316,7 @@ class SDKServer {
     }
 
     try {
-      await db.upsertUser({
-        openId: user.openId,
-        lastSignedIn: signedInAt,
-      });
+      await db.updateUserLastSignedIn(user.id, signedInAt);
     } catch (e) {
       // Non-critical background update
     }

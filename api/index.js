@@ -775,34 +775,54 @@ async function getDb() {
   }
   return _db;
 }
+async function updateUserLastSignedIn(userId, date = /* @__PURE__ */ new Date()) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ lastSignedIn: date }).where(eq(users.id, userId));
+}
 async function upsertUser(user) {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
   if (!db) return;
-  const values = { openId: user.openId };
+  const now = /* @__PURE__ */ new Date();
   const updateSet = {};
   const textFields = ["name", "email", "loginMethod", "passwordHash"];
   for (const field of textFields) {
     if (user[field] !== void 0) {
-      values[field] = user[field] ?? null;
       updateSet[field] = user[field] ?? null;
     }
   }
-  if (user.lastSignedIn !== void 0) {
-    values.lastSignedIn = user.lastSignedIn;
-    updateSet.lastSignedIn = user.lastSignedIn;
-  } else {
-    values.lastSignedIn = /* @__PURE__ */ new Date();
-    updateSet.lastSignedIn = values.lastSignedIn;
-  }
+  updateSet.lastSignedIn = user.lastSignedIn ?? now;
   if (user.role !== void 0) {
-    values.role = user.role;
     updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
-    values.role = "admin";
+  } else if (user.openId === ENV.ownerOpenId || user.openId === "admin_master") {
     updateSet.role = "admin";
   }
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  const existingByOpenId = await getUserByOpenId(user.openId);
+  if (existingByOpenId) {
+    if (Object.keys(updateSet).length > 0) {
+      await db.update(users).set(updateSet).where(eq(users.id, existingByOpenId.id));
+    }
+    return;
+  }
+  if (user.email) {
+    const existingByEmail = await getUserByEmail(user.email);
+    if (existingByEmail) {
+      await db.update(users).set({ ...updateSet, openId: user.openId }).where(eq(users.id, existingByEmail.id));
+      return;
+    }
+  }
+  const values = {
+    openId: user.openId,
+    name: user.name ?? null,
+    email: user.email ? user.email.trim().toLowerCase() : null,
+    loginMethod: user.loginMethod ?? null,
+    passwordHash: user.passwordHash ?? null,
+    role: updateSet.role || "user",
+    lastSignedIn: updateSet.lastSignedIn || now,
+    createdAt: now
+  };
+  await db.insert(users).values(values);
 }
 async function getUserByOpenId(openId) {
   const db = await getDb();
@@ -1137,10 +1157,7 @@ var SDKServer = class {
       throw ForbiddenError("User not found");
     }
     try {
-      await upsertUser({
-        openId: user.openId,
-        lastSignedIn: signedInAt
-      });
+      await updateUserLastSignedIn(user.id, signedInAt);
     } catch (e) {
     }
     return user;
@@ -3182,11 +3199,16 @@ var appRouter = router({
       const allClients = await db.select().from(clients);
       const allAppointments = await db.select().from(appointments);
       const allServices = await db.select().from(services);
+      const adminEmail = getAdminEmail().toLowerCase();
+      const validProfessionals = allUsers.filter(
+        (u) => u.email && u.name && u.role !== "admin" && u.email.toLowerCase() !== adminEmail && u.openId !== "admin_master"
+      );
       const totalQuotedCents = allQuotes.reduce((acc, q) => acc + (q.totalCents || 0), 0);
       const acceptedQuotes = allQuotes.filter((q) => q.status === "aceito");
       const acceptedQuotedCents = acceptedQuotes.reduce((acc, q) => acc + (q.totalCents || 0), 0);
       return {
-        usersCount: allUsers.length,
+        usersCount: validProfessionals.length,
+        totalRawUsersCount: allUsers.length,
         profilesCount: allProfiles.length,
         quotesCount: allQuotes.length,
         acceptedQuotesCount: acceptedQuotes.length,
@@ -3206,22 +3228,61 @@ var appRouter = router({
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const allUsers = await db.select().from(users).orderBy(desc2(users.createdAt));
       const allProfiles = await db.select().from(professionalProfiles);
-      return allUsers.map((u) => {
+      const adminEmail = getAdminEmail().toLowerCase();
+      let seenAdmin = false;
+      const filteredUsers = allUsers.filter((u) => {
+        const isAdmin = u.openId === "admin_master" || u.email && u.email.toLowerCase() === adminEmail;
+        if (isAdmin) {
+          if (seenAdmin) return false;
+          seenAdmin = true;
+          return true;
+        }
+        return true;
+      });
+      return filteredUsers.map((u) => {
         const prof = allProfiles.find((p) => p.userId === u.id);
+        const isIncomplete = !u.name && !u.email;
         return {
           id: u.id,
-          name: u.name,
-          email: u.email,
+          name: u.name || (isIncomplete ? "Cadastro Incompleto (Sess\xE3o Antiga)" : "Sem nome"),
+          email: u.email || "Sem e-mail",
           role: u.role,
           loginMethod: u.loginMethod,
           createdAt: u.createdAt,
           lastSignedIn: u.lastSignedIn,
-          profileName: prof?.displayName,
-          profession: prof?.professionName,
-          city: prof?.city,
-          slug: prof?.slug
+          profileName: prof?.displayName || (isIncomplete ? "\u2014" : "Sem perfil"),
+          profession: prof?.professionName || "\u2014",
+          city: prof?.city || "\u2014",
+          slug: prof?.slug || "\u2014",
+          isIncomplete
         };
       });
+    }),
+    cleanGhostSessions: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      const adminEmail = getAdminEmail().toLowerCase();
+      const allProfiles = await db.select({ userId: professionalProfiles.userId }).from(professionalProfiles);
+      const protectedUserIds = new Set(allProfiles.map((p) => p.userId));
+      const allUsers = await db.select().from(users).orderBy(desc2(users.createdAt));
+      const ghostUserIds = allUsers.filter((u) => !u.name && !u.email && u.role === "user" && !protectedUserIds.has(u.id)).map((u) => u.id);
+      const adminRows = allUsers.filter((u) => u.openId === "admin_master" || u.email && u.email.toLowerCase() === adminEmail);
+      const duplicateAdminIds = adminRows.slice(1).map((u) => u.id);
+      const toDelete = [...ghostUserIds, ...duplicateAdminIds];
+      if (toDelete.length > 0) {
+        for (const id of toDelete) {
+          await db.delete(users).where(eq3(users.id, id));
+        }
+      }
+      return {
+        success: true,
+        deletedGhostCount: ghostUserIds.length,
+        deletedAdminDuplicates: duplicateAdminIds.length,
+        remainingUsersCount: allUsers.length - toDelete.length
+      };
     }),
     resetDatabase: protectedProcedure.mutation(async ({ ctx }) => {
       if (ctx.user.role !== "admin") {

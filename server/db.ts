@@ -37,36 +37,63 @@ export async function getDb(): Promise<ReturnType<typeof drizzle>> {
   return _db;
 }
 
+export async function updateUserLastSignedIn(userId: number, date = new Date()): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ lastSignedIn: date }).where(eq(users.id, userId));
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
   if (!db) return;
 
-  const values: InsertUser = { openId: user.openId };
+  const now = new Date();
   const updateSet: Record<string, unknown> = {};
   const textFields = ["name", "email", "loginMethod", "passwordHash"] as const;
   for (const field of textFields) {
     if (user[field] !== undefined) {
-      values[field] = user[field] ?? null;
       updateSet[field] = user[field] ?? null;
     }
   }
-  if (user.lastSignedIn !== undefined) {
-    values.lastSignedIn = user.lastSignedIn;
-    updateSet.lastSignedIn = user.lastSignedIn;
-  } else {
-    values.lastSignedIn = new Date();
-    updateSet.lastSignedIn = values.lastSignedIn;
-  }
+  updateSet.lastSignedIn = user.lastSignedIn ?? now;
   if (user.role !== undefined) {
-    values.role = user.role;
     updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
-    values.role = "admin";
+  } else if (user.openId === ENV.ownerOpenId || user.openId === "admin_master") {
     updateSet.role = "admin";
   }
 
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  // 1. Check if user already exists by openId
+  const existingByOpenId = await getUserByOpenId(user.openId);
+  if (existingByOpenId) {
+    if (Object.keys(updateSet).length > 0) {
+      await db.update(users).set(updateSet).where(eq(users.id, existingByOpenId.id));
+    }
+    return;
+  }
+
+  // 2. Check if user already exists by email (prevents duplicate accounts if openId differs)
+  if (user.email) {
+    const existingByEmail = await getUserByEmail(user.email);
+    if (existingByEmail) {
+      await db.update(users).set({ ...updateSet, openId: user.openId }).where(eq(users.id, existingByEmail.id));
+      return;
+    }
+  }
+
+  // 3. Only insert if user does not exist by openId or email
+  const values: InsertUser = {
+    openId: user.openId,
+    name: user.name ?? null,
+    email: user.email ? user.email.trim().toLowerCase() : null,
+    loginMethod: user.loginMethod ?? null,
+    passwordHash: user.passwordHash ?? null,
+    role: (updateSet.role as any) || "user",
+    lastSignedIn: (updateSet.lastSignedIn as Date) || now,
+    createdAt: now,
+  };
+
+  await db.insert(users).values(values);
 }
 
 export async function getUserByOpenId(openId: string) {

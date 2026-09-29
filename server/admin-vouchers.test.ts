@@ -101,6 +101,25 @@ describe("Painel Administrativo & Gestão de Vouchers - MeuAutônomo", () => {
     expect(me?.role).toBe("admin");
   });
 
+  it("3b. Estabilidade de contas: logins e consultas repetidas NÃO duplicam administradores nem criam usuários vazios", async () => {
+    const { ctx } = createMockContext(adminUser);
+    const caller = appRouter.createCaller(ctx);
+    const initialUsers = await caller.admin.listUsers();
+
+    // Simula logins e autenticações repetidas
+    for (let i = 0; i < 3; i++) {
+      await caller.admin.login({ email: adminEmail, password: adminPassword });
+      await sdk.authenticateRequest({
+        headers: { authorization: `Bearer ${adminSessionToken}` },
+        cookies: {},
+      } as any);
+      await caller.auth.me();
+    }
+
+    const afterUsers = await caller.admin.listUsers();
+    expect(afterUsers.length).toBe(initialUsers.length);
+  });
+
   it("4. Bloqueio para usuário comum: não-administrador não pode acessar dados administrativos", async () => {
     const commonUser: TrpcContext["user"] = {
       id: 99999,

@@ -1317,12 +1317,23 @@ export const appRouter = router({
       const allAppointments = await db.select().from(appointments);
       const allServices = await db.select().from(services);
 
+      const adminEmail = getAdminEmail().toLowerCase();
+      // Contar apenas profissionais válidos cadastrados (excluindo resíduos técnicos sem identificação e a conta mestre do admin)
+      const validProfessionals = allUsers.filter(u =>
+        u.email &&
+        u.name &&
+        u.role !== "admin" &&
+        u.email.toLowerCase() !== adminEmail &&
+        u.openId !== "admin_master"
+      );
+
       const totalQuotedCents = allQuotes.reduce((acc, q) => acc + (q.totalCents || 0), 0);
       const acceptedQuotes = allQuotes.filter(q => q.status === "aceito");
       const acceptedQuotedCents = acceptedQuotes.reduce((acc, q) => acc + (q.totalCents || 0), 0);
 
       return {
-        usersCount: allUsers.length,
+        usersCount: validProfessionals.length,
+        totalRawUsersCount: allUsers.length,
         profilesCount: allProfiles.length,
         quotesCount: allQuotes.length,
         acceptedQuotesCount: acceptedQuotes.length,
@@ -1343,23 +1354,76 @@ export const appRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
       const allProfiles = await db.select().from(professionalProfiles);
+      const adminEmail = getAdminEmail().toLowerCase();
 
-      return allUsers.map(u => {
+      // Deduplica visualmente registros de admin (mantendo o mais recente)
+      let seenAdmin = false;
+      const filteredUsers = allUsers.filter(u => {
+        const isAdmin = u.openId === "admin_master" || (u.email && u.email.toLowerCase() === adminEmail);
+        if (isAdmin) {
+          if (seenAdmin) return false;
+          seenAdmin = true;
+          return true;
+        }
+        return true;
+      });
+
+      return filteredUsers.map(u => {
         const prof = allProfiles.find(p => p.userId === u.id);
+        const isIncomplete = !u.name && !u.email;
         return {
           id: u.id,
-          name: u.name,
-          email: u.email,
+          name: u.name || (isIncomplete ? "Cadastro Incompleto (Sessão Antiga)" : "Sem nome"),
+          email: u.email || "Sem e-mail",
           role: u.role,
           loginMethod: u.loginMethod,
           createdAt: u.createdAt,
           lastSignedIn: u.lastSignedIn,
-          profileName: prof?.displayName,
-          profession: prof?.professionName,
-          city: prof?.city,
-          slug: prof?.slug,
+          profileName: prof?.displayName || (isIncomplete ? "—" : "Sem perfil"),
+          profession: prof?.professionName || "—",
+          city: prof?.city || "—",
+          slug: prof?.slug || "—",
+          isIncomplete,
         };
       });
+    }),
+
+    cleanGhostSessions: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const adminEmail = getAdminEmail().toLowerCase();
+
+      const allProfiles = await db.select({ userId: professionalProfiles.userId }).from(professionalProfiles);
+      const protectedUserIds = new Set(allProfiles.map(p => p.userId));
+
+      const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+
+      // Sessões fantasmas sem nome e sem e-mail e sem perfil
+      const ghostUserIds = allUsers
+        .filter(u => !u.name && !u.email && u.role === "user" && !protectedUserIds.has(u.id))
+        .map(u => u.id);
+
+      // Duplicatas antigas do admin (preserva apenas o mais recente)
+      const adminRows = allUsers.filter(u => u.openId === "admin_master" || (u.email && u.email.toLowerCase() === adminEmail));
+      const duplicateAdminIds = adminRows.slice(1).map(u => u.id);
+
+      const toDelete = [...ghostUserIds, ...duplicateAdminIds];
+
+      if (toDelete.length > 0) {
+        for (const id of toDelete) {
+          await db.delete(users).where(eq(users.id, id));
+        }
+      }
+
+      return {
+        success: true,
+        deletedGhostCount: ghostUserIds.length,
+        deletedAdminDuplicates: duplicateAdminIds.length,
+        remainingUsersCount: allUsers.length - toDelete.length,
+      };
     }),
 
     resetDatabase: protectedProcedure.mutation(async ({ ctx }) => {

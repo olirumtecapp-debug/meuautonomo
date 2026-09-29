@@ -166,6 +166,17 @@ export default function AdminPage() {
     },
   });
 
+  const cleanGhostMutation = trpc.admin.cleanGhostSessions.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Higienização concluída! ${data.deletedGhostCount} sessões antigas e ${data.deletedAdminDuplicates} duplicatas removidas.`);
+      metricsQuery.refetch();
+      usersQuery.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao higienizar sessões.");
+    },
+  });
+
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: async () => {
       clearSessionToken();
@@ -572,7 +583,7 @@ export default function AdminPage() {
                   {metrics ? metrics.profilesCount : "..."}
                 </div>
                 <p className="mt-1 text-xs text-[#71867f]">
-                  {metrics ? `${metrics.usersCount} contas cadastradas` : "Carregando..."}
+                  {metrics ? `${metrics.usersCount} profissionais ativos` : "Carregando..."}
                 </p>
               </Card>
 
@@ -660,9 +671,21 @@ export default function AdminPage() {
                       Usuários criados no banco de dados e seus respectivos espaços públicos.
                     </p>
                   </div>
-                  <Badge variant="outline" className="rounded-lg border-[#dce5dc]">
-                    {usersQuery.data?.length || 0} registros
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => cleanGhostMutation.mutate()}
+                      disabled={cleanGhostMutation.isPending}
+                      className="rounded-xl border-[#dce5dc] text-xs font-semibold text-[#38584f] hover:bg-[#f2f7f0]"
+                      title="Remove com segurança apenas sessões fantasmas sem nome e sem e-mail"
+                    >
+                      {cleanGhostMutation.isPending ? "Higienizando..." : "Limpar Sessões Antigas"}
+                    </Button>
+                    <Badge variant="outline" className="rounded-lg border-[#dce5dc]">
+                      {usersQuery.data?.length || 0} registros
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -682,7 +705,19 @@ export default function AdminPage() {
                         usersQuery.data.map((u) => (
                           <tr key={u.id} className="hover:bg-[#fbfcf9] transition">
                             <td className="px-6 py-4 font-semibold text-[#173a34]">
-                              {u.profileName || u.name}
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span>{u.profileName || u.name}</span>
+                                {u.role === "admin" && (
+                                  <Badge className="bg-[#173a34] text-[#d9f56a] text-[10px] py-0 px-1.5 h-4">
+                                    Admin
+                                  </Badge>
+                                )}
+                                {u.isIncomplete && (
+                                  <Badge variant="outline" className="text-amber-800 bg-amber-50 border-amber-200 text-[10px] py-0 px-1.5 h-4">
+                                    Sessão Antiga
+                                  </Badge>
+                                )}
+                              </div>
                               {u.profession && (
                                 <span className="block text-[11px] font-normal text-[#71867f]">
                                   {u.profession}
