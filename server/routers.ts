@@ -1315,6 +1315,102 @@ export const appRouter = router({
         setDemoMode(input.enabled);
         return { success: true, demoMode: isDemoMode() };
       }),
+
+    listVouchers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const allVouchers = await db.select().from(vouchers).orderBy(desc(vouchers.createdAt));
+      const allRedemptions = await db.select().from(voucherRedemptions).orderBy(desc(voucherRedemptions.redeemedAt));
+      const allUsers = await db.select().from(users);
+      const allProfiles = await db.select().from(professionalProfiles);
+
+      const redemptionsWithDetails = allRedemptions.map(r => {
+        const u = allUsers.find(user => user.id === r.userId);
+        const p = allProfiles.find(prof => prof.id === r.profileId);
+        return {
+          id: r.id,
+          voucherId: r.voucherId,
+          voucherCode: r.voucherCode,
+          userName: u?.name || "Usuário",
+          userEmail: u?.email || "Sem e-mail",
+          profileName: p?.displayName || "Sem perfil",
+          redeemedAt: r.redeemedAt,
+        };
+      });
+
+      return {
+        vouchers: allVouchers,
+        redemptions: redemptionsWithDetails,
+      };
+    }),
+
+    createVoucher: protectedProcedure
+      .input(
+        z.object({
+          code: z.string().min(3).max(50),
+          description: z.string().max(255).optional(),
+          days: z.number().int().min(0).default(15),
+          plan: z.enum(["pro", "team"]).default("pro"),
+          isVipTotal: z.boolean().default(false),
+          maxUses: z.number().int().min(1).default(1),
+          expiresAt: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        const cleanCode = input.code.trim().toUpperCase().replace(/\s+/g, "-");
+        const existing = await db.select().from(vouchers).where(eq(vouchers.code, cleanCode)).limit(1);
+        if (existing[0]) {
+          throw new TRPCError({ code: "CONFLICT", message: `O voucher ${cleanCode} já existe no sistema.` });
+        }
+
+        await db.insert(vouchers).values({
+          code: cleanCode,
+          description: input.description || (input.isVipTotal ? "Acesso VIP Total Vitalício" : `${input.days} dias de Plano ${input.plan.toUpperCase()}`),
+          days: input.isVipTotal ? 0 : input.days,
+          plan: input.plan,
+          isVipTotal: input.isVipTotal,
+          maxUses: input.maxUses,
+          usedCount: 0,
+          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+          active: true,
+        });
+
+        return { success: true, code: cleanCode };
+      }),
+
+    toggleVoucher: protectedProcedure
+      .input(z.object({ id: z.number(), active: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(vouchers).set({ active: input.active }).where(eq(vouchers.id, input.id));
+        return { success: true };
+      }),
+
+    deleteVoucher: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.delete(voucherRedemptions).where(eq(voucherRedemptions.voucherId, input.id));
+        await db.delete(vouchers).where(eq(vouchers.id, input.id));
+        return { success: true };
+      }),
   }),
 
   voucher: router({

@@ -32,6 +32,9 @@ import {
   CreditCard,
   ShieldCheck,
   LayoutDashboard,
+  Ticket,
+  Crown,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -43,14 +46,30 @@ export default function AdminPage() {
   const [password, setPassword] = useState("admin@123456");
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "marketing" | "simulator">("simulator");
+  const [activeTab, setActiveTab] = useState<"overview" | "vouchers" | "marketing" | "simulator">("vouchers");
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
+
+  // Voucher form states
+  const [voucherCodeInput, setVoucherCodeInput] = useState("");
+  const [voucherDescInput, setVoucherDescInput] = useState("");
+  const [voucherDaysInput, setVoucherDaysInput] = useState(20);
+  const [voucherPlanInput, setVoucherPlanInput] = useState<"pro" | "team">("pro");
+  const [voucherIsVipInput, setVoucherIsVipInput] = useState(false);
+  const [voucherMaxUsesInput, setVoucherMaxUsesInput] = useState(1);
+  const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard?.writeText(text);
     setCopiedScript(id);
     toast.success("Roteiro copiado para a área de transferência!");
     setTimeout(() => setCopiedScript(null), 2500);
+  };
+
+  const copyVoucherToClipboard = (code: string) => {
+    navigator.clipboard?.writeText(code);
+    setCopiedVoucher(code);
+    toast.success(`Código ${code} copiado para envio!`);
+    setTimeout(() => setCopiedVoucher(null), 2000);
   };
 
   const meQuery = trpc.auth.me.useQuery();
@@ -61,6 +80,42 @@ export default function AdminPage() {
   const usersQuery = trpc.admin.listUsers.useQuery(undefined, {
     enabled: meQuery.data?.role === "admin",
     retry: false,
+  });
+  const vouchersQuery = trpc.admin.listVouchers.useQuery(undefined, {
+    enabled: meQuery.data?.role === "admin",
+    retry: false,
+  });
+
+  const createVoucherMutation = trpc.admin.createVoucher.useMutation({
+    onSuccess: (data) => {
+      toast.success(`🎉 Cupom ${data.code} criado com sucesso!`);
+      setVoucherCodeInput("");
+      setVoucherDescInput("");
+      vouchersQuery.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao criar voucher.");
+    },
+  });
+
+  const toggleVoucherMutation = trpc.admin.toggleVoucher.useMutation({
+    onSuccess: () => {
+      toast.success("Status do voucher atualizado!");
+      vouchersQuery.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao atualizar voucher.");
+    },
+  });
+
+  const deleteVoucherMutation = trpc.admin.deleteVoucher.useMutation({
+    onSuccess: () => {
+      toast.success("Voucher removido com sucesso!");
+      vouchersQuery.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao excluir voucher.");
+    },
   });
 
   const loginMutation = trpc.admin.login.useMutation({
@@ -300,6 +355,22 @@ export default function AdminPage() {
 
           <button
             type="button"
+            onClick={() => setActiveTab("vouchers")}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition -mb-[2px] ${
+              activeTab === "vouchers"
+                ? "border-[#173a34] text-[#173a34] bg-white rounded-t-2xl shadow-xs"
+                : "border-transparent text-[#71867f] hover:text-[#173a34]"
+            }`}
+          >
+            <Ticket className="h-4 w-4 text-[#8aa500]" />
+            <span>Cupons & Vouchers</span>
+            <span className="rounded-full bg-[#173a34] px-2 py-0.5 text-[10px] font-bold text-[#d9f56a]">
+              Novo
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab("marketing")}
             className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition -mb-[2px] ${
               activeTab === "marketing"
@@ -491,6 +562,468 @@ export default function AdminPage() {
                         <tr>
                           <td colSpan={5} className="px-6 py-8 text-center text-[#82948e]">
                             Nenhum usuário encontrado.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* CONTEÚDO DA ABA: GESTÃO DE CUPONS & VOUCHERS */}
+        {activeTab === "vouchers" && (
+          <div className="space-y-8">
+            {/* CARDS DE RESUMO DE VOUCHERS */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Card className="rounded-[22px] border-0 bg-white p-5 shadow-[0_8px_30px_rgba(19,42,39,0.04)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#82948e] uppercase">Cupons Cadastrados</span>
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#eef5d2] text-[#819815]">
+                    <Ticket className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 text-2xl font-black text-[#173a34]">
+                  {vouchersQuery.data ? vouchersQuery.data.vouchers.length : "..."}
+                </div>
+                <p className="mt-1 text-xs text-[#71867f]">
+                  Disponíveis no banco de dados
+                </p>
+              </Card>
+
+              <Card className="rounded-[22px] border-0 bg-white p-5 shadow-[0_8px_30px_rgba(19,42,39,0.04)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#82948e] uppercase">Cupons Ativos</span>
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#e1f5ec] text-[#1c784e]">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 text-2xl font-black text-[#173a34]">
+                  {vouchersQuery.data ? vouchersQuery.data.vouchers.filter(v => v.active).length : "..."}
+                </div>
+                <p className="mt-1 text-xs text-[#71867f]">
+                  Prontos para resgate imediato
+                </p>
+              </Card>
+
+              <Card className="rounded-[22px] border-0 bg-white p-5 shadow-[0_8px_30px_rgba(19,42,39,0.04)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#82948e] uppercase">Resgates Realizados</span>
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#e1effa] text-[#23638e]">
+                    <Users className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 text-2xl font-black text-[#173a34]">
+                  {vouchersQuery.data ? vouchersQuery.data.redemptions.length : "..."}
+                </div>
+                <p className="mt-1 text-xs text-[#71867f]">
+                  Usuários que ativaram cupons
+                </p>
+              </Card>
+
+              <Card className="rounded-[22px] border-0 bg-white p-5 shadow-[0_8px_30px_rgba(19,42,39,0.04)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#82948e] uppercase">Vouchers VIP Total</span>
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#fef6e0] text-[#a1750d]">
+                    <Crown className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 text-2xl font-black text-[#173a34]">
+                  {vouchersQuery.data ? vouchersQuery.data.vouchers.filter(v => v.isVipTotal).length : "..."}
+                </div>
+                <p className="mt-1 text-xs text-[#71867f]">
+                  Acesso Vitalício ilimitado
+                </p>
+              </Card>
+            </div>
+
+            {/* CARD: CRIAR NOVO CUPOM / VOUCHER */}
+            <Card className="rounded-[28px] border-0 bg-white p-6 sm:p-8 shadow-[0_12px_40px_rgba(19,42,39,0.06)]">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-6 border-b border-[#edf1eb] gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-[#173a34] flex items-center gap-2">
+                    <Plus className="h-5 w-5 text-[#8aa500]" />
+                    Criar Novo Cupom / Voucher Promocional
+                  </h3>
+                  <p className="text-xs text-[#71867f] mt-1">
+                    Gere códigos especiais para suas primeiras testadoras, parceiras estratégicas ou promoções de lançamento.
+                  </p>
+                </div>
+
+                {/* BOTÕES DE PRESETS RÁPIDOS */}
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setVoucherCodeInput("VIP20TESTE");
+                      setVoucherDescInput("20 Dias PRO para Testadora");
+                      setVoucherDaysInput(20);
+                      setVoucherIsVipInput(false);
+                      setVoucherPlanInput("pro");
+                      setVoucherMaxUsesInput(1);
+                    }}
+                    className="rounded-xl border-[#dce5dc] text-xs font-bold text-[#173a34] hover:bg-[#edf5da]"
+                  >
+                    + Preset 20 Dias
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setVoucherCodeInput("PRO30DIAS");
+                      setVoucherDescInput("30 Dias Grátis de PRO");
+                      setVoucherDaysInput(30);
+                      setVoucherIsVipInput(false);
+                      setVoucherPlanInput("pro");
+                      setVoucherMaxUsesInput(10);
+                    }}
+                    className="rounded-xl border-[#dce5dc] text-xs font-bold text-[#173a34] hover:bg-[#edf5da]"
+                  >
+                    + Preset 30 Dias (10 Usos)
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setVoucherCodeInput("VIPTOTAL-SOCIO");
+                      setVoucherDescInput("VIP Total Vitalício");
+                      setVoucherDaysInput(0);
+                      setVoucherIsVipInput(true);
+                      setVoucherPlanInput("pro");
+                      setVoucherMaxUsesInput(1);
+                    }}
+                    className="rounded-xl border-[#f0deab] bg-[#fdf9ee] text-xs font-bold text-[#8a6405] hover:bg-[#faeed0]"
+                  >
+                    👑 Preset VIP Total Vitalício
+                  </Button>
+                </div>
+              </div>
+
+              {/* FORMULÁRIO */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!voucherCodeInput.trim()) return toast.error("Informe o código do cupom.");
+                  createVoucherMutation.mutate({
+                    code: voucherCodeInput.trim(),
+                    description: voucherDescInput.trim() || undefined,
+                    days: voucherDaysInput,
+                    plan: voucherPlanInput,
+                    isVipTotal: voucherIsVipInput,
+                    maxUses: voucherMaxUsesInput,
+                  });
+                }}
+                className="mt-6 space-y-5"
+              >
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div>
+                    <Label className="text-xs font-bold text-[#173a34] mb-1.5 block">
+                      Código do Cupom / Voucher *
+                    </Label>
+                    <Input
+                      placeholder="Ex: VIP20DIAS, PRO15, TESTE30"
+                      value={voucherCodeInput}
+                      onChange={(e) => setVoucherCodeInput(e.target.value.toUpperCase().replace(/\s+/g, "-"))}
+                      required
+                      className="h-11 rounded-xl border-[#dce5dc] font-mono font-bold tracking-wider uppercase text-base"
+                    />
+                    <p className="text-[11px] text-[#71867f] mt-1">
+                      Letras maiúsculas, números e traços.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-bold text-[#173a34] mb-1.5 block">
+                      Descrição / Finalidade (Opcional)
+                    </Label>
+                    <Input
+                      placeholder="Ex: Degustação da primeira cliente testadora"
+                      value={voucherDescInput}
+                      onChange={(e) => setVoucherDescInput(e.target.value)}
+                      className="h-11 rounded-xl border-[#dce5dc]"
+                    />
+                    <p className="text-[11px] text-[#71867f] mt-1">
+                      Identificação interna para você saber quem ganhou.
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-bold text-[#173a34] mb-1.5 block">
+                      Limite de Resgates (Quantas pessoas podem usar?)
+                    </Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={99999}
+                      value={voucherMaxUsesInput}
+                      onChange={(e) => setVoucherMaxUsesInput(Math.max(1, parseInt(e.target.value) || 1))}
+                      required
+                      className="h-11 rounded-xl border-[#dce5dc]"
+                    />
+                    <p className="text-[11px] text-[#71867f] mt-1">
+                      Use 1 para cupom exclusivo de uma única pessoa.
+                    </p>
+                  </div>
+                </div>
+
+                {/* TIPO: DIAS VS VIP TOTAL */}
+                <div className="rounded-2xl border border-[#dce5dc] bg-[#f9faf7] p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`grid h-10 w-10 place-items-center rounded-xl transition ${voucherIsVipInput ? "bg-[#d9f56a] text-[#173a34]" : "bg-emerald-100 text-emerald-800"}`}>
+                        {voucherIsVipInput ? <Crown className="h-5 w-5" /> : <Clock className="h-5 w-5" />}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-[#173a34]">
+                          {voucherIsVipInput ? "Acesso VIP Total (Vitalício / Permanente)" : "Acesso Temporário por Dias (Degustação)"}
+                        </h4>
+                        <p className="text-xs text-[#71867f] mt-0.5">
+                          {voucherIsVipInput
+                            ? "Nunca expira! A pessoa terá acesso total a todos os recursos da plataforma para sempre."
+                            : "Válido pela quantidade de dias escolhida. Quando expirar, o plano volta para Grátis sem perda de dados."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-[#173a34]">
+                        <input
+                          type="checkbox"
+                          checked={voucherIsVipInput}
+                          onChange={(e) => setVoucherIsVipInput(e.target.checked)}
+                          className="h-4 w-4 rounded accent-[#173a34]"
+                        />
+                        <span>Tornar este voucher VIP TOTAL VITALÍCIO</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  {!voucherIsVipInput && (
+                    <div className="mt-4 pt-4 border-t border-[#e8eee4] grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <Label className="text-xs font-bold text-[#173a34] mb-1.5 block">
+                          Quantidade de Dias de Degustação *
+                        </Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min={1}
+                            max={365}
+                            value={voucherDaysInput}
+                            onChange={(e) => setVoucherDaysInput(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="h-11 rounded-xl border-[#dce5dc] font-bold text-base"
+                          />
+                          <div className="flex gap-1">
+                            {[10, 15, 20, 30].map(d => (
+                              <button
+                                key={d}
+                                type="button"
+                                onClick={() => setVoucherDaysInput(d)}
+                                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${voucherDaysInput === d ? "bg-[#173a34] text-[#d9f56a]" : "bg-white border border-[#dce5dc] text-[#38584f] hover:bg-[#edf5da]"}`}
+                              >
+                                {d}d
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-bold text-[#173a34] mb-1.5 block">
+                          Plano a ser Concedido
+                        </Label>
+                        <select
+                          value={voucherPlanInput}
+                          onChange={(e) => setVoucherPlanInput(e.target.value as "pro" | "team")}
+                          className="h-11 w-full rounded-xl border border-[#dce5dc] bg-white px-3 text-sm font-semibold text-[#173a34] outline-none"
+                        >
+                          <option value="pro">Plano PRO (Individual / Autônomo)</option>
+                          <option value="team">Plano Equipe (Salões, Barbearias e Estúdios)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button
+                    type="submit"
+                    disabled={createVoucherMutation.isPending}
+                    className="h-12 px-8 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] font-bold text-sm shadow-md cursor-pointer"
+                  >
+                    {createVoucherMutation.isPending ? "Cadastrando..." : "Cadastrar Voucher no Banco"}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+
+            {/* TABELA DE CUPONS CADASTRADOS */}
+            <Card className="rounded-[28px] border-0 bg-white shadow-[0_12px_40px_rgba(19,42,39,0.06)] overflow-hidden">
+              <CardHeader className="p-6 border-b border-[#edf1eb]">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <CardTitle className="text-lg font-bold text-[#173a34] flex items-center gap-2">
+                    <Ticket className="h-5 w-5 text-[#8aa500]" />
+                    Cupons & Vouchers Cadastrados
+                  </CardTitle>
+                  <span className="text-xs text-[#71867f]">
+                    {vouchersQuery.data ? `${vouchersQuery.data.vouchers.length} cupons no sistema` : "Carregando..."}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#f8faf6] text-xs font-bold text-[#537067] uppercase border-b border-[#edf1eb]">
+                      <tr>
+                        <th className="px-6 py-4">Código</th>
+                        <th className="px-6 py-4">Descrição / Tipo</th>
+                        <th className="px-6 py-4">Benefício Concedido</th>
+                        <th className="px-6 py-4">Usos</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#edf1eb]">
+                      {vouchersQuery.data?.vouchers && vouchersQuery.data.vouchers.length > 0 ? (
+                        vouchersQuery.data.vouchers.map((v) => (
+                          <tr key={v.id} className="hover:bg-[#fcfdfa] transition">
+                            <td className="px-6 py-4 font-mono font-bold text-[#173a34]">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded-lg bg-[#edf5da] px-2.5 py-1 text-xs text-[#4c630f] border border-[#d2e4a8]">
+                                  {v.code}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => copyVoucherToClipboard(v.code)}
+                                  className="text-[#71867f] hover:text-[#173a34] transition p-1 cursor-pointer"
+                                  title="Copiar código"
+                                >
+                                  {copiedVoucher === v.code ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="block font-semibold text-[#173a34] text-xs">{v.description || "—"}</span>
+                              <span className="text-[11px] text-[#71867f] capitalize">Plano {v.plan}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              {v.isVipTotal ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 text-xs font-black">
+                                  <Crown className="h-3 w-3" /> VIP TOTAL VITALÍCIO
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 text-xs font-bold">
+                                  <Clock className="h-3 w-3" /> {v.days} Dias de Degustação
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-xs font-medium text-[#38584f]">
+                              <span className="font-bold text-[#173a34]">{v.usedCount}</span> / {v.maxUses >= 9999 ? "∞ Ilimitado" : v.maxUses}
+                            </td>
+                            <td className="px-6 py-4">
+                              <button
+                                type="button"
+                                onClick={() => toggleVoucherMutation.mutate({ id: v.id, active: !v.active })}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer ${v.active ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                              >
+                                {v.active ? (
+                                  <>
+                                    <ToggleRight className="h-4 w-4 text-emerald-600" /> Ativo
+                                  </>
+                                ) : (
+                                  <>
+                                    <ToggleLeft className="h-4 w-4" /> Inativo
+                                  </>
+                                )}
+                              </button>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (confirm(`Tem certeza que deseja excluir o voucher ${v.code}?`)) {
+                                    deleteVoucherMutation.mutate({ id: v.id });
+                                  }
+                                }}
+                                className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                                title="Excluir voucher"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-8 text-center text-[#82948e]">
+                            Nenhum voucher cadastrado ainda.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* CARD: HISTÓRICO DE RESGATES */}
+            <Card className="rounded-[28px] border-0 bg-white shadow-[0_12px_40px_rgba(19,42,39,0.06)] overflow-hidden">
+              <CardHeader className="p-6 border-b border-[#edf1eb]">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <CardTitle className="text-lg font-bold text-[#173a34] flex items-center gap-2">
+                    <Users className="h-5 w-5 text-[#23638e]" />
+                    Histórico de Resgates Realizados por Usuários
+                  </CardTitle>
+                  <span className="text-xs text-[#71867f]">
+                    {vouchersQuery.data ? `${vouchersQuery.data.redemptions.length} resgates registrados` : ""}
+                  </span>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-[#f8faf6] text-xs font-bold text-[#537067] uppercase border-b border-[#edf1eb]">
+                      <tr>
+                        <th className="px-6 py-4">Usuário</th>
+                        <th className="px-6 py-4">E-mail</th>
+                        <th className="px-6 py-4">Espaço / Perfil</th>
+                        <th className="px-6 py-4">Cupom Utilizado</th>
+                        <th className="px-6 py-4">Data do Resgate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#edf1eb]">
+                      {vouchersQuery.data?.redemptions && vouchersQuery.data.redemptions.length > 0 ? (
+                        vouchersQuery.data.redemptions.map((r) => (
+                          <tr key={r.id} className="hover:bg-[#fcfdfa] transition">
+                            <td className="px-6 py-4 font-bold text-[#173a34]">{r.userName}</td>
+                            <td className="px-6 py-4 text-[#5c756d] text-xs">{r.userEmail}</td>
+                            <td className="px-6 py-4 text-[#38584f] text-xs font-semibold">{r.profileName}</td>
+                            <td className="px-6 py-4 font-mono font-bold text-xs text-[#7a961f]">
+                              {r.voucherCode}
+                            </td>
+                            <td className="px-6 py-4 text-xs text-[#71867f]">
+                              {new Date(r.redeemedAt).toLocaleDateString("pt-BR", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-8 text-center text-[#82948e]">
+                            Nenhum cupom foi resgatado por usuários até o momento.
                           </td>
                         </tr>
                       )}

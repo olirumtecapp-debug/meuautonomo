@@ -2993,6 +2993,87 @@ var appRouter = router({
       }
       setDemoMode(input.enabled);
       return { success: true, demoMode: isDemoMode() };
+    }),
+    listVouchers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      const allVouchers = await db.select().from(vouchers).orderBy(desc2(vouchers.createdAt));
+      const allRedemptions = await db.select().from(voucherRedemptions).orderBy(desc2(voucherRedemptions.redeemedAt));
+      const allUsers = await db.select().from(users);
+      const allProfiles = await db.select().from(professionalProfiles);
+      const redemptionsWithDetails = allRedemptions.map((r) => {
+        const u = allUsers.find((user) => user.id === r.userId);
+        const p = allProfiles.find((prof) => prof.id === r.profileId);
+        return {
+          id: r.id,
+          voucherId: r.voucherId,
+          voucherCode: r.voucherCode,
+          userName: u?.name || "Usu\xE1rio",
+          userEmail: u?.email || "Sem e-mail",
+          profileName: p?.displayName || "Sem perfil",
+          redeemedAt: r.redeemedAt
+        };
+      });
+      return {
+        vouchers: allVouchers,
+        redemptions: redemptionsWithDetails
+      };
+    }),
+    createVoucher: protectedProcedure.input(
+      z2.object({
+        code: z2.string().min(3).max(50),
+        description: z2.string().max(255).optional(),
+        days: z2.number().int().min(0).default(15),
+        plan: z2.enum(["pro", "team"]).default("pro"),
+        isVipTotal: z2.boolean().default(false),
+        maxUses: z2.number().int().min(1).default(1),
+        expiresAt: z2.string().optional()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      const cleanCode = input.code.trim().toUpperCase().replace(/\s+/g, "-");
+      const existing = await db.select().from(vouchers).where(eq3(vouchers.code, cleanCode)).limit(1);
+      if (existing[0]) {
+        throw new TRPCError3({ code: "CONFLICT", message: `O voucher ${cleanCode} j\xE1 existe no sistema.` });
+      }
+      await db.insert(vouchers).values({
+        code: cleanCode,
+        description: input.description || (input.isVipTotal ? "Acesso VIP Total Vital\xEDcio" : `${input.days} dias de Plano ${input.plan.toUpperCase()}`),
+        days: input.isVipTotal ? 0 : input.days,
+        plan: input.plan,
+        isVipTotal: input.isVipTotal,
+        maxUses: input.maxUses,
+        usedCount: 0,
+        expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+        active: true
+      });
+      return { success: true, code: cleanCode };
+    }),
+    toggleVoucher: protectedProcedure.input(z2.object({ id: z2.number(), active: z2.boolean() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(vouchers).set({ active: input.active }).where(eq3(vouchers.id, input.id));
+      return { success: true };
+    }),
+    deleteVoucher: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError3({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(voucherRedemptions).where(eq3(voucherRedemptions.voucherId, input.id));
+      await db.delete(vouchers).where(eq3(vouchers.id, input.id));
+      return { success: true };
     })
   }),
   voucher: router({
