@@ -3168,7 +3168,7 @@ var appRouter = router({
       });
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-      return { success: true, email: adminEmail };
+      return { success: true, email: adminEmail, sessionToken };
     }),
     getMetrics: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin") {
@@ -3352,12 +3352,12 @@ var appRouter = router({
       if (voucher.expiresAt && /* @__PURE__ */ new Date() > new Date(voucher.expiresAt)) {
         throw new TRPCError3({ code: "BAD_REQUEST", message: "Este voucher j\xE1 expirou." });
       }
-      if (voucher.maxUses !== -1 && voucher.usedCount >= voucher.maxUses) {
-        throw new TRPCError3({ code: "BAD_REQUEST", message: "Este voucher atingiu o limite m\xE1ximo de resgates." });
-      }
       const alreadyRedeemed = await db.select().from(voucherRedemptions).where(and2(eq3(voucherRedemptions.voucherId, voucher.id), eq3(voucherRedemptions.userId, ctx.user.id))).limit(1);
       if (alreadyRedeemed[0]) {
         throw new TRPCError3({ code: "CONFLICT", message: "Voc\xEA j\xE1 resgatou este voucher anteriormente." });
+      }
+      if (voucher.maxUses !== -1 && voucher.usedCount >= voucher.maxUses) {
+        throw new TRPCError3({ code: "BAD_REQUEST", message: "Este voucher atingiu o limite m\xE1ximo de resgates." });
       }
       if (voucher.isVipTotal) {
         await db.update(professionalProfiles).set({

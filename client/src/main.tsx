@@ -34,12 +34,13 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   }
   sessionStorage.setItem("last_auth_redirect", now.toString());
 
-  // Não redireciona se já estiver em páginas públicas (landing, perfil público, orçamento público)
+  // Não redireciona se já estiver em páginas públicas (landing, perfil público, orçamento público) ou no painel admin
   if (
     window.location.pathname === "/" ||
     window.location.pathname.startsWith("/p/") ||
     window.location.pathname.startsWith("/orcamento/") ||
-    window.location.pathname.startsWith("/r/")
+    window.location.pathname.startsWith("/r/") ||
+    window.location.pathname.startsWith("/admin")
   ) {
     return;
   }

@@ -1301,7 +1301,7 @@ export const appRouter = router({
         });
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        return { success: true, email: adminEmail };
+        return { success: true, email: adminEmail, sessionToken };
       }),
 
     getMetrics: protectedProcedure.query(async ({ ctx }) => {
@@ -1516,10 +1516,6 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Este voucher já expirou." });
         }
 
-        if (voucher.maxUses !== -1 && voucher.usedCount >= voucher.maxUses) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Este voucher atingiu o limite máximo de resgates." });
-        }
-
         const alreadyRedeemed = await db
           .select()
           .from(voucherRedemptions)
@@ -1528,6 +1524,10 @@ export const appRouter = router({
 
         if (alreadyRedeemed[0]) {
           throw new TRPCError({ code: "CONFLICT", message: "Você já resgatou este voucher anteriormente." });
+        }
+
+        if (voucher.maxUses !== -1 && voucher.usedCount >= voucher.maxUses) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Este voucher atingiu o limite máximo de resgates." });
         }
 
         if (voucher.isVipTotal) {

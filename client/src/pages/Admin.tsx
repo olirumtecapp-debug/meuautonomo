@@ -45,6 +45,7 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 
 import { SimulatorTour } from "@/components/SimulatorTour";
+import { setSessionToken, clearSessionToken } from "@/components/AuthModal";
 
 export default function AdminPage() {
   const [email, setEmail] = useState("");
@@ -77,6 +78,7 @@ export default function AdminPage() {
     setTimeout(() => setCopiedVoucher(null), 2000);
   };
 
+  const utils = trpc.useUtils();
   const meQuery = trpc.auth.me.useQuery();
   const metricsQuery = trpc.admin.getMetrics.useQuery(undefined, {
     enabled: meQuery.data?.role === "admin",
@@ -124,11 +126,16 @@ export default function AdminPage() {
   });
 
   const loginMutation = trpc.admin.login.useMutation({
-    onSuccess: () => {
+    onSuccess: async (data) => {
+      if (data.sessionToken) {
+        setSessionToken(data.sessionToken);
+      }
       toast.success("Autenticado como administrador com sucesso!");
-      meQuery.refetch();
-      metricsQuery.refetch();
-      usersQuery.refetch();
+      await utils.auth.me.invalidate();
+      await meQuery.refetch();
+      await metricsQuery.refetch();
+      await usersQuery.refetch();
+      await vouchersQuery.refetch();
     },
     onError: (err) => {
       toast.error(err.message || "Credenciais incorretas.");
@@ -160,11 +167,24 @@ export default function AdminPage() {
   });
 
   const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      clearSessionToken();
       toast.info("Sessão administrativa encerrada.");
-      meQuery.refetch();
+      await utils.auth.me.invalidate();
+      await meQuery.refetch();
     },
   });
+
+  if (meQuery.isLoading) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-[#f4f7f1]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#173a34] border-t-transparent" />
+          <p className="text-sm font-medium text-[#71867f]">Verificando acesso administrativo...</p>
+        </div>
+      </div>
+    );
+  }
 
   const isAdmin = meQuery.data?.role === "admin";
 

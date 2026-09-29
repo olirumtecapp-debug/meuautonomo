@@ -36,6 +36,18 @@ export function setSessionToken(token: string) {
   }
 }
 
+export function clearSessionToken() {
+  try {
+    localStorage.removeItem("manus-token");
+    sessionStorage.removeItem("manus-token");
+    sessionStorage.removeItem("manus-cookie");
+    localStorage.removeItem("manus-runtime-user-info");
+    document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax`;
+  } catch (e) {
+    console.warn("[Auth] Failed to clear session token", e);
+  }
+}
+
 interface AuthModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
