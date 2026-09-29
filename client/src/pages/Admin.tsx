@@ -47,8 +47,8 @@ import { Link } from "wouter";
 import { SimulatorTour } from "@/components/SimulatorTour";
 
 export default function AdminPage() {
-  const [email, setEmail] = useState("admin@meuautonomo.com.br");
-  const [password, setPassword] = useState("admin@123456");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "vouchers" | "marketing" | "simulator" | "screens">("screens");
@@ -199,9 +199,11 @@ export default function AdminPage() {
               </Label>
               <Input
                 type="email"
+                placeholder="seu-email@dominio.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 className="h-11 rounded-xl border-[#dce5dc] bg-[#fbfcf9]"
               />
             </div>
@@ -212,25 +214,21 @@ export default function AdminPage() {
               </Label>
               <Input
                 type="password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="h-11 rounded-xl border-[#dce5dc] bg-[#fbfcf9]"
               />
-            </div>
-
-            <div className="rounded-xl border border-dashed border-[#dce5dc] bg-[#f8faf6] p-3 text-xs text-[#6e857e]">
-              <p className="font-semibold text-[#284b42]">Credenciais padrão de teste:</p>
-              <p className="mt-0.5">E-mail: <code>admin@meuautonomo.com.br</code></p>
-              <p>Senha: <code>admin@123456</code></p>
             </div>
 
             <Button
               type="submit"
               disabled={loginMutation.isPending}
-              className="h-11 w-full rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"
+              className="h-11 w-full rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] font-bold text-sm cursor-pointer mt-2"
             >
-              {loginMutation.isPending ? "Validando..." : "Entrar no Painel Admin"}
+              {loginMutation.isPending ? "Validando credenciais..." : "Entrar no Painel Admin"}
             </Button>
 
             <div className="pt-2 text-center">
