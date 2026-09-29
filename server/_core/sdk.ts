@@ -154,7 +154,7 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret;
+    const secret = ENV.cookieSecret || "meuautonomo-jwt-secret-key-super-secure-min-32-chars-fallback";
     return new TextEncoder().encode(secret);
   }
 
@@ -256,21 +256,30 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
-    // 1. Prefer the session cookie (regular OAuth login).
-    const cookies = this.parseCookies(req.headers.cookie);
-    let sessionToken = cookies.get(COOKIE_NAME);
-
-    // 2. Fallback to the Authorization header (Preview auto-login via
-    //    sessionStorage), used when the browser blocks iframe cookies such as
-    //    Safari ITP, private browsing, or iOS/Android WebView.
-    if (!sessionToken) {
-      const authHeader = req.headers.authorization;
-      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
-        sessionToken = authHeader.slice(7);
-      }
+    // 1. Check Authorization header (Bearer token)
+    let sessionToken: string | undefined;
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+      sessionToken = authHeader.slice(7).trim();
     }
 
-    const session = await this.verifySession(sessionToken);
+    // 2. Fallback to session cookie
+    if (!sessionToken) {
+      const cookies = this.parseCookies(req.headers.cookie);
+      sessionToken = cookies.get(COOKIE_NAME);
+    }
+
+    let session = sessionToken ? await this.verifySession(sessionToken) : null;
+
+    // 3. Fallback: if primary token verification failed, test alternative source
+    if (!session) {
+      const cookies = this.parseCookies(req.headers.cookie);
+      const cookieToken = cookies.get(COOKIE_NAME);
+      if (cookieToken && cookieToken !== sessionToken) {
+        session = await this.verifySession(cookieToken);
+        if (session) sessionToken = cookieToken;
+      }
+    }
 
     if (!session) {
       throw ForbiddenError("Invalid session cookie");
@@ -311,10 +320,14 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
+    try {
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: signedInAt,
+      });
+    } catch (e) {
+      // Non-critical background update
+    }
 
     return user;
   }

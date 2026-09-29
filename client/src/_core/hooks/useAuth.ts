@@ -43,8 +43,11 @@ export function useAuth(options?: UseAuthOptions) {
       // header-based sessions (Safari ITP / WebView) are logged out too. The
       // backend cookie is cleared by the logout mutation.
       try {
+        localStorage.removeItem("manus-token");
+        sessionStorage.removeItem("manus-token");
         sessionStorage.removeItem("manus-cookie");
         localStorage.removeItem("manus-runtime-user-info");
+        document.cookie = "manus-auth-session-token=; Path=/; Max-Age=-1";
       } catch {}
       utils.auth.me.setData(undefined, null);
       window.location.href = "/";
@@ -52,10 +55,12 @@ export function useAuth(options?: UseAuthOptions) {
   }, [logoutMutation, utils]);
 
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    try {
+      localStorage.setItem(
+        "manus-runtime-user-info",
+        JSON.stringify(meQuery.data)
+      );
+    } catch {}
     return {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading || logoutMutation.isPending,
@@ -77,11 +82,10 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (redirectPath && window.location.pathname === redirectPath) return;
 
-    // Navigate at this moment only. startLogin() mints the nonce + cookie itself.
     if (redirectPath) {
       window.location.href = redirectPath;
     } else {
-      startLogin();
+      window.location.href = "/?login=true";
     }
   }, [
     redirectOnUnauthenticated,

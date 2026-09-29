@@ -2,6 +2,7 @@ import { COOKIE_NAME, ONE_YEAR_MS, OAUTH_STATE_COOKIE, decodeOAuthState } from "
 import { parse as parseCookieHeader } from "cookie";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
+import { isDemoMode } from "../demoConfig";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
@@ -65,6 +66,10 @@ export function registerOAuthRoutes(app: Express) {
 
   // Rota de Teste Local / Demonstração (Permite entrar no /app sem OAuth externo)
   app.get("/api/dev-login", async (req: Request, res: Response) => {
+    if (!isDemoMode()) {
+      res.redirect("/?login=true");
+      return;
+    }
     try {
       const devOpenId = "dev-user-local";
       let devName = "Profissional Autônomo";

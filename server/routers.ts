@@ -275,8 +275,9 @@ export const appRouter = router({
         };
       }),
 
-    listUsers: publicProcedure.query(async () => {
-      if (!isDemoMode()) {
+    listUsers: publicProcedure.query(async ({ ctx }) => {
+      // Por segurança de dados e privacidade, nunca expor lista de contas publicamente
+      if (!ctx.user || ctx.user.role !== "admin") {
         return [];
       }
       const all = await getAllUsers();
@@ -288,7 +289,7 @@ export const appRouter = router({
       }));
     }),
 
-    isDemoMode: publicProcedure.query(() => isDemoMode()),
+    isDemoMode: publicProcedure.query(() => false),
 
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);

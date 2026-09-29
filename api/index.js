@@ -740,7 +740,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 // server/_core/env.ts
 var ENV = {
   appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
+  cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "meuautonomo-jwt-secret-key-super-secure-min-32-chars-fallback",
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
@@ -842,6 +842,43 @@ async function createNotification(profileId, title, body, type) {
   await db.insert(notifications2).values({ profileId, title, body, type });
 }
 
+// server/demoConfig.ts
+import fs2 from "fs";
+import path2 from "path";
+var CONFIG_FILE = path2.resolve(process.cwd(), "server", "data", "admin-config.json");
+var _config = {
+  demoMode: false,
+  adminEmail: process.env.ADMIN_EMAIL || "admin@meuautonomo.com.br"
+};
+try {
+  if (fs2.existsSync(CONFIG_FILE)) {
+    const raw = fs2.readFileSync(CONFIG_FILE, "utf-8");
+    _config = { ..._config, ...JSON.parse(raw) };
+  }
+} catch (e) {
+  console.warn("[AdminConfig] Could not load config file:", e);
+}
+function saveConfig() {
+  try {
+    const dir = path2.dirname(CONFIG_FILE);
+    if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
+    fs2.writeFileSync(CONFIG_FILE, JSON.stringify(_config, null, 2), "utf-8");
+  } catch (e) {
+    console.warn("[AdminConfig] Could not save config file:", e);
+  }
+}
+function isDemoMode() {
+  return _config.demoMode;
+}
+function setDemoMode(value) {
+  _config.demoMode = value;
+  saveConfig();
+}
+function getAdminEmail() {
+  return _config.adminEmail;
+}
+var DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin@123456";
+
 // server/_core/cookies.ts
 function isSecureRequest(req) {
   if (req.protocol === "https") return true;
@@ -851,11 +888,11 @@ function isSecureRequest(req) {
   return protoList.some((proto) => proto.trim().toLowerCase() === "https");
 }
 function getSessionCookieOptions(req) {
-  const isSecure = isSecureRequest(req);
+  const isSecure = isSecureRequest(req) || process.env.NODE_ENV === "production";
   return {
     httpOnly: true,
     path: "/",
-    sameSite: isSecure ? "none" : "lax",
+    sameSite: "lax",
     secure: isSecure
   };
 }
@@ -975,7 +1012,7 @@ var SDKServer = class {
     return new Map(Object.entries(parsed));
   }
   getSessionSecret() {
-    const secret = ENV.cookieSecret;
+    const secret = ENV.cookieSecret || "meuautonomo-jwt-secret-key-super-secure-min-32-chars-fallback";
     return new TextEncoder().encode(secret);
   }
   /**
@@ -1049,15 +1086,24 @@ var SDKServer = class {
     };
   }
   async authenticateRequest(req) {
-    const cookies = this.parseCookies(req.headers.cookie);
-    let sessionToken = cookies.get(COOKIE_NAME);
+    let sessionToken;
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+      sessionToken = authHeader.slice(7).trim();
+    }
     if (!sessionToken) {
-      const authHeader = req.headers.authorization;
-      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
-        sessionToken = authHeader.slice(7);
+      const cookies = this.parseCookies(req.headers.cookie);
+      sessionToken = cookies.get(COOKIE_NAME);
+    }
+    let session = sessionToken ? await this.verifySession(sessionToken) : null;
+    if (!session) {
+      const cookies = this.parseCookies(req.headers.cookie);
+      const cookieToken = cookies.get(COOKIE_NAME);
+      if (cookieToken && cookieToken !== sessionToken) {
+        session = await this.verifySession(cookieToken);
+        if (session) sessionToken = cookieToken;
       }
     }
-    const session = await this.verifySession(sessionToken);
     if (!session) {
       throw ForbiddenError("Invalid session cookie");
     }
@@ -1091,10 +1137,13 @@ var SDKServer = class {
     if (!user) {
       throw ForbiddenError("User not found");
     }
-    await upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt
-    });
+    try {
+      await upsertUser({
+        openId: user.openId,
+        lastSignedIn: signedInAt
+      });
+    } catch (e) {
+    }
     return user;
   }
 };
@@ -1164,6 +1213,10 @@ function registerOAuthRoutes(app2) {
     }
   });
   app2.get("/api/dev-login", async (req, res) => {
+    if (!isDemoMode()) {
+      res.redirect("/?login=true");
+      return;
+    }
     try {
       const devOpenId = "dev-user-local";
       let devName = "Profissional Aut\xF4nomo";
@@ -1775,43 +1828,6 @@ function modeloOrcamentoAprovado(params) {
   return { assunto, texto, html };
 }
 
-// server/demoConfig.ts
-import fs2 from "fs";
-import path2 from "path";
-var CONFIG_FILE = path2.resolve(process.cwd(), "server", "data", "admin-config.json");
-var _config = {
-  demoMode: process.env.NODE_ENV !== "production",
-  adminEmail: process.env.ADMIN_EMAIL || "admin@meuautonomo.com.br"
-};
-try {
-  if (fs2.existsSync(CONFIG_FILE)) {
-    const raw = fs2.readFileSync(CONFIG_FILE, "utf-8");
-    _config = { ..._config, ...JSON.parse(raw) };
-  }
-} catch (e) {
-  console.warn("[AdminConfig] Could not load config file:", e);
-}
-function saveConfig() {
-  try {
-    const dir = path2.dirname(CONFIG_FILE);
-    if (!fs2.existsSync(dir)) fs2.mkdirSync(dir, { recursive: true });
-    fs2.writeFileSync(CONFIG_FILE, JSON.stringify(_config, null, 2), "utf-8");
-  } catch (e) {
-    console.warn("[AdminConfig] Could not save config file:", e);
-  }
-}
-function isDemoMode() {
-  return _config.demoMode;
-}
-function setDemoMode(value) {
-  _config.demoMode = value;
-  saveConfig();
-}
-function getAdminEmail() {
-  return _config.adminEmail;
-}
-var DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin@123456";
-
 // server/routers.ts
 import crypto2 from "node:crypto";
 function hashPassword(password) {
@@ -2016,8 +2032,8 @@ var appRouter = router({
         user
       };
     }),
-    listUsers: publicProcedure.query(async () => {
-      if (!isDemoMode()) {
+    listUsers: publicProcedure.query(async ({ ctx }) => {
+      if (!ctx.user || ctx.user.role !== "admin") {
         return [];
       }
       const all = await getAllUsers();
@@ -2028,7 +2044,7 @@ var appRouter = router({
         email: u.email || "Sem e-mail"
       }));
     }),
-    isDemoMode: publicProcedure.query(() => isDemoMode()),
+    isDemoMode: publicProcedure.query(() => false),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

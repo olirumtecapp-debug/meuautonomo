@@ -11,8 +11,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle2, KeyRound, Loader2, Lock, LogIn, Sparkles, User, UserPlus, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  KeyRound,
+  Loader2,
+  LogIn,
+  Sparkles,
+  User,
+  UserPlus,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { COOKIE_NAME } from "@shared/const";
+
+export function setSessionToken(token: string) {
+  try {
+    localStorage.setItem("manus-token", token);
+    sessionStorage.setItem("manus-token", token);
+    sessionStorage.setItem("manus-cookie", `${COOKIE_NAME}=${token}`);
+    document.cookie = `${COOKIE_NAME}=${token}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  } catch (e) {
+    console.warn("[Auth] Failed to set session token in storage", e);
+  }
+}
 
 interface AuthModalProps {
   open: boolean;
@@ -22,6 +44,7 @@ interface AuthModalProps {
 
 export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthModalProps) {
   const [tab, setTab] = useState<"register" | "login">(defaultTab);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Formulário de Cadastro
   const [regName, setRegName] = useState("");
@@ -32,86 +55,114 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
+  const utils = trpc.useUtils();
+
+  const handleTabChange = (newTab: "register" | "login") => {
+    setTab(newTab);
+    setErrorMessage(null);
+  };
+
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: (data) => {
-      try {
-        if (data.sessionToken) {
-          sessionStorage.setItem("manus-cookie", data.sessionToken);
-        }
-      } catch (e) {}
-      toast.success("Conta criada com sucesso! Bem-vindo ao MeuAutônomo.");
+      setErrorMessage(null);
+      if (data.sessionToken) {
+        setSessionToken(data.sessionToken);
+      }
+      utils.auth.me.setData(undefined, data.user);
+      toast.success("Conta criada com sucesso! Redirecionando para seu espaço...");
       onOpenChange(false);
       window.location.href = "/app";
     },
     onError: (err) => {
-      toast.error(err.message || "Não foi possível criar sua conta.");
+      const msg = err.message || "Não foi possível criar sua conta. Verifique os dados.";
+      setErrorMessage(msg);
+      toast.error(msg);
     },
   });
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: (data) => {
-      try {
-        if (data.sessionToken) {
-          sessionStorage.setItem("manus-cookie", data.sessionToken);
-        }
-      } catch (e) {}
-      toast.success("Login realizado com sucesso!");
+      setErrorMessage(null);
+      if (data.sessionToken) {
+        setSessionToken(data.sessionToken);
+      }
+      utils.auth.me.setData(undefined, data.user);
+      toast.success("Login realizado com sucesso! Redirecionando...");
       onOpenChange(false);
       window.location.href = "/app";
     },
     onError: (err) => {
-      toast.error(err.message || "E-mail ou senha incorretos.");
+      const msg = err.message || "E-mail ou senha incorretos. Verifique e tente novamente.";
+      setErrorMessage(msg);
+      toast.error(msg);
     },
-  });
-
-  const quickLoginMutation = trpc.auth.quickLogin.useMutation({
-    onSuccess: (data) => {
-      try {
-        if (data.sessionToken) {
-          sessionStorage.setItem("manus-cookie", data.sessionToken);
-        }
-      } catch (e) {}
-      toast.success(`Acessando espaço de ${data.user?.name || "teste"}...`);
-      onOpenChange(false);
-      window.location.href = "/app";
-    },
-    onError: (err) => {
-      toast.error(err.message || "Erro no acesso rápido.");
-    },
-  });
-
-  const usersQuery = trpc.auth.listUsers.useQuery(undefined, {
-    enabled: open,
   });
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regName.trim()) return toast.error("Informe seu nome completo ou profissional.");
-    if (!regEmail.trim()) return toast.error("Informe seu e-mail.");
-    if (regPassword.length < 6) return toast.error("A senha deve ter pelo menos 6 caracteres.");
+    setErrorMessage(null);
+
+    const trimmedName = regName.trim();
+    const trimmedEmail = regEmail.trim();
+
+    if (!trimmedName || trimmedName.length < 2) {
+      const msg = "Informe seu nome completo ou profissional (mínimo 2 caracteres).";
+      setErrorMessage(msg);
+      return toast.error(msg);
+    }
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      const msg = "Informe um e-mail válido.";
+      setErrorMessage(msg);
+      return toast.error(msg);
+    }
+    if (regPassword.length < 6) {
+      const msg = "A senha deve ter pelo menos 6 caracteres.";
+      setErrorMessage(msg);
+      return toast.error(msg);
+    }
 
     registerMutation.mutate({
-      name: regName.trim(),
-      email: regEmail.trim(),
+      name: trimmedName,
+      email: trimmedEmail,
       password: regPassword,
     });
   };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginEmail.trim()) return toast.error("Informe seu e-mail.");
-    if (!loginPassword) return toast.error("Informe sua senha.");
+    setErrorMessage(null);
+
+    const trimmedEmail = loginEmail.trim();
+
+    if (!trimmedEmail || !trimmedEmail.includes("@")) {
+      const msg = "Informe seu e-mail cadastrado.";
+      setErrorMessage(msg);
+      return toast.error(msg);
+    }
+    if (!loginPassword) {
+      const msg = "Informe sua senha de acesso.";
+      setErrorMessage(msg);
+      return toast.error(msg);
+    }
 
     loginMutation.mutate({
-      email: loginEmail.trim(),
+      email: trimmedEmail,
       password: loginPassword,
     });
   };
 
-  const isSubmitting = registerMutation.isPending || loginMutation.isPending || quickLoginMutation.isPending;
+  const isSubmitting = registerMutation.isPending || loginMutation.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(val) => {
+        if (!isSubmitting) {
+          setErrorMessage(null);
+          onOpenChange(val);
+        }
+      }}
+    >
       <DialogContent className="max-h-[95vh] w-[95vw] max-w-lg overflow-y-auto rounded-[28px] border-0 bg-white p-6 shadow-[0_25px_70px_rgba(19,42,39,0.18)] sm:p-8">
         <DialogHeader className="text-center sm:text-left">
           <div className="flex items-center justify-between">
@@ -134,7 +185,7 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
         <div className="mt-4 grid grid-cols-2 rounded-2xl bg-[#f5f7f2] p-1.5 text-sm font-semibold">
           <button
             type="button"
-            onClick={() => setTab("register")}
+            onClick={() => handleTabChange("register")}
             className={cn(
               "flex items-center justify-center gap-2 rounded-xl py-2.5 transition",
               tab === "register"
@@ -146,7 +197,7 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
           </button>
           <button
             type="button"
-            onClick={() => setTab("login")}
+            onClick={() => handleTabChange("login")}
             className={cn(
               "flex items-center justify-center gap-2 rounded-xl py-2.5 transition",
               tab === "login"
@@ -157,6 +208,14 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
             <LogIn className="h-4 w-4" /> Entrar
           </button>
         </div>
+
+        {/* Mensagem de Erro Inline Clara e Visível */}
+        {errorMessage && (
+          <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 p-3.5 text-xs font-semibold text-red-700">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+            <div className="flex-1 leading-relaxed">{errorMessage}</div>
+          </div>
+        )}
 
         {/* Formulário: Criar Conta */}
         {tab === "register" && (
@@ -169,7 +228,10 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
                 <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#92a39d]" />
                 <Input
                   value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
+                  onChange={(e) => {
+                    setRegName(e.target.value);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
                   placeholder="Ex.: Carlos Ferreira ou Silva Eletricista"
                   className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] pl-10 text-sm focus:border-[#173a34]"
                   disabled={isSubmitting}
@@ -185,7 +247,10 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
               <Input
                 type="email"
                 value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
+                onChange={(e) => {
+                  setRegEmail(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="seuemail@exemplo.com.br"
                 className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] text-sm focus:border-[#173a34]"
                 disabled={isSubmitting}
@@ -202,7 +267,10 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
                 <Input
                   type="password"
                   value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
+                  onChange={(e) => {
+                    setRegPassword(e.target.value);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
                   placeholder="Mínimo 6 caracteres"
                   className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] pl-10 text-sm focus:border-[#173a34]"
                   disabled={isSubmitting}
@@ -244,7 +312,10 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
               <Input
                 type="email"
                 value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
+                onChange={(e) => {
+                  setLoginEmail(e.target.value);
+                  if (errorMessage) setErrorMessage(null);
+                }}
                 placeholder="seuemail@exemplo.com.br"
                 className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] text-sm focus:border-[#173a34]"
                 disabled={isSubmitting}
@@ -261,7 +332,10 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
                 <Input
                   type="password"
                   value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
+                  onChange={(e) => {
+                    setLoginPassword(e.target.value);
+                    if (errorMessage) setErrorMessage(null);
+                  }}
                   placeholder="Sua senha de acesso"
                   className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] pl-10 text-sm focus:border-[#173a34]"
                   disabled={isSubmitting}
@@ -287,39 +361,6 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
             </Button>
           </form>
         )}
-
-        {/* Seção de Contas de Teste / Demonstração Rápida */}
-        {usersQuery.data && usersQuery.data.length > 0 && (
-          <div className="mt-6 border-t border-[#e2ece4] pt-5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-[#7e948c]">
-              Contas cadastradas no ambiente de teste:
-            </p>
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              {usersQuery.data.map((u) => (
-                <button
-                  key={u.openId}
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={() => quickLoginMutation.mutate({ openId: u.openId })}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#dce5dc] bg-[#f5f7f2] px-3 py-2 text-xs font-semibold text-[#173a34] transition hover:border-[#173a34] hover:bg-white"
-                >
-                  <Users className="h-3.5 w-3.5 text-[#8aa500]" />
-                  <span>{u.name}</span>
-                  <span className="text-[10px] text-[#869b93]">({u.email})</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="mt-4 pt-3 border-t border-[#edf1eb] text-center">
-          <a
-            href="/admin"
-            className="text-[11px] font-medium text-[#8ea098] hover:text-[#173a34] inline-flex items-center gap-1 transition"
-          >
-            <Lock className="h-3 w-3 text-[#8aa500]" /> Painel de Administração & Reset de Testes
-          </a>
-        </div>
       </DialogContent>
     </Dialog>
   );

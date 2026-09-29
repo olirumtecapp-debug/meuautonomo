@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AuthModal } from "@/components/AuthModal";
-import { ArrowRight, CalendarDays, CheckCircle2, CircleDollarSign, ClipboardList, LogIn, Menu, UserPlus, Users, X } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, CalendarDays, CheckCircle2, CircleDollarSign, ClipboardList, LogIn, Menu, Sparkles, UserPlus, Users, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const features = [
   { icon: CalendarDays, title: "Agenda que acompanha seu ritmo", text: "Organize atendimentos, horários e mudanças sem planilhas espalhadas." },
@@ -16,11 +17,22 @@ export default function Home() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<"register" | "login">("register");
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
 
   const openAuth = (tab: "register" | "login") => {
     setAuthTab(tab);
     setAuthOpen(true);
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("login") === "true") {
+      openAuth("login");
+    } else if (params.get("register") === "true") {
+      openAuth("register");
+    }
+  }, []);
 
   return <div className="min-h-screen overflow-hidden bg-[#f5f7f2] text-[#173a34]">
     <header className="relative z-20 border-b border-[#dce5dc] bg-[#f5f7f2]/90 backdrop-blur">
@@ -35,12 +47,20 @@ export default function Home() {
             <option value="dark">Escuro</option>
             <option value="system">Automático</option>
           </select>
-          <Button variant="ghost" onClick={() => openAuth("login")} className="rounded-xl text-[#173a34] hover:bg-[#e4ece4]">
-            <LogIn className="mr-1.5 h-4 w-4" /> Entrar
-          </Button>
-          <Button onClick={() => openAuth("register")} className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]">
-            <UserPlus className="mr-1.5 h-4 w-4" /> Criar Conta
-          </Button>
+          {user ? (
+            <Button onClick={() => window.location.href = "/app"} className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]">
+              <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Meu Espaço ({user.name?.split(" ")[0] || "Autônomo"})
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={() => openAuth("login")} className="rounded-xl text-[#173a34] hover:bg-[#e4ece4]">
+                <LogIn className="mr-1.5 h-4 w-4" /> Entrar
+              </Button>
+              <Button onClick={() => openAuth("register")} className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]">
+                <UserPlus className="mr-1.5 h-4 w-4" /> Criar Conta
+              </Button>
+            </>
+          )}
         </nav>
         <button className="rounded-xl p-2 md:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Abrir menu">{menuOpen ? <X /> : <Menu />}</button>
       </div>
@@ -54,14 +74,22 @@ export default function Home() {
             <option value="dark">Escuro</option>
             <option value="system">Automático</option>
           </select>
-          <div className="grid grid-cols-2 gap-2 pt-2">
-            <Button variant="outline" onClick={() => { setMenuOpen(false); openAuth("login"); }} className="rounded-xl border-[#cbd8cc] text-[#173a34]">
-              Entrar
-            </Button>
-            <Button onClick={() => { setMenuOpen(false); openAuth("register"); }} className="rounded-xl bg-[#173a34] text-white">
-              Criar Conta
-            </Button>
-          </div>
+          {user ? (
+            <div className="pt-2">
+              <Button onClick={() => window.location.href = "/app"} className="w-full rounded-xl bg-[#173a34] text-white">
+                <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Acessar Meu Espaço
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setMenuOpen(false); openAuth("login"); }} className="rounded-xl border-[#cbd8cc] text-[#173a34]">
+                Entrar
+              </Button>
+              <Button onClick={() => { setMenuOpen(false); openAuth("register"); }} className="rounded-xl bg-[#173a34] text-white">
+                Criar Conta
+              </Button>
+            </div>
+          )}
         </div>
       </div>}
     </header>
@@ -80,12 +108,20 @@ export default function Home() {
               O MeuAutônomo reúne agenda, clientes, serviços, pedidos e pagamentos em um espaço simples para você trabalhar melhor.
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button onClick={() => openAuth("register")} className="h-13 rounded-2xl bg-[#173a34] px-6 text-base text-white shadow-[0_12px_24px_rgba(19,42,39,0.16)] hover:bg-[#28564d]">
-                Criar minha conta <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button variant="outline" onClick={() => openAuth("login")} className="h-13 rounded-2xl border-[#cbd8cc] bg-transparent px-6 text-base text-[#416158] hover:bg-white/60">
-                Já tenho conta (Entrar)
-              </Button>
+              {user ? (
+                <Button onClick={() => window.location.href = "/app"} className="h-13 rounded-2xl bg-[#173a34] px-6 text-base text-white shadow-[0_12px_24px_rgba(19,42,39,0.16)] hover:bg-[#28564d]">
+                  Ir para meu espaço <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              ) : (
+                <>
+                  <Button onClick={() => openAuth("register")} className="h-13 rounded-2xl bg-[#173a34] px-6 text-base text-white shadow-[0_12px_24px_rgba(19,42,39,0.16)] hover:bg-[#28564d]">
+                    Criar minha conta <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                  <Button variant="outline" onClick={() => openAuth("login")} className="h-13 rounded-2xl border-[#cbd8cc] bg-transparent px-6 text-base text-[#416158] hover:bg-white/60">
+                    Já tenho conta (Entrar)
+                  </Button>
+                </>
+              )}
             </div>
             <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#708880]">
               <span><CheckCircle2 className="mr-1.5 inline h-4 w-4 text-[#8aa500]" />Sem planilhas</span>

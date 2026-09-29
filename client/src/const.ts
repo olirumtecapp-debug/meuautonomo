@@ -17,9 +17,9 @@ export const startLogin = () => {
   const appId = import.meta.env.VITE_APP_ID;
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
 
-  // No ambiente local sem portal Manus configurado, entra pelo modo de teste local
+  // Sem portal OAuth Manus externo, abre o modal de login na landing page
   if (!oauthPortalUrl) {
-    window.location.href = "/api/dev-login";
+    window.location.href = "/?login=true";
     return;
   }
 

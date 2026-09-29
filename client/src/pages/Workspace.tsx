@@ -109,7 +109,7 @@ export function AppHome() {
   if (authLoading || (user && profileQuery.isLoading)) return <LoadingScreen />;
   if (!user) {
     if (typeof window !== "undefined") {
-      window.location.replace("/");
+      window.location.replace("/?login=true");
     }
     return <LoadingScreen />;
   }

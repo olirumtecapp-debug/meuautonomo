@@ -34,6 +34,16 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
   }
   sessionStorage.setItem("last_auth_redirect", now.toString());
 
+  // Não redireciona se já estiver em páginas públicas (landing, perfil público, orçamento público)
+  if (
+    window.location.pathname === "/" ||
+    window.location.pathname.startsWith("/p/") ||
+    window.location.pathname.startsWith("/orcamento/") ||
+    window.location.pathname.startsWith("/r/")
+  ) {
+    return;
+  }
+
   startLogin();
 };
 
@@ -64,17 +74,25 @@ const trpcClient = trpc.createClient({
         // session into sessionStorage so we can forward it as a Bearer token.
         // The regular OAuth cookie flow keeps working and takes priority server-side.
         try {
-          const raw = sessionStorage.getItem("manus-cookie");
+          const raw =
+            localStorage.getItem("manus-token") ||
+            sessionStorage.getItem("manus-token") ||
+            sessionStorage.getItem("manus-cookie");
+
           if (raw) {
             const prefix = `${COOKIE_NAME}=`;
-            const pair = raw.split(";").find(s => s.trim().startsWith(prefix));
-            const token = pair?.trim().slice(prefix.length);
+            let token = raw;
+            if (raw.includes(prefix)) {
+              const pair = raw.split(";").find(s => s.trim().startsWith(prefix));
+              token = pair ? pair.trim().slice(prefix.length) : raw;
+            }
+            token = token.trim();
             if (token) {
               return { Authorization: `Bearer ${token}` };
             }
           }
         } catch {
-          // sessionStorage unavailable
+          // storage unavailable
         }
         return {};
       },

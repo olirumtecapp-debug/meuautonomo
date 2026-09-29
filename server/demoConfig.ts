@@ -10,7 +10,7 @@ interface AdminConfig {
 }
 
 let _config: AdminConfig = {
-  demoMode: process.env.NODE_ENV !== "production",
+  demoMode: false,
   adminEmail: process.env.ADMIN_EMAIL || "admin@meuautonomo.com.br",
 };
 
