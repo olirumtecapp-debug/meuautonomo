@@ -535,10 +535,11 @@ export const appRouter = router({
       await db.update(appointments).set({ status: input.status, paymentStatus: input.paymentStatus ?? result[0].paymentStatus, paymentMethod: input.paymentMethod ?? result[0].paymentMethod }).where(eq(appointments.id, input.id));
       return { success: true };
     }),
-    update: protectedProcedure.input(z.object({ id: z.number(), clientId: z.number().optional(), serviceId: z.number().optional(), startsAt: z.string().datetime(), durationMinutes: z.number().int().min(15).max(1440), location: z.string().max(600).optional(), amountCents: z.number().int().min(0), notes: z.string().max(1200).optional() })).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(z.object({ id: z.number(), teamMemberId: z.number().nullable().optional(), clientId: z.number().optional(), serviceId: z.number().optional(), startsAt: z.string().datetime(), durationMinutes: z.number().int().min(15).max(1440), location: z.string().max(600).optional(), amountCents: z.number().int().min(0), notes: z.string().max(1200).optional() })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       if (input.clientId) await getOwnedClient(profile.id, input.clientId);
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      if (input.teamMemberId) await getOwnedTeamMember(profile.id, input.teamMemberId);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const existing = (await db.select().from(appointments).where(and(eq(appointments.id, input.id), eq(appointments.profileId, profile.id))).limit(1))[0];
@@ -548,8 +549,14 @@ export const appRouter = router({
       if (!isWithinAvailability(start, input.durationMinutes, availabilityRow)) throw new TRPCError({ code: "CONFLICT", message: "Esse horário está fora da sua disponibilidade." });
       const end = new Date(start.getTime() + input.durationMinutes * 60_000).getTime();
       const sameDay = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado"), ne(appointments.id, input.id)));
-      if (sameDay.some(item => new Date(item.startsAt).getTime() < end && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 60_000)) throw new TRPCError({ code: "CONFLICT", message: "Esse horário já está ocupado." });
-      await db.update(appointments).set({ clientId: input.clientId ?? null, serviceId: input.serviceId ?? null, startsAt: start, durationMinutes: input.durationMinutes, location: input.location ?? null, amountCents: input.amountCents, notes: input.notes ?? null }).where(eq(appointments.id, input.id));
+      const effectiveTeamMemberId = input.teamMemberId !== undefined ? input.teamMemberId : existing.teamMemberId;
+      if (sameDay.some(item => {
+        const t1 = effectiveTeamMemberId ?? 0;
+        const t2 = item.teamMemberId ?? 0;
+        if (t1 !== t2) return false;
+        return new Date(item.startsAt).getTime() < end && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 60_000;
+      })) throw new TRPCError({ code: "CONFLICT", message: "Esse horário já está ocupado para este profissional." });
+      await db.update(appointments).set({ clientId: input.clientId ?? null, serviceId: input.serviceId ?? null, teamMemberId: input.teamMemberId !== undefined ? input.teamMemberId : existing.teamMemberId, startsAt: start, durationMinutes: input.durationMinutes, location: input.location ?? null, amountCents: input.amountCents, notes: input.notes ?? null }).where(eq(appointments.id, input.id));
       return { success: true };
     }),
     cancel: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
@@ -750,7 +757,7 @@ export const appRouter = router({
       await db.insert(quoteItems).values(input.items.map(item => ({ quoteId, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
       if (input.requestId) await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(and(eq(requests.id, input.requestId), eq(requests.profileId, profile.id)));
       if (input.sendNow) await createNotification(profile.id, "Orçamento enviado", "Seu orçamento está disponível por um link público.", "quote");
-      return { success: true, quoteId, token: secureToken };
+      return { success: true, quoteId, token: input.sendNow ? secureToken : null };
     }),
     update: protectedProcedure.input(z.object({ id: z.number(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(true), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().int().min(1).max(100), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
@@ -762,15 +769,28 @@ export const appRouter = router({
       const totalCents = Math.max(0, subtotalCents - input.discountCents);
       await db.delete(quoteItems).where(eq(quoteItems.quoteId, input.id));
       await db.insert(quoteItems).values(input.items.map(item => ({ quoteId: input.id, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
-      await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : existing.status, respondedAt: null }).where(eq(quotes.id, input.id));
+      await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : "rascunho", respondedAt: null }).where(eq(quotes.id, input.id));
       if (input.sendNow) await createNotification(profile.id, "Orçamento revisado e reenviado", "A proposta atualizada está disponível no link do cliente.", "quote");
+      return { success: true, token: input.sendNow ? existing.secureToken : null };
+    }),
+    publish: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const existing = (await db.select().from(quotes).where(and(eq(quotes.id, input.id), eq(quotes.profileId, profile.id))).limit(1))[0];
+      if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Orçamento não encontrado." });
+      await db.update(quotes).set({ status: "enviado" }).where(eq(quotes.id, input.id));
+      if (existing.requestId) {
+        await db.update(requests).set({ status: "orcamento_enviado" }).where(and(eq(requests.id, existing.requestId), eq(requests.profileId, profile.id)));
+      }
+      await createNotification(profile.id, "Orçamento publicado", "O orçamento foi publicado e o link do cliente foi ativado.", "quote");
       return { success: true, token: existing.secureToken };
     }),
     getPublic: publicProcedure.input(z.object({ token: z.string().min(10) })).query(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quote = (await db.select().from(quotes).where(eq(quotes.secureToken, input.token)).limit(1))[0];
-      if (!quote) throw new TRPCError({ code: "NOT_FOUND", message: "Orçamento não encontrado." });
+      if (!quote || quote.status === "rascunho") throw new TRPCError({ code: "NOT_FOUND", message: "Este orçamento está em rascunho e ainda não foi liberado para visualização pública." });
       const profile = (await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, quote.profileId)).limit(1))[0];
       const items = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quote.id));
       return { quote, profile, items };
@@ -1023,6 +1043,41 @@ export const appRouter = router({
 
       const periodPayments = await db.select().from(payments).where(and(...payConditions)).orderBy(desc(payments.createdAt));
 
+      const appConditions = [eq(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
+      if (input?.from) appConditions.push(gte(appointments.startsAt, new Date(input.from)));
+      if (input?.to) appConditions.push(lt(appointments.startsAt, new Date(input.to)));
+      if (input?.teamMemberId) appConditions.push(eq(appointments.teamMemberId, input.teamMemberId));
+      const periodAppointments = await db.select().from(appointments).where(and(...appConditions));
+
+      const linkedAppIds = new Set(periodPayments.map(p => p.appointmentId).filter(Boolean));
+      const combinedPayments: any[] = [...periodPayments];
+      for (const app of periodAppointments) {
+        if (app.teamMemberId && !linkedAppIds.has(app.id) && app.amountCents > 0) {
+          const member = members.find(m => m.id === app.teamMemberId);
+          const commPct = member?.commissionPercent ?? 50;
+          const commAmount = Math.round((app.amountCents * commPct) / 100);
+          combinedPayments.push({
+            id: -app.id,
+            profileId: profile.id,
+            teamMemberId: app.teamMemberId,
+            appointmentId: app.id,
+            clientId: app.clientId,
+            serviceId: app.serviceId,
+            amountCents: app.amountCents,
+            commissionPercent: commPct,
+            commissionAmountCents: commAmount,
+            studioAmountCents: app.amountCents - commAmount,
+            commissionPaid: false,
+            method: (app.paymentMethod as any) || "pix",
+            status: app.paymentStatus === "pago" || app.status === "concluido" ? "pago" : "pendente",
+            note: app.notes || null,
+            paidAt: app.paymentStatus === "pago" ? new Date(app.startsAt) : null,
+            createdAt: new Date(app.startsAt),
+            updatedAt: new Date(app.startsAt)
+          });
+        }
+      }
+
       const expConditions = [eq(expenses.profileId, profile.id)];
       if (input?.from) expConditions.push(gte(expenses.occurredAt, new Date(input.from)));
       if (input?.to) expConditions.push(lt(expenses.occurredAt, new Date(input.to)));
@@ -1032,7 +1087,7 @@ export const appRouter = router({
 
       // Agrupar por parceiro
       const breakdown = members.map(m => {
-        const mPayments = periodPayments.filter(p => p.teamMemberId === m.id);
+        const mPayments = combinedPayments.filter(p => p.teamMemberId === m.id);
         const grossCents = mPayments.reduce((sum, p) => sum + p.amountCents, 0);
         const receivedCents = mPayments.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
         
@@ -1055,8 +1110,8 @@ export const appRouter = router({
         };
       });
 
-      const totalGrossCents = periodPayments.reduce((sum, p) => sum + p.amountCents, 0);
-      const totalReceivedCents = periodPayments.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      const totalGrossCents = combinedPayments.reduce((sum, p) => sum + p.amountCents, 0);
+      const totalReceivedCents = combinedPayments.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
       const totalCommissionCents = breakdown.reduce((sum, b) => sum + b.commissionCents, 0);
       const totalStudioNetCents = totalReceivedCents - totalCommissionCents;
       const finalProfitCents = totalStudioNetCents - totalExpensesCents;
@@ -1069,7 +1124,7 @@ export const appRouter = router({
         totalExpensesCents,
         finalProfitCents,
         breakdown,
-        payments: periodPayments,
+        payments: combinedPayments,
       };
     }),
   }),
@@ -1138,8 +1193,18 @@ export const appRouter = router({
         db.select().from(clients).where(and(eq(clients.profileId, profile.id), gte(clients.createdAt, from), lt(clients.createdAt, to))),
         db.select().from(services).where(eq(services.profileId, profile.id)),
       ]);
-      const receivedCents = periodPayments.filter(item => item.status === "pago").reduce((sum, item) => sum + item.amountCents, 0);
-      const pendingCents = periodPayments.filter(item => item.status !== "pago").reduce((sum, item) => sum + item.amountCents, 0);
+      const linkedAppIds = new Set(periodPayments.map(p => p.appointmentId).filter(Boolean));
+      let receivedCents = periodPayments.filter(item => item.status === "pago").reduce((sum, item) => sum + item.amountCents, 0);
+      let pendingCents = periodPayments.filter(item => item.status !== "pago").reduce((sum, item) => sum + item.amountCents, 0);
+      for (const app of periodAppointments) {
+        if (!linkedAppIds.has(app.id) && app.amountCents > 0) {
+          if (app.paymentStatus === "pago" || app.status === "concluido") {
+            receivedCents += app.amountCents;
+          } else {
+            pendingCents += app.amountCents;
+          }
+        }
+      }
       const counts = new Map<number, number>();
       for (const item of periodAppointments) if (item.serviceId) counts.set(item.serviceId, (counts.get(item.serviceId) || 0) + 1);
       const topServices = Array.from(counts.entries()).map(([serviceId, count]) => ({ serviceId, count, name: profileServices.find(service => service.id === serviceId)?.name || "Serviço" })).sort((a, b) => b.count - a.count).slice(0, 5);
@@ -1162,15 +1227,33 @@ export const appRouter = router({
       const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
       const periodFrom = input?.from ? new Date(input.from) : monthStart;
       const periodTo = input?.to ? new Date(input.to) : new Date();
+      const monthAppointments = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, periodFrom), lt(appointments.startsAt, periodTo), ne(appointments.status, "cancelado")));
       const monthPayments = await db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lt(payments.createdAt, periodTo)));
       const monthExpenses = await db.select().from(expenses).where(and(eq(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lt(expenses.occurredAt, periodTo)));
-      const received = monthPayments.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
-      const pending = monthPayments.filter(p => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      const linkedAppIds = new Set(monthPayments.map(p => p.appointmentId).filter(Boolean));
+      let received = monthPayments.filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      let pending = monthPayments.filter(p => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      for (const app of monthAppointments) {
+        if (!linkedAppIds.has(app.id) && app.amountCents > 0) {
+          if (app.paymentStatus === "pago" || app.status === "concluido") {
+            received += app.amountCents;
+          } else {
+            pending += app.amountCents;
+          }
+        }
+      }
       const expensesCents = monthExpenses.reduce((sum, item) => sum + item.amountCents, 0);
       const projected = today.reduce((sum, item) => sum + item.amountCents, 0);
       const seriesMap = new Map<string, { date: string; receitas: number; pendentes: number; despesas: number }>();
       const ensureDay = (date: Date) => { const key = date.toISOString().slice(0, 10); if (!seriesMap.has(key)) seriesMap.set(key, { date: key, receitas: 0, pendentes: 0, despesas: 0 }); return seriesMap.get(key)!; };
       for (const payment of monthPayments) { const day = ensureDay(new Date(payment.createdAt)); if (payment.status === "pago") day.receitas += payment.amountCents; else day.pendentes += payment.amountCents; }
+      for (const app of monthAppointments) {
+        if (!linkedAppIds.has(app.id) && app.amountCents > 0) {
+          const day = ensureDay(new Date(app.startsAt));
+          if (app.paymentStatus === "pago" || app.status === "concluido") day.receitas += app.amountCents;
+          else day.pendentes += app.amountCents;
+        }
+      }
       for (const expense of monthExpenses) { const day = ensureDay(new Date(expense.occurredAt)); day.despesas += expense.amountCents; }
       const monthlySeries = Array.from(seriesMap.values()).sort((a, b) => a.date.localeCompare(b.date)).map((day, index, rows) => ({ ...day, saldo: rows.slice(0, index + 1).reduce((sum, item) => sum + item.receitas - item.despesas, 0) }));
       return { profile, today, recentRequests, pendingQuotes, monthlySeries, metrics: { todayCount: today.filter(a => a.status !== "cancelado").length, todayProjectedCents: projected, receivedCents: received, pendingCents: pending, monthRevenueCents: received + pending, expensesCents, balanceCents: received - expensesCents } };

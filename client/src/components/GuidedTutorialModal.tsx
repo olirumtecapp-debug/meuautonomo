@@ -89,8 +89,8 @@ export function GuidedTutorialModal({
       description:
         "Tem uma loja, salão, estúdio ou clínica com mais profissionais autônomos trabalhando juntos? Com base na Lei do Salão-Parceiro (Lei 13.352), você cadastra cada parceiro(a) e o sistema faz toda a gestão financeira.",
       details: [
-        "Divisão Automática: Defina a comissão de cada um (ex: 50% para Manicure, 60% para Sobrancelha). Toda receita divide o repasse na hora.",
-        "Agenda Simultânea: Várias profissionais podem atender clientes no mesmo horário sem conflito de sala.",
+        "Divisão Automática: Defina a comissão de cada um (ex: 50% para Manicure, 60% para Sobrancelha). Atendimentos na agenda e receitas dividem o repasse na hora.",
+        "Agenda Simultânea: Várias profissionais podem atender clientes no mesmo horário sem conflito, com seleção do profissional responsável tanto na criação quanto na edição.",
         "1-Clique no WhatsApp: Envie o extrato de repasse formatado com faturamento, comissão calculada e a chave PIX do parceiro.",
       ],
       actionLabel: "Conhecer Módulo Equipe",
@@ -107,8 +107,8 @@ export function GuidedTutorialModal({
       description:
         "Chega de mandar apenas valores soltos em mensagens de texto. No MeuAutônomo você monta uma proposta com itens detalhados, desconto e condições de pagamento em menos de 1 minuto.",
       details: [
-        "Envio em 1 clique: O botão verde 'Enviar WhatsApp' já monta a mensagem educada com o link exclusivo para o cliente.",
-        "O cliente abre pelo celular, vê os detalhes e pode clicar em 'Aprovar Orçamento' ou pedir ajustes.",
+        "Rascunho ou Publicado: Salve propostas em rascunho para trabalhar com calma, ou marque 'Enviar agora' para gerar o link público.",
+        "Envio em 1 clique: O botão verde 'Enviar WhatsApp' já monta a mensagem com o link seguro para o cliente aprovar ou pedir ajustes.",
         "Quando o cliente aprova, você pode transformar o orçamento em um atendimento na agenda com 1 toque.",
       ],
       actionLabel: "Criar um Orçamento",
@@ -126,8 +126,8 @@ export function GuidedTutorialModal({
         "Visualize seus compromissos no modo Dia, Semana ou Mês. Cada atendimento guarda o cliente, serviço, valor, horário e endereço.",
       details: [
         "Acompanhe o status: Agendado, Confirmado, Em Andamento, Concluído ou Cancelado.",
-        "Se tiver equipe, selecione qual parceiro é o responsável pelo atendimento para o cálculo de repasse.",
-        "Toque em 'Abrir rota' para abrir diretamente o Google Maps ou Waze com o endereço do cliente.",
+        "Sincronização com Relatórios: Atendimentos confirmados e concluídos alimentam automaticamente seu faturamento e gráficos.",
+        "Associação de Parceiros: Defina qual parceiro(a) realizou o atendimento tanto na criação quanto na edição para apuração da comissão.",
       ],
       actionLabel: "Acessar Minha Agenda",
       actionPath: "/agenda",

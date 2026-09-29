@@ -2278,10 +2278,11 @@ var appRouter = router({
       await db.update(appointments).set({ status: input.status, paymentStatus: input.paymentStatus ?? result[0].paymentStatus, paymentMethod: input.paymentMethod ?? result[0].paymentMethod }).where(eq3(appointments.id, input.id));
       return { success: true };
     }),
-    update: protectedProcedure.input(z2.object({ id: z2.number(), clientId: z2.number().optional(), serviceId: z2.number().optional(), startsAt: z2.string().datetime(), durationMinutes: z2.number().int().min(15).max(1440), location: z2.string().max(600).optional(), amountCents: z2.number().int().min(0), notes: z2.string().max(1200).optional() })).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(z2.object({ id: z2.number(), teamMemberId: z2.number().nullable().optional(), clientId: z2.number().optional(), serviceId: z2.number().optional(), startsAt: z2.string().datetime(), durationMinutes: z2.number().int().min(15).max(1440), location: z2.string().max(600).optional(), amountCents: z2.number().int().min(0), notes: z2.string().max(1200).optional() })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       if (input.clientId) await getOwnedClient(profile.id, input.clientId);
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      if (input.teamMemberId) await getOwnedTeamMember(profile.id, input.teamMemberId);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const existing = (await db.select().from(appointments).where(and2(eq3(appointments.id, input.id), eq3(appointments.profileId, profile.id))).limit(1))[0];
@@ -2291,8 +2292,14 @@ var appRouter = router({
       if (!isWithinAvailability(start, input.durationMinutes, availabilityRow)) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio est\xE1 fora da sua disponibilidade." });
       const end = new Date(start.getTime() + input.durationMinutes * 6e4).getTime();
       const sameDay = await db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado"), ne(appointments.id, input.id)));
-      if (sameDay.some((item) => new Date(item.startsAt).getTime() < end && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 6e4)) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio j\xE1 est\xE1 ocupado." });
-      await db.update(appointments).set({ clientId: input.clientId ?? null, serviceId: input.serviceId ?? null, startsAt: start, durationMinutes: input.durationMinutes, location: input.location ?? null, amountCents: input.amountCents, notes: input.notes ?? null }).where(eq3(appointments.id, input.id));
+      const effectiveTeamMemberId = input.teamMemberId !== void 0 ? input.teamMemberId : existing.teamMemberId;
+      if (sameDay.some((item) => {
+        const t1 = effectiveTeamMemberId ?? 0;
+        const t2 = item.teamMemberId ?? 0;
+        if (t1 !== t2) return false;
+        return new Date(item.startsAt).getTime() < end && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 6e4;
+      })) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio j\xE1 est\xE1 ocupado para este profissional." });
+      await db.update(appointments).set({ clientId: input.clientId ?? null, serviceId: input.serviceId ?? null, teamMemberId: input.teamMemberId !== void 0 ? input.teamMemberId : existing.teamMemberId, startsAt: start, durationMinutes: input.durationMinutes, location: input.location ?? null, amountCents: input.amountCents, notes: input.notes ?? null }).where(eq3(appointments.id, input.id));
       return { success: true };
     }),
     cancel: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
@@ -2474,7 +2481,7 @@ var appRouter = router({
       await db.insert(quoteItems).values(input.items.map((item) => ({ quoteId, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
       if (input.requestId) await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(and2(eq3(requests.id, input.requestId), eq3(requests.profileId, profile.id)));
       if (input.sendNow) await createNotification(profile.id, "Or\xE7amento enviado", "Seu or\xE7amento est\xE1 dispon\xEDvel por um link p\xFAblico.", "quote");
-      return { success: true, quoteId, token: secureToken };
+      return { success: true, quoteId, token: input.sendNow ? secureToken : null };
     }),
     update: protectedProcedure.input(z2.object({ id: z2.number(), description: z2.string().max(1800).optional(), discountCents: z2.number().int().min(0).default(0), notes: z2.string().max(1800).optional(), paymentTerms: z2.string().max(1e3).optional(), validUntil: z2.string().datetime().optional(), sendNow: z2.boolean().default(true), items: z2.array(z2.object({ description: z2.string().min(1).max(180), quantity: z2.number().int().min(1).max(100), unitPriceCents: z2.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
@@ -2486,15 +2493,28 @@ var appRouter = router({
       const totalCents = Math.max(0, subtotalCents - input.discountCents);
       await db.delete(quoteItems).where(eq3(quoteItems.quoteId, input.id));
       await db.insert(quoteItems).values(input.items.map((item) => ({ quoteId: input.id, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
-      await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : existing.status, respondedAt: null }).where(eq3(quotes.id, input.id));
+      await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : "rascunho", respondedAt: null }).where(eq3(quotes.id, input.id));
       if (input.sendNow) await createNotification(profile.id, "Or\xE7amento revisado e reenviado", "A proposta atualizada est\xE1 dispon\xEDvel no link do cliente.", "quote");
+      return { success: true, token: input.sendNow ? existing.secureToken : null };
+    }),
+    publish: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      const existing = (await db.select().from(quotes).where(and2(eq3(quotes.id, input.id), eq3(quotes.profileId, profile.id))).limit(1))[0];
+      if (!existing) throw new TRPCError3({ code: "NOT_FOUND", message: "Or\xE7amento n\xE3o encontrado." });
+      await db.update(quotes).set({ status: "enviado" }).where(eq3(quotes.id, input.id));
+      if (existing.requestId) {
+        await db.update(requests).set({ status: "orcamento_enviado" }).where(and2(eq3(requests.id, existing.requestId), eq3(requests.profileId, profile.id)));
+      }
+      await createNotification(profile.id, "Or\xE7amento publicado", "O or\xE7amento foi publicado e o link do cliente foi ativado.", "quote");
       return { success: true, token: existing.secureToken };
     }),
     getPublic: publicProcedure.input(z2.object({ token: z2.string().min(10) })).query(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const quote = (await db.select().from(quotes).where(eq3(quotes.secureToken, input.token)).limit(1))[0];
-      if (!quote) throw new TRPCError3({ code: "NOT_FOUND", message: "Or\xE7amento n\xE3o encontrado." });
+      if (!quote || quote.status === "rascunho") throw new TRPCError3({ code: "NOT_FOUND", message: "Este or\xE7amento est\xE1 em rascunho e ainda n\xE3o foi liberado para visualiza\xE7\xE3o p\xFAblica." });
       const profile = (await db.select().from(professionalProfiles).where(eq3(professionalProfiles.id, quote.profileId)).limit(1))[0];
       const items = await db.select().from(quoteItems).where(eq3(quoteItems.quoteId, quote.id));
       return { quote, profile, items };
@@ -2729,13 +2749,46 @@ var appRouter = router({
       if (input?.to) payConditions.push(lt(payments.createdAt, new Date(input.to)));
       if (input?.teamMemberId) payConditions.push(eq3(payments.teamMemberId, input.teamMemberId));
       const periodPayments = await db.select().from(payments).where(and2(...payConditions)).orderBy(desc2(payments.createdAt));
+      const appConditions = [eq3(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
+      if (input?.from) appConditions.push(gte(appointments.startsAt, new Date(input.from)));
+      if (input?.to) appConditions.push(lt(appointments.startsAt, new Date(input.to)));
+      if (input?.teamMemberId) appConditions.push(eq3(appointments.teamMemberId, input.teamMemberId));
+      const periodAppointments = await db.select().from(appointments).where(and2(...appConditions));
+      const linkedAppIds = new Set(periodPayments.map((p) => p.appointmentId).filter(Boolean));
+      const combinedPayments = [...periodPayments];
+      for (const app2 of periodAppointments) {
+        if (app2.teamMemberId && !linkedAppIds.has(app2.id) && app2.amountCents > 0) {
+          const member = members.find((m) => m.id === app2.teamMemberId);
+          const commPct = member?.commissionPercent ?? 50;
+          const commAmount = Math.round(app2.amountCents * commPct / 100);
+          combinedPayments.push({
+            id: -app2.id,
+            profileId: profile.id,
+            teamMemberId: app2.teamMemberId,
+            appointmentId: app2.id,
+            clientId: app2.clientId,
+            serviceId: app2.serviceId,
+            amountCents: app2.amountCents,
+            commissionPercent: commPct,
+            commissionAmountCents: commAmount,
+            studioAmountCents: app2.amountCents - commAmount,
+            commissionPaid: false,
+            method: app2.paymentMethod || "pix",
+            status: app2.paymentStatus === "pago" || app2.status === "concluido" ? "pago" : "pendente",
+            note: app2.notes || null,
+            paidAt: app2.paymentStatus === "pago" ? new Date(app2.startsAt) : null,
+            createdAt: new Date(app2.startsAt),
+            updatedAt: new Date(app2.startsAt)
+          });
+        }
+      }
       const expConditions = [eq3(expenses.profileId, profile.id)];
       if (input?.from) expConditions.push(gte(expenses.occurredAt, new Date(input.from)));
       if (input?.to) expConditions.push(lt(expenses.occurredAt, new Date(input.to)));
       const periodExpenses = await db.select().from(expenses).where(and2(...expConditions));
       const totalExpensesCents = periodExpenses.reduce((sum, e) => sum + e.amountCents, 0);
       const breakdown = members.map((m) => {
-        const mPayments = periodPayments.filter((p) => p.teamMemberId === m.id);
+        const mPayments = combinedPayments.filter((p) => p.teamMemberId === m.id);
         const grossCents = mPayments.reduce((sum, p) => sum + p.amountCents, 0);
         const receivedCents = mPayments.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
         const commissionCents = mPayments.filter((p) => p.status === "pago").reduce((sum, p) => {
@@ -2754,8 +2807,8 @@ var appRouter = router({
           commissionPercent: m.commissionPercent
         };
       });
-      const totalGrossCents = periodPayments.reduce((sum, p) => sum + p.amountCents, 0);
-      const totalReceivedCents = periodPayments.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      const totalGrossCents = combinedPayments.reduce((sum, p) => sum + p.amountCents, 0);
+      const totalReceivedCents = combinedPayments.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
       const totalCommissionCents = breakdown.reduce((sum, b) => sum + b.commissionCents, 0);
       const totalStudioNetCents = totalReceivedCents - totalCommissionCents;
       const finalProfitCents = totalStudioNetCents - totalExpensesCents;
@@ -2767,7 +2820,7 @@ var appRouter = router({
         totalExpensesCents,
         finalProfitCents,
         breakdown,
-        payments: periodPayments
+        payments: combinedPayments
       };
     })
   }),
@@ -2833,8 +2886,18 @@ var appRouter = router({
         db.select().from(clients).where(and2(eq3(clients.profileId, profile.id), gte(clients.createdAt, from), lt(clients.createdAt, to))),
         db.select().from(services).where(eq3(services.profileId, profile.id))
       ]);
-      const receivedCents = periodPayments.filter((item) => item.status === "pago").reduce((sum, item) => sum + item.amountCents, 0);
-      const pendingCents = periodPayments.filter((item) => item.status !== "pago").reduce((sum, item) => sum + item.amountCents, 0);
+      const linkedAppIds = new Set(periodPayments.map((p) => p.appointmentId).filter(Boolean));
+      let receivedCents = periodPayments.filter((item) => item.status === "pago").reduce((sum, item) => sum + item.amountCents, 0);
+      let pendingCents = periodPayments.filter((item) => item.status !== "pago").reduce((sum, item) => sum + item.amountCents, 0);
+      for (const app2 of periodAppointments) {
+        if (!linkedAppIds.has(app2.id) && app2.amountCents > 0) {
+          if (app2.paymentStatus === "pago" || app2.status === "concluido") {
+            receivedCents += app2.amountCents;
+          } else {
+            pendingCents += app2.amountCents;
+          }
+        }
+      }
       const counts = /* @__PURE__ */ new Map();
       for (const item of periodAppointments) if (item.serviceId) counts.set(item.serviceId, (counts.get(item.serviceId) || 0) + 1);
       const topServices = Array.from(counts.entries()).map(([serviceId, count]) => ({ serviceId, count, name: profileServices.find((service) => service.id === serviceId)?.name || "Servi\xE7o" })).sort((a, b) => b.count - a.count).slice(0, 5);
@@ -2858,10 +2921,21 @@ var appRouter = router({
       monthStart.setHours(0, 0, 0, 0);
       const periodFrom = input?.from ? new Date(input.from) : monthStart;
       const periodTo = input?.to ? new Date(input.to) : /* @__PURE__ */ new Date();
+      const monthAppointments = await db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, periodFrom), lt(appointments.startsAt, periodTo), ne(appointments.status, "cancelado")));
       const monthPayments = await db.select().from(payments).where(and2(eq3(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lt(payments.createdAt, periodTo)));
       const monthExpenses = await db.select().from(expenses).where(and2(eq3(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lt(expenses.occurredAt, periodTo)));
-      const received = monthPayments.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
-      const pending = monthPayments.filter((p) => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      const linkedAppIds = new Set(monthPayments.map((p) => p.appointmentId).filter(Boolean));
+      let received = monthPayments.filter((p) => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      let pending = monthPayments.filter((p) => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0);
+      for (const app2 of monthAppointments) {
+        if (!linkedAppIds.has(app2.id) && app2.amountCents > 0) {
+          if (app2.paymentStatus === "pago" || app2.status === "concluido") {
+            received += app2.amountCents;
+          } else {
+            pending += app2.amountCents;
+          }
+        }
+      }
       const expensesCents = monthExpenses.reduce((sum, item) => sum + item.amountCents, 0);
       const projected = today.reduce((sum, item) => sum + item.amountCents, 0);
       const seriesMap = /* @__PURE__ */ new Map();
@@ -2874,6 +2948,13 @@ var appRouter = router({
         const day = ensureDay(new Date(payment.createdAt));
         if (payment.status === "pago") day.receitas += payment.amountCents;
         else day.pendentes += payment.amountCents;
+      }
+      for (const app2 of monthAppointments) {
+        if (!linkedAppIds.has(app2.id) && app2.amountCents > 0) {
+          const day = ensureDay(new Date(app2.startsAt));
+          if (app2.paymentStatus === "pago" || app2.status === "concluido") day.receitas += app2.amountCents;
+          else day.pendentes += app2.amountCents;
+        }
       }
       for (const expense of monthExpenses) {
         const day = ensureDay(new Date(expense.occurredAt));
