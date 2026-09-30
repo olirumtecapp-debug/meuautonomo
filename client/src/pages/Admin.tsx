@@ -129,9 +129,9 @@ export default function AdminPage() {
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
 
   // Estados do Simulador de Transações & PIX Direto
-  const [testPixKey, setTestPixKey] = useState("11985052148");
-  const [testPixType, setTestPixType] = useState<"telefone" | "cpf" | "cnpj" | "email" | "aleatoria">("telefone");
-  const [testProName, setTestProName] = useState("Murilo Prestador de Serviços");
+  const [testPixKey, setTestPixKey] = useState("contato@autonomo.com.br");
+  const [testPixType, setTestPixType] = useState<"telefone" | "cpf" | "cnpj" | "email" | "aleatoria">("email");
+  const [testProName, setTestProName] = useState("João Eletricista Silva");
   const [testClientName, setTestClientName] = useState("Dona Maria Silva");
   const [testServiceDesc, setTestServiceDesc] = useState("Troca de Disjuntor Geral e Fiação do Chuveiro");
   const [testAmount, setTestAmount] = useState("350,00");
@@ -2502,34 +2502,34 @@ Quer ativar para experimentar no seu próximo serviço?`}
                     <button
                       type="button"
                       onClick={() => {
-                        setTestPixKey("11985052148");
+                        setTestPixKey("11999998888");
                         setTestPixType("telefone");
-                        setTestProName("Murilo Prestador");
-                        toast.success("Chave Telefone (11) 98505-2148 ativada no QR Code!");
+                        setTestProName("Prestador Exemplo");
+                        toast.success("Chave Telefone de exemplo ativada!");
                       }}
                       className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition border ${
-                        testPixKey === "11985052148"
+                        testPixKey === "11999998888"
                           ? "bg-emerald-700 text-white border-emerald-800"
                           : "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border-emerald-300"
                       }`}
                     >
-                      📱 11985052148
+                      📱 Exemplo Celular
                     </button>
                     <button
                       type="button"
                       onClick={() => {
-                        setTestPixKey("olirumdev1@gmail.com");
+                        setTestPixKey("contato@autonomo.com.br");
                         setTestPixType("email");
-                        setTestProName("Murilo Prestador");
-                        toast.success("Chave E-mail olirumdev1@gmail.com ativada no QR Code!");
+                        setTestProName("Prestador Exemplo");
+                        toast.success("Chave E-mail de exemplo ativada!");
                       }}
                       className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition border ${
-                        testPixKey === "olirumdev1@gmail.com"
+                        testPixKey === "contato@autonomo.com.br"
                           ? "bg-blue-700 text-white border-blue-800"
                           : "bg-blue-100 hover:bg-blue-200 text-blue-900 border-blue-300"
                       }`}
                     >
-                      ✉️ olirumdev1@gmail.com
+                      ✉️ Exemplo E-mail
                     </button>
                   </div>
                 </div>
@@ -2752,40 +2752,40 @@ Quer ativar para experimentar no seu próximo serviço?`}
                         {/* BOTÕES DE TESTE DIRETO COM CHAVES REAIS DE MURILO */}
                         <div className="bg-white/90 p-2.5 rounded-xl border border-emerald-300 space-y-1.5 shadow-2xs">
                           <span className="text-[10px] font-black text-emerald-950 uppercase tracking-wider block">
-                            👇 Clique para Testar com sua Chave Real:
+                            👇 Testar com Chave de Exemplo:
                           </span>
                           <div className="grid grid-cols-2 gap-1.5">
                             <button
                               type="button"
                               onClick={() => {
-                                setTestPixKey("11985052148");
+                                setTestPixKey("11999998888");
                                 setTestPixType("telefone");
-                                setTestProName("Murilo Prestador");
-                                toast.success("📱 Chave Telefone (11) 98505-2148 ativada no QR Code!");
+                                setTestProName("Prestador Exemplo");
+                                toast.success("📱 Chave Telefone de exemplo ativada!");
                               }}
                               className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition cursor-pointer leading-tight ${
-                                testPixKey === "11985052148"
+                                testPixKey === "11999998888"
                                   ? "bg-emerald-700 text-white border-emerald-800 shadow-xs ring-2 ring-emerald-400"
                                   : "bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100"
                               }`}
                             >
-                              📱 (11) 98505-2148
+                              📱 Exemplo Celular
                             </button>
                             <button
                               type="button"
                               onClick={() => {
-                                setTestPixKey("olirumdev1@gmail.com");
+                                setTestPixKey("contato@autonomo.com.br");
                                 setTestPixType("email");
-                                setTestProName("Murilo Prestador");
-                                toast.success("✉️ Chave E-mail olirumdev1@gmail.com ativada no QR Code!");
+                                setTestProName("Prestador Exemplo");
+                                toast.success("✉️ Chave E-mail de exemplo ativada!");
                               }}
                               className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition cursor-pointer leading-tight ${
-                                testPixKey === "olirumdev1@gmail.com"
+                                testPixKey === "contato@autonomo.com.br"
                                   ? "bg-blue-700 text-white border-blue-800 shadow-xs ring-2 ring-blue-400"
                                   : "bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100"
                               }`}
                             >
-                              ✉️ olirumdev1@...
+                              ✉️ Exemplo E-mail
                             </button>
                           </div>
                         </div>
