@@ -40,6 +40,11 @@ import {
   BookOpen,
   Gift,
   ArrowUpRight,
+  QrCode,
+  Receipt,
+  Banknote,
+  Info,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
@@ -52,8 +57,22 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [resetConfirmInput, setResetConfirmInput] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "vouchers" | "marketing" | "simulator" | "screens" | "homologacao">("homologacao");
+  const [activeTab, setActiveTab] = useState<"overview" | "vouchers" | "marketing" | "simulator" | "screens" | "homologacao" | "transacoes">("homologacao");
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
+
+  // Estados do Simulador de Transações & PIX Direto
+  const [testPixKey, setTestPixKey] = useState("11987654321");
+  const [testPixType, setTestPixType] = useState<"telefone" | "cpf" | "cnpj" | "email" | "aleatoria">("telefone");
+  const [testProName, setTestProName] = useState("Carlos Eletricista & Instalações");
+  const [testClientName, setTestClientName] = useState("Dona Maria Silva");
+  const [testServiceDesc, setTestServiceDesc] = useState("Troca de Disjuntor Geral e Fiação do Chuveiro");
+  const [testAmount, setTestAmount] = useState("350,00");
+  const [testPaymentMethod, setTestPaymentMethod] = useState<"pix" | "cartao" | "dinheiro">("pix");
+  const [testPaymentCondition, setTestPaymentCondition] = useState<"integral" | "sinal">("sinal");
+  const [testDepositPercent, setTestDepositPercent] = useState(50);
+  const [testCopiedPix, setTestCopiedPix] = useState(false);
+  const [isTestConfirmedReceived, setIsTestConfirmedReceived] = useState(false);
+  const [testReceiptCopied, setTestReceiptCopied] = useState(false);
 
   // Voucher form states
   const [voucherCodeInput, setVoucherCodeInput] = useState("");
@@ -582,6 +601,22 @@ export default function AdminPage() {
             <span>Plano de Vendas</span>
             <span className="rounded-full bg-[#eef5d2] px-2 py-0.5 text-[10px] font-bold text-[#556b10]">
               Estratégia
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("transacoes")}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-bold border-b-2 transition -mb-[2px] cursor-pointer ${
+              activeTab === "transacoes"
+                ? "border-[#173a34] text-[#173a34] bg-white rounded-t-2xl shadow-xs"
+                : "border-transparent text-[#71867f] hover:text-[#173a34]"
+            }`}
+          >
+            <Banknote className="h-4 w-4 text-emerald-600" />
+            <span>Simulador de Pagamento & PIX</span>
+            <span className="rounded-full bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 text-[10px] font-black uppercase">
+              Passo a Passo
             </span>
           </button>
 
@@ -2184,6 +2219,698 @@ Quer ativar para experimentar no seu próximo serviço?`}
                   </div>
                 </Card>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* CONTEÚDO DA ABA: SIMULADOR DE PAGAMENTO & PIX */}
+        {activeTab === "transacoes" && (
+          <div className="space-y-8">
+            {/* HERO BANNER EXPLICATIVO */}
+            <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#173a34] via-[#1e4840] to-[#0f2824] p-7 text-white shadow-xl">
+              <div className="absolute -right-10 -bottom-10 h-64 w-64 rounded-full bg-[#d9f56a]/10 blur-3xl pointer-events-none" />
+              <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="space-y-3 max-w-3xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#d9f56a] px-3.5 py-1 text-xs font-black uppercase tracking-wider text-[#173a34]">
+                      <Banknote className="h-4 w-4" />
+                      Laboratório de Pagamentos Diretos
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-xs">
+                      <ShieldCheck className="h-3.5 w-3.5 text-[#d9f56a]" />
+                      Zero Taxas de Intermediação (0% Retido)
+                    </span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                    Como Funciona o Pagamento no MeuAutônomo?
+                  </h2>
+                  <p className="text-sm text-[#e0ece6] leading-relaxed">
+                    Aqui você pode <strong>testar na prática</strong> o fluxo completo de pagamento: como o cliente paga (no PIX, maquininha de cartão ou dinheiro vivo), a blindagem de transparência onde fica 100% claro que o acordo é direto entre as duas partes, e como o autônomo confirma o recebimento no seu próprio aplicativo.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2 shrink-0 w-full sm:w-auto">
+                  <div className="rounded-2xl bg-white/10 p-3.5 backdrop-blur-md border border-white/15 text-center">
+                    <span className="text-[11px] font-bold uppercase text-[#d9f56a] block">Comissão da Plataforma</span>
+                    <span className="text-3xl font-black text-white">0,00%</span>
+                    <span className="text-[10px] text-white/70 block mt-0.5">O dinheiro NUNCA é retido pelo app</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* RESPOSTA DIRETA ÀS 3 PRINCIPAIS DÚVIDAS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <Card className="rounded-[22px] border-[#dce5dc] bg-white p-5 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-700">
+                      <QrCode className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-full">
+                        Dúvida 1
+                      </span>
+                      <h4 className="text-sm font-bold text-[#173a34]">Por que 'PIX Automático'?</h4>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#5c756d] leading-relaxed">
+                    No vídeo de demonstração, o termo <em>"PIX automático"</em> refere-se à <strong>geração instantânea do QR Code e Chave Copia-e-Cola</strong> na tela do cliente. O cliente não precisa ficar pedindo a chave no chat do WhatsApp; a tela da proposta já abre com os dados bancários do autônomo prontos para pagar. O dinheiro vai <strong>direto para a conta bancária do profissional</strong> (sem intermediários).
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#edf1eb] text-[11px] font-semibold text-emerald-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>Dinheiro cai 100% na conta particular do prestador</span>
+                </div>
+              </Card>
+
+              <Card className="rounded-[22px] border-[#dce5dc] bg-white p-5 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-50 text-blue-700">
+                      <CreditCard className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-blue-700 bg-blue-100/60 px-2 py-0.5 rounded-full">
+                        Dúvida 2
+                      </span>
+                      <h4 className="text-sm font-bold text-[#173a34]">E Cartão ou Dinheiro Vivo?</h4>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#5c756d] leading-relaxed">
+                    Ao criar a proposta ou orçamento, o autônomo seleciona a forma combinada: <strong>"Cartão na Maquininha do Profissional"</strong> ou <strong>"Dinheiro à Vista na Entrega"</strong>. A proposta do cliente exibe em letras garrafais que o pagamento será feito pessoalmente através da maquininha ou dinheiro, com aviso prévio se necessitar de troco.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#edf1eb] text-[11px] font-semibold text-blue-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-blue-600" />
+                  <span>Total flexibilidade: PIX, maquininha ou dinheiro</span>
+                </div>
+              </Card>
+
+              <Card className="rounded-[22px] border-[#dce5dc] bg-white p-5 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-50 text-amber-700">
+                      <Receipt className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-black uppercase text-amber-700 bg-amber-100/60 px-2 py-0.5 rounded-full">
+                        Dúvida 3
+                      </span>
+                      <h4 className="text-sm font-bold text-[#173a34]">Como o Autônomo Confirma?</h4>
+                    </div>
+                  </div>
+                  <p className="text-xs text-[#5c756d] leading-relaxed">
+                    O autônomo verifica o saldo no seu aplicativo bancário (no caso de PIX), confere o comprovante da maquininha ou o dinheiro na mão. Em seguida, clica no botão <strong>"Confirmar Recebimento (Dar Baixa)"</strong> dentro do MeuAutônomo. O sistema registra a receita no fluxo de caixa e gera um <strong>Recibo Oficial em PDF com termo de quitação</strong> para enviar ao cliente.
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#edf1eb] text-[11px] font-semibold text-amber-800 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-amber-600" />
+                  <span>Controle total nas mãos do profissional autônomo</span>
+                </div>
+              </Card>
+            </div>
+
+            {/* SEÇÃO 2: O AVISO DE TRANSPARÊNCIA E ISENÇÃO LEGAL */}
+            <Card className="rounded-[24px] border-2 border-amber-300 bg-amber-50/60 p-6 shadow-xs">
+              <div className="flex items-start gap-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-200 text-amber-900 shadow-xs">
+                  <ShieldAlert className="h-6 w-6" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-black text-amber-950">
+                      Termo de Transparência Exibido a Todo Cliente Antes de Concluir
+                    </h3>
+                    <span className="rounded-full bg-amber-200 px-2.5 py-0.5 text-[10px] font-bold text-amber-900">
+                      Blindagem Jurídica Ativa
+                    </span>
+                  </div>
+                  <p className="text-xs text-amber-900/90 leading-relaxed font-sans">
+                    Em <strong>todas as propostas e orçamentos públicos</strong> gerados pelo sistema, o cliente lê este aviso obrigatório em destaque antes de aprovar qualquer serviço ou efetuar pagamentos:
+                  </p>
+                  <div className="rounded-xl border border-amber-300/80 bg-white p-4 text-xs text-slate-800 space-y-2 shadow-xs">
+                    <p className="font-bold text-[#173a34] flex items-center gap-1.5">
+                      <Info className="h-4 w-4 text-emerald-600 shrink-0" />
+                      Aviso Legal ao Consumidor (Artigo de Transparência Financeira):
+                    </p>
+                    <p className="italic text-slate-700 bg-amber-50/50 p-2.5 rounded-lg border border-amber-200">
+                      "A plataforma MeuAutônomo é uma ferramenta de tecnologia e gestão para profissionais autônomos. <strong>Nós NÃO cobramos taxas ou comissões sobre os serviços, NÃO intermediamos transações financeiras e NÃO retemos o dinheiro contratado.</strong> O valor total é pago <strong>diretamente ao prestador contratado</strong>, seja presencialmente através da <strong>maquininha de cartão do próprio profissional</strong>, em <strong>dinheiro vivo</strong> ou <strong>transferência bancária/PIX acordada entre as partes</strong>."
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* SEÇÃO 3: LABORATÓRIO DE TESTE PRÁTICO (DIGITE SUA CHAVE PIX E VEJA) */}
+            <Card className="rounded-[26px] border-[#dce5dc] bg-white p-6 shadow-sm">
+              <div className="border-b border-[#edf1eb] pb-4 mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[11px] font-black uppercase text-[#8aa500] tracking-wider">
+                      Painel de Simulação em Tempo Real
+                    </span>
+                    <h3 className="text-lg font-black text-[#173a34]">
+                      Personalize os Dados para Testar o Fluxo
+                    </h3>
+                    <p className="text-xs text-[#71867f] mt-0.5">
+                      Digite qualquer chave PIX sua, altere os valores e veja exatamente como fica para o cliente e para o autônomo.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setTestPixKey("11987654321");
+                      setTestPixType("telefone");
+                      setTestProName("Carlos Eletricista & Instalações");
+                      setTestClientName("Dona Maria Silva");
+                      setTestServiceDesc("Troca de Disjuntor Geral e Fiação do Chuveiro");
+                      setTestAmount("350,00");
+                      setTestPaymentMethod("pix");
+                      setTestPaymentCondition("sinal");
+                      setIsTestConfirmedReceived(false);
+                      toast.info("Dados de teste redefinidos.");
+                    }}
+                    className="rounded-xl border-[#dce5dc] text-xs font-semibold text-[#5c756d]"
+                  >
+                    Restaurar Padrão
+                  </Button>
+                </div>
+              </div>
+
+              {/* FORMULÁRIO DE ENTRADA DE DADOS DE TESTE */}
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8 bg-[#fbfcf9] p-5 rounded-2xl border border-[#edf1eb]">
+                <div>
+                  <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                    Chave PIX do Autônomo (Teste a sua):
+                  </Label>
+                  <Input
+                    type="text"
+                    value={testPixKey}
+                    onChange={(e) => setTestPixKey(e.target.value)}
+                    placeholder="Ex: seu CPF, Celular, E-mail ou CNPJ"
+                    className="h-10 rounded-xl border-[#dce5dc] text-xs font-mono font-bold"
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                    Tipo de Chave PIX:
+                  </Label>
+                  <select
+                    value={testPixType}
+                    onChange={(e: any) => setTestPixType(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-[#dce5dc] bg-white px-3 text-xs font-medium text-[#173a34] focus:outline-hidden"
+                  >
+                    <option value="telefone">Celular / Telefone</option>
+                    <option value="cpf">CPF</option>
+                    <option value="cnpj">CNPJ</option>
+                    <option value="email">E-mail</option>
+                    <option value="aleatoria">Chave Aleatória (EVP)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                    Nome do Profissional / Empresa:
+                  </Label>
+                  <Input
+                    type="text"
+                    value={testProName}
+                    onChange={(e) => setTestProName(e.target.value)}
+                    placeholder="Ex: Carlos Eletricista"
+                    className="h-10 rounded-xl border-[#dce5dc] text-xs"
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                    Nome do Cliente:
+                  </Label>
+                  <Input
+                    type="text"
+                    value={testClientName}
+                    onChange={(e) => setTestClientName(e.target.value)}
+                    placeholder="Ex: Dona Maria Silva"
+                    className="h-10 rounded-xl border-[#dce5dc] text-xs"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                    Descrição do Serviço:
+                  </Label>
+                  <Input
+                    type="text"
+                    value={testServiceDesc}
+                    onChange={(e) => setTestServiceDesc(e.target.value)}
+                    placeholder="Ex: Instalação Elétrica Completa"
+                    className="h-10 rounded-xl border-[#dce5dc] text-xs"
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                    Valor Total do Serviço (R$):
+                  </Label>
+                  <Input
+                    type="text"
+                    value={testAmount}
+                    onChange={(e) => setTestAmount(e.target.value)}
+                    placeholder="350,00"
+                    className="h-10 rounded-xl border-[#dce5dc] text-xs font-bold font-mono text-emerald-800"
+                  />
+                </div>
+
+                <div>
+                  <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                    Condição de Pagamento:
+                  </Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTestPaymentCondition("sinal")}
+                      className={`flex-1 h-10 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        testPaymentCondition === "sinal"
+                          ? "bg-[#173a34] text-white border-[#173a34]"
+                          : "bg-white text-[#71867f] border-[#dce5dc]"
+                      }`}
+                    >
+                      50% Sinal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTestPaymentCondition("integral")}
+                      className={`flex-1 h-10 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                        testPaymentCondition === "integral"
+                          ? "bg-[#173a34] text-white border-[#173a34]"
+                          : "bg-white text-[#71867f] border-[#dce5dc]"
+                      }`}
+                    >
+                      100% Final
+                    </button>
+                  </div>
+                </div>
+
+                <div className="md:col-span-3 lg:col-span-4 pt-2">
+                  <Label className="mb-2 block text-xs font-bold text-[#38584f]">
+                    Escolha a Forma de Pagamento para Simular:
+                  </Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setTestPaymentMethod("pix")}
+                      className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition text-left cursor-pointer ${
+                        testPaymentMethod === "pix"
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-950 shadow-xs"
+                          : "border-[#dce5dc] bg-white text-[#5c756d] hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-xl ${testPaymentMethod === "pix" ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                        <QrCode className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold">1. PIX Direto</div>
+                        <div className="text-[11px] text-[#71867f]">QR Code + Copia e Cola</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTestPaymentMethod("cartao")}
+                      className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition text-left cursor-pointer ${
+                        testPaymentMethod === "cartao"
+                          ? "border-blue-600 bg-blue-50 text-blue-950 shadow-xs"
+                          : "border-[#dce5dc] bg-white text-[#5c756d] hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-xl ${testPaymentMethod === "cartao" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                        <CreditCard className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold">2. Cartão na Maquininha</div>
+                        <div className="text-[11px] text-[#71867f]">No local do atendimento</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setTestPaymentMethod("dinheiro")}
+                      className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition text-left cursor-pointer ${
+                        testPaymentMethod === "dinheiro"
+                          ? "border-amber-600 bg-amber-50 text-amber-950 shadow-xs"
+                          : "border-[#dce5dc] bg-white text-[#5c756d] hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className={`p-2 rounded-xl ${testPaymentMethod === "dinheiro" ? "bg-amber-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                        <Banknote className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold">3. Dinheiro em Espécie</div>
+                        <div className="text-[11px] text-[#71867f]">Cédulas na entrega</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* AS DUAS PONTAS: TELA DO CLIENTE VS TELA DO AUTÔNOMO */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                {/* LADO ESQUERDO: O QUE O CLIENTE VÊ NO WHATSAPP / NAVEGADOR */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#173a34] text-[#d9f56a] text-xs font-bold">
+                        1
+                      </div>
+                      <h4 className="text-sm font-bold text-[#173a34]">
+                        O que o Cliente Vê no Celular:
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-semibold text-[#71867f]">
+                      Link público da proposta
+                    </span>
+                  </div>
+
+                  {/* MOCKUP DO SMARTPHONE DO CLIENTE */}
+                  <div className="rounded-[28px] border-4 border-slate-800 bg-[#f4f7f1] p-4 shadow-xl text-[#173a34] max-w-md mx-auto">
+                    {/* TOPO DO SMARTPHONE */}
+                    <div className="flex items-center justify-between border-b border-[#dce5dc] pb-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-[#173a34] grid place-items-center text-white font-bold text-xs">
+                          {testProName.charAt(0) || "P"}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-[#173a34] leading-tight">{testProName}</div>
+                          <div className="text-[10px] text-[#71867f]">Orçamento Oficial #2026-081</div>
+                        </div>
+                      </div>
+                      <Badge className="bg-emerald-100 text-emerald-800 text-[10px] font-bold border-0">
+                        Proposta Aberta
+                      </Badge>
+                    </div>
+
+                    {/* DADOS DO CLIENTE E SERVIÇO */}
+                    <div className="bg-white p-3.5 rounded-2xl border border-[#edf1eb] shadow-2xs space-y-2 mb-3">
+                      <div className="text-[10px] font-bold uppercase text-[#71867f]">Destinatário:</div>
+                      <div className="text-xs font-bold text-slate-800">{testClientName}</div>
+                      <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span className="text-[#5c756d]">{testServiceDesc}</span>
+                        <span className="font-mono font-black text-[#173a34]">R$ {testAmount}</span>
+                      </div>
+                    </div>
+
+                    {/* CONDIÇÃO E DETALHE DO PAGAMENTO SELECIONADO */}
+                    {testPaymentMethod === "pix" && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center space-y-3 shadow-2xs">
+                        <div className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                          <QrCode className="h-3 w-3" />
+                          PIX Direto ao Profissional
+                        </div>
+
+                        <div className="text-xs text-emerald-950 font-medium">
+                          {testPaymentCondition === "sinal"
+                            ? `Pague o sinal de 50% para reservar a data:`
+                            : `Pagamento do valor total acordado:`}
+                        </div>
+
+                        <div className="text-2xl font-black text-emerald-900 font-mono">
+                          {testPaymentCondition === "sinal"
+                            ? `R$ ${(parseFloat(testAmount.replace(/\./g, "").replace(",", ".")) * 0.5 || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : `R$ ${testAmount}`}
+                        </div>
+
+                        {/* QR CODE GERADO */}
+                        <div className="mx-auto w-36 h-36 bg-white p-2 rounded-2xl border border-emerald-300 shadow-sm grid place-items-center">
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=PIX:${encodeURIComponent(testPixKey)}`}
+                            alt="QR Code PIX de Teste"
+                            className="w-full h-full object-contain rounded-lg"
+                            onError={(e: any) => {
+                              e.target.style.display = "none";
+                            }}
+                          />
+                        </div>
+
+                        {/* CHAVE COPIA E COLA */}
+                        <div className="space-y-1">
+                          <div className="text-[10px] text-emerald-800 font-semibold">
+                            Chave ({testPixType.toUpperCase()}): <strong className="font-mono">{testPixKey}</strong>
+                          </div>
+                          <div className="text-[10px] text-emerald-700">Favorecido: {testProName}</div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(testPixKey);
+                            setTestCopiedPix(true);
+                            toast.success(`Chave PIX "${testPixKey}" copiada com sucesso!`);
+                            setTimeout(() => setTestCopiedPix(false), 2000);
+                          }}
+                          className="w-full h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                        >
+                          {testCopiedPix ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                          <span>{testCopiedPix ? "Chave Copiada!" : "Copiar Chave PIX (Copia e Cola)"}</span>
+                        </Button>
+                      </div>
+                    )}
+
+                    {testPaymentMethod === "cartao" && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center space-y-2.5 shadow-2xs">
+                        <div className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                          <CreditCard className="h-3 w-3" />
+                          Cartão de Crédito / Débito
+                        </div>
+                        <div className="text-xl font-black text-blue-950 font-mono">
+                          R$ {testAmount}
+                        </div>
+                        <p className="text-xs text-blue-900 leading-relaxed">
+                          O profissional <strong>{testProName}</strong> levará sua <strong>maquininha de cartão</strong> física até o local do atendimento no dia agendado.
+                        </p>
+                        <div className="text-[11px] text-blue-800 bg-white p-2.5 rounded-xl border border-blue-200 font-medium">
+                          💳 Débito à vista ou Crédito parcelado (conforme acordado previamente com o profissional).
+                        </div>
+                      </div>
+                    )}
+
+                    {testPaymentMethod === "dinheiro" && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center space-y-2.5 shadow-2xs">
+                        <div className="inline-flex items-center gap-1 rounded-full bg-amber-600 px-3 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                          <Banknote className="h-3 w-3" />
+                          Pagamento em Dinheiro Vivo
+                        </div>
+                        <div className="text-xl font-black text-amber-950 font-mono">
+                          R$ {testAmount}
+                        </div>
+                        <p className="text-xs text-amber-900 leading-relaxed">
+                          O pagamento será realizado em cédulas diretamente a <strong>{testProName}</strong> na conclusão da entrega do serviço.
+                        </p>
+                        <div className="text-[11px] text-amber-800 bg-white p-2.5 rounded-xl border border-amber-200 font-medium">
+                          💵 Caso necessite de troco, favor avisar o profissional antecipadamente pelo WhatsApp.
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AVISO DE ISENÇÃO VISÍVEL PARA O CLIENTE */}
+                    <div className="mt-3 p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-[10px] text-slate-600 leading-tight">
+                      🔒 <strong>Transação Direta:</strong> A plataforma MeuAutônomo não retém valores. A transação e a forma de quitação são acordadas exclusivamente entre cliente e prestador.
+                    </div>
+
+                    {/* BOTÃO DE APROVAÇÃO DO CLIENTE */}
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        toast.success("Orçamento aprovado pelo cliente! Notificação enviada para o autônomo.");
+                      }}
+                      className="w-full mt-3 h-10 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] text-xs font-black shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-[#d9f56a]" />
+                      <span>Aprovar Orçamento e Confirmar Termos</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* LADO DIREITO: COMO O AUTÔNOMO CONFIRMA NO APP DELE */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-emerald-700 text-white text-xs font-bold">
+                        2
+                      </div>
+                      <h4 className="text-sm font-bold text-[#173a34]">
+                        Como o Autônomo Confirma no Aplicativo:
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-semibold text-emerald-700">
+                      Painel do Prestador
+                    </span>
+                  </div>
+
+                  <Card className="rounded-[28px] border-2 border-[#dce5dc] bg-white p-5 shadow-lg space-y-4">
+                    <div className="flex items-center justify-between border-b border-[#edf1eb] pb-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase text-[#71867f]">Orçamento Ativo</span>
+                        <h5 className="text-sm font-bold text-[#173a34]">{testServiceDesc}</h5>
+                      </div>
+                      <Badge
+                        className={`text-xs font-bold border-0 ${
+                          isTestConfirmedReceived
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-amber-100 text-amber-900"
+                        }`}
+                      >
+                        {isTestConfirmedReceived ? "PAGO & RECEBIDO ✅" : "Aguardando Recebimento ⏳"}
+                      </Badge>
+                    </div>
+
+                    {/* PASSO A PASSO DA CONFERÊNCIA */}
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[#f8faf6] border border-[#edf1eb]">
+                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#173a34] text-[10px] font-bold text-[#d9f56a]">
+                          A
+                        </span>
+                        <div>
+                          <strong className="text-[#173a34] block">Conferência no Banco / Maquininha / Bolso:</strong>
+                          <span className="text-[#5c756d] text-[11px]">
+                            O autônomo abre o aplicativo do seu próprio banco (Nubank, Caixa, Itaú, etc.), confere se o PIX caiu, ou se o cliente passou o cartão ou pagou em dinheiro.
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[#f8faf6] border border-[#edf1eb]">
+                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#173a34] text-[10px] font-bold text-[#d9f56a]">
+                          B
+                        </span>
+                        <div>
+                          <strong className="text-[#173a34] block">Dar Baixa no Sistema:</strong>
+                          <span className="text-[#5c756d] text-[11px]">
+                            Assim que o dinheiro é confirmado em mãos ou em conta, ele aperta o botão abaixo no MeuAutônomo para dar a quitação oficial:
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* BOTÃO DE CONFIRMAR RECEBIMENTO (DAR BAIXA) */}
+                    {!isTestConfirmedReceived ? (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setIsTestConfirmedReceived(true);
+                          toast.success("✅ Recebimento confirmado com sucesso! Recibo de Quitação gerado.");
+                        }}
+                        className="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transition hover:scale-[1.01]"
+                      >
+                        <CheckCircle2 className="h-5 w-5 text-[#d9f56a]" />
+                        <span>Confirmar Recebimento de R$ {testAmount} (Dar Baixa)</span>
+                      </Button>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-center space-y-1">
+                          <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800">
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            <span>Recebimento Confirmado & Quitado no Sistema!</span>
+                          </div>
+                          <p className="text-[11px] text-emerald-700">
+                            Valor de <strong>R$ {testAmount}</strong> lançado automaticamente no Fluxo de Caixa do autônomo.
+                          </p>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsTestConfirmedReceived(false);
+                            toast.info("Status revertido para pendente de recebimento.");
+                          }}
+                          className="w-full h-9 rounded-xl border-[#dce5dc] text-xs font-semibold text-[#71867f]"
+                        >
+                          Simular novamente (Desfazer Baixa)
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* RECIBO OFICIAL DE QUITAÇÃO (GERADO AUTOMATICAMENTE) */}
+                    {isTestConfirmedReceived && (
+                      <div className="pt-2 border-t border-[#edf1eb] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-[#173a34] flex items-center gap-1.5">
+                            <Receipt className="h-4 w-4 text-emerald-600" />
+                            Recibo de Quitação Emitido:
+                          </span>
+                          <span className="text-[10px] font-mono text-[#71867f]">#REC-2026-9842</span>
+                        </div>
+
+                        {/* CORPO DO RECIBO */}
+                        <div className="p-4 rounded-2xl bg-[#f8faf6] border border-[#dce5dc] font-sans text-xs space-y-2 text-[#173a34]">
+                          <div className="text-center pb-2 border-b border-slate-200">
+                            <strong className="block text-sm font-black text-[#173a34] uppercase tracking-wide">
+                              Comprovante de Quitação de Serviço
+                            </strong>
+                            <span className="text-[10px] text-[#71867f]">Emitido através da plataforma MeuAutônomo</span>
+                          </div>
+
+                          <div className="space-y-1 text-[11px] leading-relaxed">
+                            <div><strong>Prestador:</strong> {testProName}</div>
+                            <div><strong>Cliente:</strong> {testClientName}</div>
+                            <div><strong>Serviço Realizado:</strong> {testServiceDesc}</div>
+                            <div><strong>Valor Total Quitado:</strong> <span className="font-mono font-bold text-emerald-800">R$ {testAmount}</span></div>
+                            <div><strong>Forma de Pagamento:</strong> {testPaymentMethod.toUpperCase()} (Acordada diretamente)</div>
+                            <div><strong>Data da Quitação:</strong> {new Date().toLocaleDateString("pt-BR")} às {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</div>
+                          </div>
+
+                          <div className="p-2 rounded-lg bg-emerald-100/60 border border-emerald-200 text-[10px] text-emerald-900 italic text-center">
+                            "Declaramos para os devidos fins que o valor acima foi devidamente recebido e o serviço considerado liquidado e quitado."
+                          </div>
+                        </div>
+
+                        {/* BOTÕES DE COMPARTILHAMENTO DO RECIBO */}
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const receiptText = `*COMPROVANTE DE QUITAÇÃO & RECIBO* 📄✨\n\n• *Prestador:* ${testProName}\n• *Cliente:* ${testClientName}\n• *Serviço:* ${testServiceDesc}\n• *Valor Total:* R$ ${testAmount} (QUITADO ✅)\n• *Forma:* ${testPaymentMethod.toUpperCase()}\n• *Data:* ${new Date().toLocaleDateString("pt-BR")}\n\nAgradecemos pela preferência e confiança! 🤝`;
+                              navigator.clipboard?.writeText(receiptText);
+                              setTestReceiptCopied(true);
+                              toast.success("Recibo copiado para envio no WhatsApp!");
+                              setTimeout(() => setTestReceiptCopied(false), 2000);
+                            }}
+                            className="flex-1 h-10 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            <span>{testReceiptCopied ? "Copiado!" : "Copiar Recibo p/ WhatsApp"}</span>
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              </div>
+            </Card>
+
+            {/* SEÇÃO 4: RESUMO DE GARANTIA E SEGURANÇA */}
+            <div className="rounded-[22px] bg-white border border-[#dce5dc] p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-100 text-emerald-800">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-[#173a34]">
+                    Total Clareza: Seu Negócio Protegido e o Autônomo Valorizado
+                  </h4>
+                  <p className="text-xs text-[#5c756d]">
+                    O MeuAutônomo não tem custódia de dinheiro, não cobra taxa de transação e não se responsabiliza por inadimplência. Tudo é pactuado e quitado diretamente entre as partes.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                onClick={() => setActiveTab("homologacao")}
+                className="rounded-xl bg-[#173a34] text-white text-xs font-bold px-4 py-2 shrink-0 cursor-pointer"
+              >
+                Voltar à Homologação
+              </Button>
             </div>
           </div>
         )}
