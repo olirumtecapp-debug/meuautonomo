@@ -175,17 +175,17 @@ export default function VideoDemoPage() {
       id: 4,
       badge: "O DINHEIRO 100% SEU",
       badgeColor: "bg-[#d9f56a]/20 text-[#d9f56a] border-[#d9f56a]/30",
-      title: "Zero Taxas de Intermediação (0%)",
-      painText: "Outros aplicativos e maquininhas mordem de 3% a 10% do dinheiro do seu trabalho.",
-      solutionTitle: "💰 VANTAGEM 4: O PIX Cai Direto na sua Conta",
-      solutionText: "O QR Code PIX abre na tela do cliente. Você recebe o sinal antes mesmo de sair de casa para atender.",
+      title: "Recebimento 100% Direto e Sem Intermediários",
+      painText: "Outras plataformas retêm o dinheiro do seu trabalho ou cobram taxas abusivas a cada venda realizada.",
+      solutionTitle: "💰 VANTAGEM 4: Pagamento Acordado Direto com Você",
+      solutionText: "Você define como receber: PIX direto no seu banco pessoal (0% de comissão retida), cartão na sua maquininha física ou dinheiro vivo na conclusão do serviço.",
       buttonText: "E se eu tiver ajudantes ou salão?",
       screenComponent: (
         <div className="bg-white text-slate-800 rounded-3xl p-4 shadow-2xl border border-slate-100 relative">
           <div className="flex items-center justify-between border-b pb-2 mb-3">
-            <span className="text-xs font-black text-slate-800">Pagamento Instantâneo</span>
+            <span className="text-xs font-black text-slate-800">PIX, Cartão ou Dinheiro</span>
             <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-              0% DE TAXA
+              0% DE COMISSÃO
             </span>
           </div>
 
@@ -193,13 +193,13 @@ export default function VideoDemoPage() {
             <div className="w-24 h-24 bg-white p-2 rounded-xl mx-auto flex items-center justify-center shadow">
               <QrCode className="w-20 h-20 text-slate-950" />
             </div>
-            <div className="text-[11px] font-bold text-[#d9f56a] mt-2">PIX Copia e Cola Gerado</div>
+            <div className="text-[11px] font-bold text-[#d9f56a] mt-2">PIX Direto na sua Conta Pessoal</div>
             <div className="text-[10px] text-white/70">Chave: 11988442211 (Marcos Eletricista)</div>
           </div>
 
-          <div className="p-2.5 bg-emerald-50 rounded-xl text-center">
+          <div className="p-2.5 bg-emerald-50 rounded-xl text-center space-y-0.5">
             <div className="text-xs font-bold text-emerald-800">Entrada Recebida: R$ 240,00</div>
-            <div className="text-[10px] text-emerald-600">Saldo disponível imediatamente no seu banco</div>
+            <div className="text-[10px] text-emerald-600">Dinheiro direto no seu banco, maquininha ou em mãos</div>
           </div>
         </div>
       ),
