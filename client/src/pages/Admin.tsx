@@ -52,6 +52,74 @@ import { Link } from "wouter";
 import { SimulatorTour } from "@/components/SimulatorTour";
 import { setSessionToken, clearSessionToken } from "@/components/AuthModal";
 
+// Gerador Oficial de Payload PIX Padrão BACEN / EMV BRCode (compatível com todos os bancos)
+function formatEMV(id: string, value: string): string {
+  const len = value.length.toString().padStart(2, "0");
+  return `${id}${len}${value}`;
+}
+
+function crc16(payload: string): string {
+  let crc = 0xFFFF;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+      } else {
+        crc = (crc << 1) & 0xFFFF;
+      }
+    }
+  }
+  return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, "0");
+}
+
+function generatePixBRCode(key: string, name: string, city: string, amount: number, txid = "***"): string {
+  let cleanKey = key.trim();
+  const digitsOnly = cleanKey.replace(/\D/g, "");
+  // Padrão BACEN: Telefone celular no EMV precisa iniciar com +55 (código internacional do Brasil)
+  if (!cleanKey.includes("@") && (digitsOnly.length === 10 || digitsOnly.length === 11)) {
+    cleanKey = `+55${digitsOnly}`;
+  } else if (!cleanKey.includes("@") && (digitsOnly.length === 14 || digitsOnly.length === 11)) {
+    cleanKey = digitsOnly;
+  }
+
+  const cleanName = (name || "PRESTADOR MEUAUTONOMO")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .slice(0, 25)
+    .toUpperCase() || "PRESTADOR";
+
+  const cleanCity = (city || "SAO PAULO")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9 ]/g, "")
+    .slice(0, 15)
+    .toUpperCase() || "SAO PAULO";
+
+  const formattedAmount = amount > 0 ? amount.toFixed(2) : "";
+
+  // 26: Merchant Account Information
+  const merchantInfo = formatEMV("00", "br.gov.bcb.pix") + formatEMV("01", cleanKey);
+  const cleanTxId = (txid || "***").replace(/[^a-zA-Z0-9*]/g, "").slice(0, 25) || "***";
+  const additionalData = formatEMV("05", cleanTxId);
+
+  let payload =
+    formatEMV("00", "01") +
+    formatEMV("26", merchantInfo) +
+    formatEMV("52", "0000") +
+    formatEMV("53", "986") +
+    (formattedAmount ? formatEMV("54", formattedAmount) : "") +
+    formatEMV("58", "BR") +
+    formatEMV("59", cleanName) +
+    formatEMV("60", cleanCity) +
+    formatEMV("62", additionalData) +
+    "6304";
+
+  payload += crc16(payload);
+  return payload;
+}
+
 export default function AdminPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -61,9 +129,9 @@ export default function AdminPage() {
   const [copiedScript, setCopiedScript] = useState<string | null>(null);
 
   // Estados do Simulador de Transações & PIX Direto
-  const [testPixKey, setTestPixKey] = useState("11987654321");
+  const [testPixKey, setTestPixKey] = useState("11985052148");
   const [testPixType, setTestPixType] = useState<"telefone" | "cpf" | "cnpj" | "email" | "aleatoria">("telefone");
-  const [testProName, setTestProName] = useState("Carlos Eletricista & Instalações");
+  const [testProName, setTestProName] = useState("Murilo Prestador de Serviços");
   const [testClientName, setTestClientName] = useState("Dona Maria Silva");
   const [testServiceDesc, setTestServiceDesc] = useState("Troca de Disjuntor Geral e Fiação do Chuveiro");
   const [testAmount, setTestAmount] = useState("350,00");
@@ -71,6 +139,8 @@ export default function AdminPage() {
   const [testPaymentCondition, setTestPaymentCondition] = useState<"integral" | "sinal">("sinal");
   const [testDepositPercent, setTestDepositPercent] = useState(50);
   const [testCopiedPix, setTestCopiedPix] = useState(false);
+  const [testCopiedBRCode, setTestCopiedBRCode] = useState(false);
+  const [testCopiedRawKey, setTestCopiedRawKey] = useState(false);
   const [isTestConfirmedReceived, setIsTestConfirmedReceived] = useState(false);
   const [testReceiptCopied, setTestReceiptCopied] = useState(false);
 
@@ -309,6 +379,17 @@ export default function AdminPage() {
   }
 
   const metrics = metricsQuery.data;
+
+  // Cálculo e Geração do Payload Oficial PIX (Padrão BACEN / BRCode)
+  const numTestAmount = parseFloat(testAmount.replace(/\./g, "").replace(",", ".")) || 0;
+  const calculatedPixAmount = testPaymentCondition === "sinal" ? numTestAmount * 0.5 : numTestAmount;
+  const brCodePayload = generatePixBRCode(
+    testPixKey,
+    testProName,
+    "SAO PAULO",
+    calculatedPixAmount
+  );
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=${encodeURIComponent(brCodePayload)}`;
 
   // PAINEL ADMINISTRATIVO AUTENTICADO
   return (
@@ -2402,9 +2483,14 @@ Quer ativar para experimentar no seu próximo serviço?`}
               {/* FORMULÁRIO DE ENTRADA DE DADOS DE TESTE */}
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8 bg-[#fbfcf9] p-5 rounded-2xl border border-[#edf1eb]">
                 <div>
-                  <Label className="mb-1 block text-xs font-bold text-[#38584f]">
-                    Chave PIX do Autônomo (Teste a sua):
-                  </Label>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="block text-xs font-bold text-[#38584f]">
+                      Chave PIX do Autônomo:
+                    </Label>
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">
+                      BACEN EMV
+                    </span>
+                  </div>
                   <Input
                     type="text"
                     value={testPixKey}
@@ -2412,6 +2498,40 @@ Quer ativar para experimentar no seu próximo serviço?`}
                     placeholder="Ex: seu CPF, Celular, E-mail ou CNPJ"
                     className="h-10 rounded-xl border-[#dce5dc] text-xs font-mono font-bold"
                   />
+                  <div className="flex gap-1.5 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTestPixKey("11985052148");
+                        setTestPixType("telefone");
+                        setTestProName("Murilo Prestador");
+                        toast.success("Chave Telefone (11) 98505-2148 ativada no QR Code!");
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition border ${
+                        testPixKey === "11985052148"
+                          ? "bg-emerald-700 text-white border-emerald-800"
+                          : "bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border-emerald-300"
+                      }`}
+                    >
+                      📱 11985052148
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTestPixKey("olirumdev1@gmail.com");
+                        setTestPixType("email");
+                        setTestProName("Murilo Prestador");
+                        toast.success("Chave E-mail olirumdev1@gmail.com ativada no QR Code!");
+                      }}
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold cursor-pointer transition border ${
+                        testPixKey === "olirumdev1@gmail.com"
+                          ? "bg-blue-700 text-white border-blue-800"
+                          : "bg-blue-100 hover:bg-blue-200 text-blue-900 border-blue-300"
+                      }`}
+                    >
+                      ✉️ olirumdev1@gmail.com
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -2629,6 +2749,47 @@ Quer ativar para experimentar no seu próximo serviço?`}
                           PIX Direto ao Profissional
                         </div>
 
+                        {/* BOTÕES DE TESTE DIRETO COM CHAVES REAIS DE MURILO */}
+                        <div className="bg-white/90 p-2.5 rounded-xl border border-emerald-300 space-y-1.5 shadow-2xs">
+                          <span className="text-[10px] font-black text-emerald-950 uppercase tracking-wider block">
+                            👇 Clique para Testar com sua Chave Real:
+                          </span>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTestPixKey("11985052148");
+                                setTestPixType("telefone");
+                                setTestProName("Murilo Prestador");
+                                toast.success("📱 Chave Telefone (11) 98505-2148 ativada no QR Code!");
+                              }}
+                              className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition cursor-pointer leading-tight ${
+                                testPixKey === "11985052148"
+                                  ? "bg-emerald-700 text-white border-emerald-800 shadow-xs ring-2 ring-emerald-400"
+                                  : "bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100"
+                              }`}
+                            >
+                              📱 (11) 98505-2148
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTestPixKey("olirumdev1@gmail.com");
+                                setTestPixType("email");
+                                setTestProName("Murilo Prestador");
+                                toast.success("✉️ Chave E-mail olirumdev1@gmail.com ativada no QR Code!");
+                              }}
+                              className={`py-1.5 px-2 rounded-lg text-[10px] font-bold border transition cursor-pointer leading-tight ${
+                                testPixKey === "olirumdev1@gmail.com"
+                                  ? "bg-blue-700 text-white border-blue-800 shadow-xs ring-2 ring-blue-400"
+                                  : "bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100"
+                              }`}
+                            >
+                              ✉️ olirumdev1@...
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="text-xs text-emerald-950 font-medium">
                           {testPaymentCondition === "sinal"
                             ? `Pague o sinal de 50% para reservar a data:`
@@ -2636,44 +2797,60 @@ Quer ativar para experimentar no seu próximo serviço?`}
                         </div>
 
                         <div className="text-2xl font-black text-emerald-900 font-mono">
-                          {testPaymentCondition === "sinal"
-                            ? `R$ ${(parseFloat(testAmount.replace(/\./g, "").replace(",", ".")) * 0.5 || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : `R$ ${testAmount}`}
+                          R$ {calculatedPixAmount.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
 
-                        {/* QR CODE GERADO */}
-                        <div className="mx-auto w-36 h-36 bg-white p-2 rounded-2xl border border-emerald-300 shadow-sm grid place-items-center">
+                        {/* QR CODE GERADO COM PAYLOAD OFICIAL BACEN */}
+                        <div className="mx-auto w-44 h-44 bg-white p-2 rounded-2xl border-2 border-emerald-400 shadow-md grid place-items-center">
                           <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=PIX:${encodeURIComponent(testPixKey)}`}
-                            alt="QR Code PIX de Teste"
+                            src={qrCodeUrl}
+                            alt="QR Code PIX Oficial Padrão Banco Central"
                             className="w-full h-full object-contain rounded-lg"
-                            onError={(e: any) => {
-                              e.target.style.display = "none";
-                            }}
                           />
                         </div>
 
-                        {/* CHAVE COPIA E COLA */}
+                        {/* CHAVE E DADOS */}
                         <div className="space-y-1">
-                          <div className="text-[10px] text-emerald-800 font-semibold">
-                            Chave ({testPixType.toUpperCase()}): <strong className="font-mono">{testPixKey}</strong>
+                          <div className="text-[11px] text-emerald-950 font-bold">
+                            Chave ({testPixType.toUpperCase()}): <span className="font-mono bg-white px-2 py-0.5 rounded border border-emerald-200">{testPixKey}</span>
                           </div>
-                          <div className="text-[10px] text-emerald-700">Favorecido: {testProName}</div>
+                          <div className="text-[10px] text-emerald-800 font-medium">Favorecido: {testProName}</div>
+                          <div className="text-[10px] text-emerald-800 bg-emerald-100/80 p-1.5 rounded-lg border border-emerald-200 text-left">
+                            🎯 <strong>Padrão Oficial Banco Central (BR Code):</strong> Aponte a câmera do aplicativo do seu banco (Nubank, Itaú, Inter, etc.) para o QR Code acima ou use o Copia e Cola abaixo!
+                          </div>
                         </div>
 
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard?.writeText(testPixKey);
-                            setTestCopiedPix(true);
-                            toast.success(`Chave PIX "${testPixKey}" copiada com sucesso!`);
-                            setTimeout(() => setTestCopiedPix(false), 2000);
-                          }}
-                          className="w-full h-9 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                        >
-                          {testCopiedPix ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                          <span>{testCopiedPix ? "Chave Copiada!" : "Copiar Chave PIX (Copia e Cola)"}</span>
-                        </Button>
+                        {/* BOTÕES DE COPIAR */}
+                        <div className="space-y-1.5 pt-1">
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(brCodePayload);
+                              setTestCopiedBRCode(true);
+                              toast.success("✅ Código PIX Copia e Cola (Padrão Banco Central) copiado! Pode colar na área 'Pix Copia e Cola' do seu banco.");
+                              setTimeout(() => setTestCopiedBRCode(false), 2500);
+                            }}
+                            className="w-full h-10 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                          >
+                            {testCopiedBRCode ? <Check className="h-4 w-4 text-[#d9f56a]" /> : <Copy className="h-4 w-4" />}
+                            <span>{testCopiedBRCode ? "Código Copiado! Cole no App do Banco" : "Copiar PIX Copia e Cola (Padrão Banco)"}</span>
+                          </Button>
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(testPixKey);
+                              setTestCopiedRawKey(true);
+                              toast.success(`Chave simples "${testPixKey}" copiada!`);
+                              setTimeout(() => setTestCopiedRawKey(false), 2000);
+                            }}
+                            className="w-full h-8 rounded-xl border-emerald-300 bg-white text-emerald-900 hover:bg-emerald-50 text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                          >
+                            {testCopiedRawKey ? <Check className="h-3.5 w-3.5 text-emerald-700" /> : <Copy className="h-3.5 w-3.5" />}
+                            <span>{testCopiedRawKey ? "Chave Copiada!" : `Copiar Somente a Chave: ${testPixKey}`}</span>
+                          </Button>
+                        </div>
                       </div>
                     )}
 
