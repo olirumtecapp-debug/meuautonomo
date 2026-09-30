@@ -238,6 +238,7 @@ export default function AdminPage() {
               loginMutation.mutate({ email, password });
             }}
             className="space-y-4"
+            autoComplete="off"
           >
             <div>
               <Label className="mb-1.5 block text-xs font-semibold text-[#38584f]">
@@ -245,11 +246,11 @@ export default function AdminPage() {
               </Label>
               <Input
                 type="text"
-                placeholder="meuatonomomaster"
+                placeholder="Digite seu usuário ou e-mail"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                autoComplete="username"
+                autoComplete="off"
                 className="h-11 rounded-xl border-[#dce5dc] bg-[#fbfcf9]"
               />
             </div>
@@ -260,11 +261,11 @@ export default function AdminPage() {
               </Label>
               <Input
                 type="password"
-                placeholder="••••••••"
+                placeholder="Digite sua senha"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoComplete="current-password"
+                autoComplete="off"
                 className="h-11 rounded-xl border-[#dce5dc] bg-[#fbfcf9]"
               />
             </div>
