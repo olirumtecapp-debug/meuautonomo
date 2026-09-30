@@ -41,8 +41,6 @@ export default function Home() {
         <nav className="hidden items-center gap-4 text-sm font-semibold text-[#5c756d] md:flex">
           <a href="#como-funciona" className="transition hover:text-[#173a34]">Como funciona</a>
           <a href="#recursos" className="transition hover:text-[#173a34]">Recursos</a>
-          <a href="/demo" className="transition hover:text-[#173a34] text-emerald-800 font-bold">Vídeo Demo</a>
-          <a href="/planos" className="transition hover:text-[#173a34] text-[#173a34] font-bold">Planos</a>
           <label className="sr-only" htmlFor="theme-select">Tema</label>
           <select id="theme-select" value={theme} onChange={event => setTheme(event.target.value as "light" | "dark" | "system")} className="h-9 rounded-xl border border-[#dce5dc] bg-white/60 px-2 text-xs font-semibold text-[#58716b] outline-none focus:ring-2 focus:ring-[#d9f56a]">
             <option value="light">Claro</option>
@@ -70,8 +68,6 @@ export default function Home() {
         <div className="grid gap-3">
           <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-semibold">Como funciona</a>
           <a href="#recursos" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-semibold">Recursos</a>
-          <a href="/demo" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-bold text-emerald-800 bg-emerald-50">Vídeo Demonstração</a>
-          <a href="/planos" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-bold text-[#173a34] bg-[#f5f7f2]">Conhecer os Planos</a>
           <label className="px-3 pt-2 text-xs font-semibold uppercase tracking-wider text-[#82948e]" htmlFor="mobile-theme-select">Tema</label>
           <select id="mobile-theme-select" value={theme} onChange={event => setTheme(event.target.value as "light" | "dark" | "system")} className="h-11 rounded-xl border border-[#dce5dc] bg-white px-3 text-sm font-semibold">
             <option value="light">Claro</option>

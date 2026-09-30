@@ -19,8 +19,6 @@ import {
   Ticket,
   Gift,
   Crown,
-  MessageSquare,
-  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +34,6 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { VoucherRedeemModal } from "@/components/VoucherRedeemModal";
-import { generatePixBRCode } from "@/lib/pix";
 
 export default function PlansPage() {
   const [selectedPlan, setSelectedPlan] = useState<"solo" | "team" | null>(null);
@@ -51,9 +48,6 @@ export default function PlansPage() {
   // Preços
   const PRICE_SOLO = "R$ 49,90";
   const PRICE_TEAM = "R$ 89,90";
-  const PIX_KEY = "11985052148";
-  const PIX_NAME = "MURILO ALVES PEREIRA";
-  const PIX_CITY = "SAO PAULO";
 
   const handleOpenCheckout = (plan: "solo" | "team") => {
     setSelectedPlan(plan);
@@ -61,34 +55,13 @@ export default function PlansPage() {
     setPixModalOpen(true);
   };
 
-  const amountNumber = selectedPlan === "solo" ? 49.9 : 89.9;
-  const planTxId = selectedPlan === "solo" ? "PROSOLO" : "PROTEAM";
-  const officialPixPayload = generatePixBRCode(
-    PIX_KEY,
-    PIX_NAME,
-    PIX_CITY,
-    amountNumber,
-    planTxId
-  );
-  const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-    officialPixPayload
-  )}`;
-
   const handleCopyPix = () => {
-    navigator.clipboard?.writeText(officialPixPayload);
-    toast.success("Código PIX Copia e Cola (padrão BACEN) copiado!");
-  };
-
-  const handleCopyKey = () => {
-    navigator.clipboard?.writeText(PIX_KEY);
-    toast.success("Chave PIX celular (11985052148) copiada!");
-  };
-
-  const handleWhatsAppConfirm = () => {
-    const planName = selectedPlan === "solo" ? "PRO Solo Vitalício (R$ 49,90)" : "PRO Estúdio & Equipe (R$ 89,90)";
-    const userEmail = profileQuery.data?.email || "";
-    const msg = `Olá Murilo! Acabei de realizar o pagamento do ${planName} via PIX no MeuAutônomo.\n\nMinha conta: ${userEmail}\nSegue meu comprovante:`;
-    window.open(`https://wa.me/5511985052148?text=${encodeURIComponent(msg)}`, "_blank");
+    const dummyKey =
+      selectedPlan === "solo"
+        ? "00020126580014br.gov.bcb.pix0136meuautonomo-pro-solo-4990520400005303986540549.905802BR5916MeuAutonomo Tech6009Sao Paulo62070503***6304E8A1"
+        : "00020126580014br.gov.bcb.pix0136meuautonomo-pro-team-8990520400005303986540589.905802BR5916MeuAutonomo Tech6009Sao Paulo62070503***63049F2D";
+    navigator.clipboard?.writeText(dummyKey);
+    toast.success("Código PIX Copia e Cola copiado!");
   };
 
   const handleSimulateWebhookSuccess = async () => {
@@ -503,74 +476,47 @@ export default function PlansPage() {
                   </span>
                 </div>
                 <Badge className="bg-[#173a34] text-[#d9f56a] text-xs font-bold">
-                  PIX Instantâneo
+                  PIX Asaas
                 </Badge>
               </div>
 
-              {/* QR CODE PIX OFICIAL BACEN */}
+              {/* QR CODE PIX SIMULADO */}
               <div className="bg-slate-900 text-white p-5 rounded-2xl text-center space-y-3 shadow-inner">
-                <div className="w-48 h-48 bg-white p-2 rounded-2xl mx-auto flex items-center justify-center shadow">
-                  <img
-                    src={qrCodeImageUrl}
-                    alt="QR Code PIX Banco Central"
-                    className="w-44 h-44 object-contain rounded-xl"
-                  />
+                <div className="w-40 h-40 bg-white p-3 rounded-2xl mx-auto flex items-center justify-center shadow">
+                  <QrCode className="w-32 h-32 text-slate-950" />
                 </div>
                 <div className="text-xs font-bold text-[#d9f56a]">
-                  Abra o app do seu banco e aponte a câmera
+                  Abra o aplicativo do seu banco e aponte a câmera
                 </div>
-                <div className="text-[11px] text-white/80 space-y-0.5 border-t border-white/10 pt-2">
-                  <div>Titular: <strong className="text-white">Murilo Alves Pereira</strong></div>
-                  <div>Chave Telefone: <strong className="text-emerald-300 font-mono">11 98505-2148</strong></div>
-                </div>
+                <p className="text-[11px] text-white/70">
+                  Liberação 100% automática em segundos via Webhook Asaas.
+                </p>
               </div>
 
-              {/* BOTÕES DE CÓPIA */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <Button
-                  onClick={handleCopyPix}
-                  variant="outline"
-                  className="w-full h-11 rounded-xl border-[#dce5dc] font-bold text-[11px] text-[#173a34] flex items-center justify-center gap-1.5"
-                >
-                  <Copy className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                  <span>Copia e Cola (BACEN)</span>
-                </Button>
-                <Button
-                  onClick={handleCopyKey}
-                  variant="outline"
-                  className="w-full h-11 rounded-xl border-[#dce5dc] font-bold text-[11px] text-[#173a34] flex items-center justify-center gap-1.5"
-                >
-                  <Phone className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                  <span>Copiar Chave Celular</span>
-                </Button>
-              </div>
-
-              {/* BOTÃO CONFIRMAÇÃO VIA WHATSAPP (CLIENTE REAL) */}
+              {/* BOTÃO COPIAR CHAVE PIX */}
               <Button
-                onClick={handleWhatsAppConfirm}
-                className="w-full h-12 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition-all"
+                onClick={handleCopyPix}
+                variant="outline"
+                className="w-full h-11 rounded-xl border-[#dce5dc] font-bold text-xs text-[#173a34] flex items-center justify-center gap-2"
               >
-                <MessageSquare className="w-4 h-4 fill-white" />
-                <span>Confirmar Pagamento no WhatsApp</span>
+                <Copy className="w-4 h-4 text-emerald-700" />
+                <span>Copiar Código PIX Copia e Cola</span>
               </Button>
 
-              {/* PAINEL DE SIMULAÇÃO RESTRITO APENAS PARA ADMINISTRADOR */}
-              {profileQuery.data?.role === "admin" && (
-                <div className="pt-3 border-t border-dashed border-amber-300 bg-amber-50/50 p-3 rounded-xl space-y-1.5">
-                  <div className="text-[10px] font-black uppercase text-amber-800 flex items-center gap-1">
-                    <Zap className="w-3 h-3 text-amber-600" />
-                    <span>Ferramenta Exclusiva de Teste (Admin)</span>
-                  </div>
-                  <Button
-                    onClick={handleSimulateWebhookSuccess}
-                    disabled={simulatingPayment}
-                    variant="outline"
-                    className="w-full h-9 rounded-lg border-amber-400 bg-white hover:bg-amber-100 text-amber-900 font-bold text-[11px] flex items-center justify-center gap-2"
-                  >
-                    <span>{simulatingPayment ? "Processando..." : "Simular Webhook Asaas Imediato"}</span>
-                  </Button>
-                </div>
-              )}
+              {/* BOTÃO DE SIMULAÇÃO DE WEBHOOK (TESTE / HOMOLOGAÇÃO) */}
+              <div className="pt-2 border-t border-slate-100">
+                <Button
+                  onClick={handleSimulateWebhookSuccess}
+                  disabled={simulatingPayment}
+                  className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-4 h-4 text-[#d9f56a]" />
+                  <span>{simulatingPayment ? "Processando no Asaas..." : "Simular Confirmação do Pagamento"}</span>
+                </Button>
+                <span className="text-[10px] text-slate-400 text-center block mt-1">
+                  (Simula a chamada real do webhook que o Asaas faz quando o cliente paga)
+                </span>
+              </div>
             </div>
           )}
         </DialogContent>
