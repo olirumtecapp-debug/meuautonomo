@@ -64,6 +64,21 @@ export default function AdminPage() {
   const [voucherMaxUsesInput, setVoucherMaxUsesInput] = useState(1);
   const [copiedVoucher, setCopiedVoucher] = useState<string | null>(null);
 
+  // WhatsApp Voucher Share Modal states
+  const [whatsAppModalVoucher, setWhatsAppModalVoucher] = useState<any | null>(null);
+  const [whatsAppRecipientPhone, setWhatsAppRecipientPhone] = useState("");
+  const [whatsAppDomain, setWhatsAppDomain] = useState("https://meuautonomo.creativeam.com.br");
+  const [copiedWhatsAppMsg, setCopiedWhatsAppMsg] = useState(false);
+
+  const getVoucherWhatsAppMessage = (voucher: any, domain: string) => {
+    if (!voucher) return "";
+    const benefit = voucher.isVipTotal
+      ? "Acesso VIP Vitalício Ilimitado"
+      : `${voucher.days || 20} dias de Plano ${(voucher.plan || "pro").toUpperCase()} Grátis (Todas as Funcionalidades Liberadas)`;
+
+    return `Olá! Tudo bem? 🚀\n\nEstou liberando um acesso VIP de cortesia para você experimentar o *MeuAutônomo* — a plataforma feita para profissionais autônomos e prestadores de serviços organizarem orçamentos profissionais com 1 clique, agenda inteligente e controle financeiro direto no WhatsApp.\n\n🎁 *Seu Voucher com Acesso Total Liberado:*\n• Código do Voucher: *${voucher.code}*\n• Benefício: *${benefit}*\n\n👉 *Como começar em menos de 1 minuto:*\n1. Acesse o link: ${domain}\n2. Faça seu cadastro rápido (leva 30 segundos)\n3. No menu *Meu Plano* (ou no perfil), digite o código *${voucher.code}*\n\nPronto! Todas as funções profissionais estarão liberadas para você impressionar seus clientes e fechar mais serviços com total credibilidade. Se tiver qualquer dúvida, estou por aqui! 💼✨`;
+  };
+
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard?.writeText(text);
     setCopiedScript(id);
@@ -1478,20 +1493,36 @@ export default function AdminPage() {
                               </button>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  if (confirm(`Tem certeza que deseja excluir o voucher ${v.code}?`)) {
-                                    deleteVoucherMutation.mutate({ id: v.id });
-                                  }
-                                }}
-                                className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
-                                title="Excluir voucher"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => {
+                                    setWhatsAppModalVoucher(v);
+                                    setWhatsAppRecipientPhone("");
+                                    setCopiedWhatsAppMsg(false);
+                                  }}
+                                  className="h-8 px-2.5 bg-[#25D366] hover:bg-[#20ba5a] text-white rounded-lg cursor-pointer font-bold text-xs shadow-2xs flex items-center gap-1.5"
+                                  title="Enviar Convite com Voucher no WhatsApp"
+                                >
+                                  <MessageSquare className="h-3.5 w-3.5" />
+                                  <span className="hidden sm:inline">WhatsApp</span>
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (confirm(`Tem certeza que deseja excluir o voucher ${v.code}?`)) {
+                                      deleteVoucherMutation.mutate({ id: v.id });
+                                    }
+                                  }}
+                                  className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                                  title="Excluir voucher"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -2208,6 +2239,118 @@ Quer ativar para experimentar no seu próximo serviço?`}
                 className="rounded-xl bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
               >
                 {resetMutation.isPending ? "Zerando..." : "Sim, zerar dados"}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL DE ENVIO DE VOUCHER POR WHATSAPP */}
+      {whatsAppModalVoucher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <Card className="w-full max-w-lg rounded-[28px] border-0 bg-white p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#edf1eb] pb-3">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[#25D366]/20 text-[#173a34]">
+                  <MessageSquare className="h-5 w-5 text-[#25D366]" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-[#173a34]">
+                    Enviar Convite via WhatsApp
+                  </h3>
+                  <p className="text-xs text-[#71867f]">
+                    Voucher: <strong className="font-mono text-[#4c630f] bg-[#edf5da] px-1.5 py-0.5 rounded border border-[#d2e4a8]">{whatsAppModalVoucher.code}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWhatsAppModalVoucher(null)}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-[#71867f] hover:text-[#173a34] hover:bg-slate-100 transition cursor-pointer font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                  Número do WhatsApp do Autônomo (Opcional):
+                </Label>
+                <Input
+                  type="text"
+                  placeholder="Ex: 11999998888 (ou deixe vazio para escolher o contato no WhatsApp)"
+                  value={whatsAppRecipientPhone}
+                  onChange={(e) => setWhatsAppRecipientPhone(e.target.value)}
+                  className="h-10 rounded-xl border-[#dce5dc] text-sm"
+                />
+                <span className="text-[11px] text-[#71867f]">
+                  Se preenchido com DDD, abre a conversa direta. Se vazio, abre o WhatsApp para você selecionar qualquer contato ou grupo.
+                </span>
+              </div>
+
+              <div>
+                <Label className="mb-1 block text-xs font-bold text-[#38584f]">
+                  Link da Plataforma:
+                </Label>
+                <Input
+                  type="text"
+                  value={whatsAppDomain}
+                  onChange={(e) => setWhatsAppDomain(e.target.value)}
+                  className="h-10 rounded-xl border-[#dce5dc] font-mono text-xs text-[#173a34]"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <Label className="text-xs font-bold text-[#38584f]">
+                    Prévia da Mensagem Formatada:
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const msg = getVoucherWhatsAppMessage(whatsAppModalVoucher, whatsAppDomain);
+                      navigator.clipboard?.writeText(msg);
+                      setCopiedWhatsAppMsg(true);
+                      toast.success("Mensagem completa copiada!");
+                      setTimeout(() => setCopiedWhatsAppMsg(false), 2000);
+                    }}
+                    className="text-xs font-bold text-[#173a34] hover:text-[#4c630f] flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedWhatsAppMsg ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                    <span>{copiedWhatsAppMsg ? "Copiado!" : "Copiar Texto"}</span>
+                  </button>
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[#f8faf6] border border-[#dce5dc] text-xs font-sans text-[#173a34] whitespace-pre-line leading-relaxed max-h-56 overflow-y-auto">
+                  {getVoucherWhatsAppMessage(whatsAppModalVoucher, whatsAppDomain)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setWhatsAppModalVoucher(null)}
+                className="rounded-xl border-[#dce5dc] text-xs font-bold"
+              >
+                Fechar
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  const msg = getVoucherWhatsAppMessage(whatsAppModalVoucher, whatsAppDomain);
+                  const cleanPhone = whatsAppRecipientPhone.replace(/\D/g, "");
+                  const url = cleanPhone
+                    ? `https://api.whatsapp.com/send?phone=55${cleanPhone}&text=${encodeURIComponent(msg)}`
+                    : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+                  window.open(url, "_blank");
+                  toast.success("Abrindo WhatsApp...");
+                }}
+                className="rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer"
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>Enviar no WhatsApp</span>
               </Button>
             </div>
           </Card>
