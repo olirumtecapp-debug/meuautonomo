@@ -213,7 +213,7 @@ export default function PlansPage() {
                   </li>
                   <li className="flex items-start gap-2.5 text-slate-400">
                     <X className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
-                    <span>Remoção da marca d'água</span>
+                    <span>Relatórios financeiros detalhados</span>
                   </li>
                 </ul>
               </div>
@@ -222,7 +222,7 @@ export default function PlansPage() {
                 <Button
                   disabled={currentPlan === "free"}
                   variant="outline"
-                  className="w-full h-11 rounded-xl border-[#dce5dc] font-bold text-xs text-[#38584f]"
+                  className="w-full min-h-[48px] py-2.5 px-3 rounded-xl border-[#dce5dc] font-bold text-xs text-[#38584f]"
                 >
                   {currentPlan === "free" ? "Plano em Uso" : "Voltar ao Grátis"}
                 </Button>
@@ -230,13 +230,13 @@ export default function PlansPage() {
             </Card>
 
             {/* PLANO 2: PRO SOLO (DESTAQUE) */}
-            <Card className="rounded-[28px] border-2 border-[#173a34] bg-white p-6 shadow-xl flex flex-col justify-between relative transform md:-translate-y-2">
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#d9f56a] text-[#173a34] font-black text-[11px] px-3.5 py-1 rounded-full uppercase tracking-wider shadow">
+            <Card className="rounded-[28px] border-2 border-[#173a34] bg-white p-5 sm:p-6 shadow-xl flex flex-col justify-between relative transform md:-translate-y-2">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#d9f56a] text-[#173a34] font-black text-[10px] sm:text-[11px] px-4 py-1.5 rounded-full uppercase tracking-wider shadow-md whitespace-nowrap z-20 border border-[#b8dc2e]">
                 🔥 Mais Escolhido por Autônomos
               </div>
 
               <div>
-                <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center justify-between mt-5">
                   <span className="text-xs font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
                     Acesso Vitalício
                   </span>
@@ -286,7 +286,7 @@ export default function PlansPage() {
                   </li>
                   <li className="flex items-start gap-2.5">
                     <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Sem marca d'água</strong> (Sua marca 100% profissional)</span>
+                    <span><strong>Sua Marca & Foto em Destaque</strong> nas propostas e no WhatsApp</span>
                   </li>
                   <li className="flex items-start gap-2.5 font-bold text-emerald-800">
                     <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -298,22 +298,22 @@ export default function PlansPage() {
               <div className="mt-8">
                 <Button
                   onClick={() => handleOpenCheckout("solo")}
-                  className="w-full h-12 rounded-xl bg-[#173a34] hover:bg-[#28564d] font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition"
+                  className="w-full min-h-[48px] py-2.5 px-3 rounded-xl bg-[#173a34] hover:bg-[#28564d] font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>Garantir Acesso Vitalício ({PRICE_SOLO})</span>
-                  <ArrowRight className="w-4 h-4 ml-1.5" />
+                  <ArrowRight className="w-4 h-4 shrink-0" />
                 </Button>
               </div>
             </Card>
 
             {/* PLANO 3: PRO ESTÚDIO / EQUIPE */}
-            <Card className="rounded-[28px] border-2 border-purple-200 bg-white p-6 shadow-sm flex flex-col justify-between relative">
+            <Card className="rounded-[28px] border-2 border-purple-200 bg-white p-5 sm:p-6 shadow-sm flex flex-col justify-between relative">
               <div className="absolute -top-3.5 right-6 bg-purple-600 text-white font-bold text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow">
                 Salões & Oficinas
               </div>
 
               <div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mt-5">
                   <span className="text-xs font-black uppercase tracking-wider text-purple-800 bg-purple-100 px-3 py-1 rounded-full">
                     Estúdio & Equipe
                   </span>
@@ -375,10 +375,10 @@ export default function PlansPage() {
               <div className="mt-8">
                 <Button
                   onClick={() => handleOpenCheckout("team")}
-                  className="w-full h-12 rounded-xl bg-purple-700 hover:bg-purple-800 font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition"
+                  className="w-full min-h-[48px] py-2.5 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>Desbloquear Modo Equipe ({PRICE_TEAM})</span>
-                  <ArrowRight className="w-4 h-4 ml-1.5" />
+                  <ArrowRight className="w-4 h-4 shrink-0" />
                 </Button>
               </div>
             </Card>
