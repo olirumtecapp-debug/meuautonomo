@@ -241,15 +241,15 @@ export default function AdminPage() {
           >
             <div>
               <Label className="mb-1.5 block text-xs font-semibold text-[#38584f]">
-                E-mail do Administrador
+                Usuário ou E-mail do Administrador
               </Label>
               <Input
-                type="email"
-                placeholder="seu-email@dominio.com"
+                type="text"
+                placeholder="meuatonomomaster"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                autoComplete="email"
+                autoComplete="username"
                 className="h-11 rounded-xl border-[#dce5dc] bg-[#fbfcf9]"
               />
             </div>

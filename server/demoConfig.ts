@@ -6,12 +6,14 @@ const CONFIG_FILE = path.resolve(process.cwd(), "server", "data", "admin-config.
 interface AdminConfig {
   demoMode: boolean;
   adminEmail: string;
+  adminUsername?: string;
   adminPasswordHash?: string;
 }
 
 let _config: AdminConfig = {
   demoMode: false,
-  adminEmail: process.env.ADMIN_EMAIL || "admin@meuautonomo.com.br",
+  adminEmail: process.env.ADMIN_EMAIL || "meuatonomomaster@creativeam.com.br",
+  adminUsername: process.env.ADMIN_USERNAME || "meuatonomomaster",
 };
 
 // Load saved config if exists
@@ -44,7 +46,11 @@ export function setDemoMode(value: boolean): void {
 }
 
 export function getAdminEmail(): string {
-  return _config.adminEmail;
+  return _config.adminEmail || "meuatonomomaster@creativeam.com.br";
 }
 
-export const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin@123456";
+export function getAdminUsername(): string {
+  return _config.adminUsername || "meuatonomomaster";
+}
+
+export const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "16Bl33@p";
