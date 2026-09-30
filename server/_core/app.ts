@@ -3,6 +3,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { handleAsaasWebhook } from "../webhooks/asaas";
+import { createPixPayment, getPaymentStatus } from "../routes/asaas-checkout";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 
@@ -18,6 +19,10 @@ export function createExpressApp() {
 
   // Webhook oficial do Asaas (PIX automático e reembolsos CDC)
   app.post("/api/webhooks/asaas", handleAsaasWebhook);
+
+  // Checkout PIX via Asaas (cria cobrança real com QR Code)
+  app.post("/api/asaas/create-pix", createPixPayment);
+  app.get("/api/asaas/payment-status/:paymentId", getPaymentStatus);
 
   // tRPC API
   app.use(

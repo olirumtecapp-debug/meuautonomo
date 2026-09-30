@@ -42,6 +42,17 @@ export default function PlansPage() {
   const [simulatingPayment, setSimulatingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
+  // Estado do PIX real do Asaas
+  const [pixLoading, setPixLoading] = useState(false);
+  const [pixError, setPixError] = useState<string | null>(null);
+  const [pixData, setPixData] = useState<{
+    paymentId: string;
+    encodedImage: string;
+    payload: string;
+    invoiceUrl: string;
+  } | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
+
   const profileQuery = trpc.profile.get.useQuery();
   const utils = trpc.useUtils();
 
@@ -49,25 +60,81 @@ export default function PlansPage() {
   const PRICE_SOLO = "R$ 49,90";
   const PRICE_TEAM = "R$ 89,90";
 
-  const handleOpenCheckout = (plan: "solo" | "team") => {
+  const stopPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+  };
+
+  const handleOpenCheckout = async (plan: "solo" | "team") => {
     setSelectedPlan(plan);
     setPaymentSuccess(false);
+    setPixData(null);
+    setPixError(null);
+    setPixLoading(true);
     setPixModalOpen(true);
+    stopPolling();
+
+    try {
+      const res = await fetch("/api/asaas/create-pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+        credentials: "include",
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setPixError(data?.error || "Erro ao gerar cobrança PIX. Tente novamente.");
+        setPixLoading(false);
+        return;
+      }
+
+      setPixData(data);
+      setPixLoading(false);
+
+      // Inicia polling para detectar pagamento confirmado automaticamente
+      const interval = setInterval(async () => {
+        try {
+          const statusRes = await fetch(
+            `/api/asaas/payment-status/${data.paymentId}`,
+            { credentials: "include" }
+          );
+          const statusData = await statusRes.json();
+          if (statusData.confirmed) {
+            clearInterval(interval);
+            setPollingInterval(null);
+            setPaymentSuccess(true);
+            toast.success("🎉 Pagamento confirmado! Plano ativado automaticamente.");
+            utils.profile.get.invalidate();
+          }
+        } catch {
+          // silently ignore polling errors
+        }
+      }, 5000); // verifica a cada 5s
+      setPollingInterval(interval);
+    } catch (err: any) {
+      setPixError("Erro de conexão. Verifique sua internet e tente novamente.");
+      setPixLoading(false);
+    }
   };
 
   const handleCopyPix = () => {
-    const dummyKey =
-      selectedPlan === "solo"
-        ? "00020126580014br.gov.bcb.pix0136meuautonomo-pro-solo-4990520400005303986540549.905802BR5916MeuAutonomo Tech6009Sao Paulo62070503***6304E8A1"
-        : "00020126580014br.gov.bcb.pix0136meuautonomo-pro-team-8990520400005303986540589.905802BR5916MeuAutonomo Tech6009Sao Paulo62070503***63049F2D";
-    navigator.clipboard?.writeText(dummyKey);
+    if (!pixData?.payload) return;
+    navigator.clipboard?.writeText(pixData.payload);
     toast.success("Código PIX Copia e Cola copiado!");
+  };
+
+  const handleCloseModal = () => {
+    stopPolling();
+    setPixModalOpen(false);
   };
 
   const handleSimulateWebhookSuccess = async () => {
     setSimulatingPayment(true);
     try {
-      // Simula a confirmação via webhook do Asaas
+      // Simula a confirmação via webhook do Asaas (apenas admin)
       const res = await fetch("/api/webhooks/asaas", {
         method: "POST",
         headers: {
@@ -91,21 +158,20 @@ export default function PlansPage() {
 
       if (res.ok) {
         setPaymentSuccess(true);
-        toast.success("Pagamento confirmado via Webhook do Asaas!");
+        toast.success("Pagamento simulado via Webhook do Asaas!");
         utils.profile.get.invalidate();
       } else {
-        setPaymentSuccess(true);
-        toast.success("Plano atualizado!");
+        toast.error("Erro na simulação do webhook.");
       }
     } catch (err) {
-      setPaymentSuccess(true);
-      toast.success("Plano ativado com sucesso!");
+      toast.error("Erro ao simular webhook.");
     } finally {
       setSimulatingPayment(false);
     }
   };
 
   const currentPlan = profileQuery.data?.plan || "free";
+  const isAdmin = (profileQuery.data as any)?.role === "admin";
 
   return (
     <DashboardLayout>
@@ -436,8 +502,8 @@ export default function PlansPage() {
         </div>
       </div>
 
-      {/* MODAL DE CHECKOUT PIX (ASAAS) */}
-      <Dialog open={pixModalOpen} onOpenChange={setPixModalOpen}>
+      {/* MODAL DE CHECKOUT PIX (ASAAS REAL) */}
+      <Dialog open={pixModalOpen} onOpenChange={handleCloseModal}>
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[28px] max-w-md p-6 bg-white border border-[#dce5dc]">
           <DialogHeader>
             <DialogTitle className="text-xl font-black text-[#173a34] flex items-center gap-2">
@@ -460,7 +526,7 @@ export default function PlansPage() {
                 O Webhook do Asaas confirmou o recebimento do PIX. Todos os recursos ilimitados já estão liberados na sua conta!
               </p>
               <Button
-                onClick={() => setPixModalOpen(false)}
+                onClick={handleCloseModal}
                 className="w-full mt-4 h-11 rounded-xl bg-[#173a34] text-white font-bold"
               >
                 Voltar e Aproveitar
@@ -480,43 +546,82 @@ export default function PlansPage() {
                 </Badge>
               </div>
 
-              {/* QR CODE PIX SIMULADO */}
+              {/* QR CODE PIX REAL DO ASAAS */}
               <div className="bg-slate-900 text-white p-5 rounded-2xl text-center space-y-3 shadow-inner">
-                <div className="w-40 h-40 bg-white p-3 rounded-2xl mx-auto flex items-center justify-center shadow">
-                  <QrCode className="w-32 h-32 text-slate-950" />
+                <div className="w-44 h-44 bg-white p-2 rounded-2xl mx-auto flex items-center justify-center shadow">
+                  {pixLoading && (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-8 h-8 border-4 border-[#d9f56a] border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] text-slate-500">Gerando QR Code...</span>
+                    </div>
+                  )}
+                  {!pixLoading && pixError && (
+                    <div className="text-center p-2">
+                      <span className="text-red-500 text-xs font-bold block">⚠️ Erro</span>
+                      <span className="text-slate-500 text-[10px] block mt-1">{pixError}</span>
+                    </div>
+                  )}
+                  {!pixLoading && pixData?.encodedImage && (
+                    <img
+                      src={`data:image/png;base64,${pixData.encodedImage}`}
+                      alt="QR Code PIX"
+                      className="w-40 h-40 object-contain"
+                    />
+                  )}
+                  {!pixLoading && !pixError && !pixData && (
+                    <QrCode className="w-32 h-32 text-slate-300" />
+                  )}
                 </div>
                 <div className="text-xs font-bold text-[#d9f56a]">
-                  Abra o aplicativo do seu banco e aponte a câmera
+                  {pixLoading
+                    ? "Aguarde, preparando seu QR Code..."
+                    : "Abra o aplicativo do seu banco e aponte a câmera"}
                 </div>
                 <p className="text-[11px] text-white/70">
                   Liberação 100% automática em segundos via Webhook Asaas.
                 </p>
               </div>
 
-              {/* BOTÃO COPIAR CHAVE PIX */}
+              {/* BOTÃO COPIAR PIX COPIA E COLA */}
               <Button
                 onClick={handleCopyPix}
+                disabled={!pixData?.payload || pixLoading}
                 variant="outline"
-                className="w-full h-11 rounded-xl border-[#dce5dc] font-bold text-xs text-[#173a34] flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl border-[#dce5dc] font-bold text-xs text-[#173a34] flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Copy className="w-4 h-4 text-emerald-700" />
                 <span>Copiar Código PIX Copia e Cola</span>
               </Button>
 
-              {/* BOTÃO DE SIMULAÇÃO DE WEBHOOK (TESTE / HOMOLOGAÇÃO) */}
-              <div className="pt-2 border-t border-slate-100">
-                <Button
-                  onClick={handleSimulateWebhookSuccess}
-                  disabled={simulatingPayment}
-                  className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2"
+              {/* LINK ABRIR FATURA NO ASAAS */}
+              {pixData?.invoiceUrl && (
+                <a
+                  href={pixData.invoiceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-[#dce5dc] text-xs font-bold text-[#173a34] hover:bg-slate-50 transition"
                 >
-                  <Zap className="w-4 h-4 text-[#d9f56a]" />
-                  <span>{simulatingPayment ? "Processando no Asaas..." : "Simular Confirmação do Pagamento"}</span>
-                </Button>
-                <span className="text-[10px] text-slate-400 text-center block mt-1">
-                  (Simula a chamada real do webhook que o Asaas faz quando o cliente paga)
-                </span>
-              </div>
+                  <ArrowRight className="w-4 h-4 text-emerald-700" />
+                  Abrir Fatura no Asaas
+                </a>
+              )}
+
+              {/* BOTÃO DE SIMULAÇÃO DE WEBHOOK (APENAS ADMIN) */}
+              {isAdmin && (
+                <div className="pt-2 border-t border-slate-100">
+                  <Button
+                    onClick={handleSimulateWebhookSuccess}
+                    disabled={simulatingPayment}
+                    className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2"
+                  >
+                    <Zap className="w-4 h-4 text-[#d9f56a]" />
+                    <span>{simulatingPayment ? "Processando..." : "Admin: Simular Pagamento"}</span>
+                  </Button>
+                  <span className="text-[10px] text-slate-400 text-center block mt-1">
+                    (Visível apenas para administradores)
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
