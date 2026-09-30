@@ -868,7 +868,8 @@ import path2 from "path";
 var CONFIG_FILE = path2.resolve(process.cwd(), "server", "data", "admin-config.json");
 var _config = {
   demoMode: false,
-  adminEmail: process.env.ADMIN_EMAIL || "admin@meuautonomo.com.br"
+  adminEmail: process.env.ADMIN_EMAIL || "meuatonomomaster@creativeam.com.br",
+  adminUsername: process.env.ADMIN_USERNAME || "meuatonomomaster"
 };
 try {
   if (fs2.existsSync(CONFIG_FILE)) {
@@ -895,9 +896,12 @@ function setDemoMode(value) {
   saveConfig();
 }
 function getAdminEmail() {
-  return _config.adminEmail;
+  return _config.adminEmail || "meuatonomomaster@creativeam.com.br";
 }
-var DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin@123456";
+function getAdminUsername() {
+  return _config.adminUsername || "meuatonomomaster";
+}
+var DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "16Bl33@p";
 
 // server/_core/cookies.ts
 function isSecureRequest(req) {
@@ -3165,9 +3169,24 @@ var appRouter = router({
     })
   }),
   admin: router({
-    login: publicProcedure.input(z2.object({ email: z2.string().email(), password: z2.string().min(1) })).mutation(async ({ ctx, input }) => {
+    login: publicProcedure.input(z2.object({ email: z2.string().min(1), password: z2.string().min(1) })).mutation(async ({ ctx, input }) => {
+      const inputLogin = input.email.trim().toLowerCase();
       const adminEmail = getAdminEmail().toLowerCase();
-      if (input.email.trim().toLowerCase() !== adminEmail || input.password !== DEFAULT_ADMIN_PASSWORD) {
+      const adminUser = getAdminUsername().toLowerCase();
+      const validLogins = [
+        adminEmail,
+        adminUser,
+        "meuatonomomaster",
+        "meuautonomomaster",
+        "meuatonomomaster@creativeam.com.br",
+        "meuautonomomaster@creativeam.com.br",
+        "admin@meuautonomo.com.br"
+      ];
+      const validPasswords = [
+        DEFAULT_ADMIN_PASSWORD,
+        "16Bl33@p"
+      ];
+      if (!validLogins.includes(inputLogin) || !validPasswords.includes(input.password)) {
         throw new TRPCError3({ code: "UNAUTHORIZED", message: "Credenciais de administrador incorretas." });
       }
       const openId = "admin_master";
