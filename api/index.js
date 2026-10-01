@@ -2894,7 +2894,7 @@ var appRouter = router({
           try {
             const profile = (await db.select().from(professionalProfiles).where(eq4(professionalProfiles.id, quote.profileId)).limit(1))[0];
             const items = await db.select().from(quoteItems).where(eq4(quoteItems.quoteId, quote.id));
-            const publicUrl = process.env.APP_URL || process.env.PUBLIC_URL || "https://meuautonomo.com.br";
+            const publicUrl = process.env.APP_URL || process.env.PUBLIC_URL || "https://meuautonomo.creativeam.com.br";
             const linkProposta = `${publicUrl}/orcamento/${quote.secureToken}`;
             const emailData = modeloOrcamentoAprovado({
               clienteNome: input.clientName || "Cliente",
