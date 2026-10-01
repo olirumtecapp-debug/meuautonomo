@@ -30,35 +30,67 @@ async function asaasRequest(path: string, method: string, body?: object) {
   return data;
 }
 
-async function getOrCreateAsaasCustomer(email: string, name: string): Promise<string> {
+async function getOrCreateAsaasCustomer(
+  email: string,
+  name: string,
+  cpfCnpj?: string
+): Promise<string> {
+  const cleanCpf = cpfCnpj ? cpfCnpj.replace(/\D/g, "") : undefined;
+
   // Busca cliente existente pelo e-mail
   const searchData = await asaasRequest(
     `/customers?email=${encodeURIComponent(email)}&limit=1`,
     "GET"
   );
   if (searchData?.data?.length > 0) {
-    return searchData.data[0].id as string;
+    const existing = searchData.data[0];
+    // Se o cliente existe mas ainda não tinha CPF e recebemos agora, atualiza no Asaas
+    if (cleanCpf && (!existing.cpfCnpj || existing.cpfCnpj !== cleanCpf)) {
+      try {
+        await asaasRequest(`/customers/${existing.id}`, "POST", {
+          cpfCnpj: cleanCpf,
+        });
+      } catch (e: any) {
+        console.warn("[Asaas] Aviso ao atualizar CPF do cliente existente:", e?.message);
+      }
+    }
+    return existing.id as string;
   }
-  // Cria novo cliente
-  const created = await asaasRequest("/customers", "POST", {
+
+  // Cria novo cliente no Asaas
+  const createPayload: any = {
     name: name || "Cliente MeuAutônomo",
     email,
     notificationDisabled: false,
-  });
+  };
+  if (cleanCpf) {
+    createPayload.cpfCnpj = cleanCpf;
+  }
+
+  const created = await asaasRequest("/customers", "POST", createPayload);
   return created.id as string;
 }
 
 /**
  * POST /api/asaas/create-pix
- * Body: { plan: "solo" | "team" }
+ * Body: { plan: "solo" | "team", cpf?: string }
  * Autenticação via cookie de sessão (padrão do projeto)
  * Retorna: { encodedImage, payload, invoiceUrl, paymentId }
  */
 export async function createPixPayment(req: Request, res: Response) {
   try {
     const plan = req.body?.plan as "solo" | "team";
+    const rawCpf = (req.body?.cpf as string) || "";
+    const cleanCpf = rawCpf.replace(/\D/g, "");
+
     if (!plan || !PLAN_CONFIG[plan]) {
       return res.status(400).json({ error: "Plano inválido. Use 'solo' ou 'team'." });
+    }
+
+    if (!cleanCpf || (cleanCpf.length !== 11 && cleanCpf.length !== 14)) {
+      return res.status(400).json({
+        error: "Informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido para registrar a cobrança PIX.",
+      });
     }
 
     if (!ASAAS_API_KEY) {
@@ -87,10 +119,11 @@ export async function createPixPayment(req: Request, res: Response) {
     }
     const user = userRows[0];
 
-    // Busca ou cria cliente no Asaas
+    // Busca ou cria cliente no Asaas com CPF/CNPJ
     const asaasCustomerId = await getOrCreateAsaasCustomer(
       user.email!,
-      user.name || user.email!
+      user.name || user.email!,
+      cleanCpf
     );
 
     // Data de vencimento = amanhã (PIX expira em 24h)
