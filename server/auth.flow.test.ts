@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
@@ -220,5 +220,14 @@ describe("Fluxo Completo de Autenticação - MeuAutônomo", () => {
     expect(res.success).toBe(true);
     expect(cookiesCleared).toHaveLength(1);
     expect(cookiesCleared[0]?.name).toBe(COOKIE_NAME);
+  });
+
+  afterAll(async () => {
+    const fs = await import("fs");
+    if (fs.existsSync("server/data/db-store.json")) {
+      const data = JSON.parse(fs.readFileSync("server/data/db-store.json", "utf8"));
+      data.users = data.users.filter((u: any) => !u.email?.includes("teste.qa.") && !u.email?.includes("qa.") && u.openId !== "admin_master");
+      fs.writeFileSync("server/data/db-store.json", JSON.stringify(data, null, 2), "utf8");
+    }
   });
 });

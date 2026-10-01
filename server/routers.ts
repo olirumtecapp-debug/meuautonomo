@@ -1307,7 +1307,7 @@ export const appRouter = router({
         const openId = "admin_master";
         await upsertUser({
           openId,
-          name: "Administrador Geral",
+          name: "Administrador do Sistema",
           email: adminEmail,
           role: "admin",
           loginMethod: "admin-panel",

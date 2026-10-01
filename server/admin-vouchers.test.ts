@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
@@ -47,6 +47,14 @@ describe("Painel Administrativo & Gestão de Vouchers - MeuAutônomo", () => {
   let adminSessionToken: string;
   let adminUser: NonNullable<TrpcContext["user"]>;
   let savedQaUser: NonNullable<TrpcContext["user"]>;
+  let initialDbSnapshot: string | null = null;
+
+  beforeAll(async () => {
+    const fs = await import("fs");
+    if (fs.existsSync("server/data/db-store.json")) {
+      initialDbSnapshot = fs.readFileSync("server/data/db-store.json", "utf8");
+    }
+  });
 
   it("1. Login administrativo com credenciais incorretas deve ser rejeitado", async () => {
     const { ctx } = createMockContext();
@@ -341,5 +349,12 @@ describe("Painel Administrativo & Gestão de Vouchers - MeuAutônomo", () => {
 
     const clearedCookie = cookiesCleared.find((c) => c.name === COOKIE_NAME);
     expect(clearedCookie).toBeDefined();
+  });
+
+  afterAll(async () => {
+    const fs = await import("fs");
+    if (initialDbSnapshot) {
+      fs.writeFileSync("server/data/db-store.json", initialDbSnapshot, "utf8");
+    }
   });
 });

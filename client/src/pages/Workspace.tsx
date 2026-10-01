@@ -1089,6 +1089,8 @@ function Field({
             placeholder={effectivePlaceholder}
             spellCheck={!isPhone && !isCurrency && spellCheck}
             lang="pt-BR"
+            autoCorrect="on"
+            autoCapitalize="sentences"
             className="h-full flex-1 bg-transparent px-3 text-sm font-semibold text-[#173a34] outline-none placeholder:text-[#9bad9a]"
           />
         </div>
@@ -1601,16 +1603,23 @@ function Quotes() {
     if (!form.items.every(item => item.description.trim() && Number(item.quantity) > 0)) {
       return toast.error("Preencha a descrição e quantidade de todos os itens.");
     }
-    const payloadItems = form.items.map(item => ({
-      description: item.description,
-      quantity: Number(item.quantity),
-      unitPriceCents: parseBrlToCents(item.unitPrice)
-    }));
+    const payloadItems = form.items.map(item => {
+      const spell = checkServiceSpelling(item.description);
+      const cleanDesc = spell.hasCorrection ? spell.correctedText : item.description;
+      return {
+        description: cleanDesc,
+        quantity: Number(item.quantity),
+        unitPriceCents: parseBrlToCents(item.unitPrice)
+      };
+    });
+
+    const descSpell = form.description ? checkServiceSpelling(form.description) : null;
+    const finalQuoteDesc = (descSpell?.hasCorrection ? descSpell.correctedText : form.description) || undefined;
 
     if (editingQuoteId) {
       update.mutate({
         id: editingQuoteId,
-        description: form.description || undefined,
+        description: finalQuoteDesc,
         discountCents: parseBrlToCents(form.discount),
         notes: form.notes || undefined,
         paymentTerms: form.paymentTerms || undefined,
@@ -1622,7 +1631,7 @@ function Quotes() {
       create.mutate({
         clientId: form.clientId ? Number(form.clientId) : undefined,
         serviceId: form.serviceId ? Number(form.serviceId) : undefined,
-        description: form.description || undefined,
+        description: finalQuoteDesc,
         discountCents: parseBrlToCents(form.discount),
         notes: form.notes || undefined,
         paymentTerms: form.paymentTerms || undefined,
