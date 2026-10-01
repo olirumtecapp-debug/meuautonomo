@@ -19,6 +19,7 @@ import {
   BarChart3,
   BookOpen,
   BriefcaseBusiness,
+  Calendar,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -37,6 +38,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  Printer,
   RefreshCcw,
   Send,
   Search,
@@ -693,12 +695,14 @@ function Onboarding() {
     if (!profession.slug.trim()) return toast.error("Informe o link do seu cartão digital.");
 
     try {
+      const spellBio = profession.bio ? checkServiceSpelling(profession.bio) : null;
+      const finalBio = spellBio?.hasCorrection ? spellBio.correctedText : profession.bio;
       await profileMutation.mutateAsync({
         ...profession,
         professionCategory: profession.professionCategory || "Serviços Gerais",
         city: profession.city || undefined,
         serviceRegion: profession.serviceRegion || undefined,
-        bio: profession.bio || undefined,
+        bio: finalBio || undefined,
         showPrices: true,
         bookingEnabled: false,
       });
@@ -1235,14 +1239,63 @@ function Dashboard() {
 function Metric({ title, value, hint, icon: Icon, accent }: { title: string; value: string; hint: string; icon: typeof CalendarDays; accent: string }) { const colors: Record<string,string> = { lime: "bg-[#eef5d2] text-[#809614]", blue: "bg-[#e8f1f5] text-[#3f738e]", green: "bg-[#e3f3e8] text-[#3e885c]", orange: "bg-[#fff1d9] text-[#a27320]" }; return <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_26px_rgba(19,42,39,0.04)]"><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold text-[#83968f]">{title}</p><p className="mt-2 text-2xl font-bold tracking-tight text-[#173a34]">{value}</p><p className="mt-1 text-xs text-[#9aa9a3]">{hint}</p></div><div className={cn("grid h-10 w-10 place-items-center rounded-xl", colors[accent])}><Icon className="h-5 w-5" /></div></div></CardContent></Card>; }
 
 function Agenda() {
-  const today = new Date();
-  const [view, setView] = useState<"day" | "week" | "month">("week");
-  const bounds = useMemo(() => { const from = new Date(today.getFullYear(), today.getMonth(), today.getDate()); const to = new Date(from); if (view === "day") to.setDate(to.getDate() + 1); else if (view === "month") { from.setDate(1); to.setMonth(to.getMonth() + 1, 1); } else to.setDate(to.getDate() + 7); return { from: from.toISOString(), to: to.toISOString() }; }, [view]);
-  const appointments = trpc.appointment.list.useQuery(bounds);
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [view, setView] = useState<"day" | "week" | "month" | "all">("week");
+
+  const bounds = useMemo(() => {
+    if (view === "all") return undefined;
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const date = currentDate.getDate();
+
+    if (view === "day") {
+      const from = new Date(year, month, date, 0, 0, 0);
+      const to = new Date(year, month, date, 23, 59, 59, 999);
+      return { from: from.toISOString(), to: to.toISOString() };
+    } else if (view === "month") {
+      const from = new Date(year, month, 1, 0, 0, 0);
+      const to = new Date(year, month + 1, 0, 23, 59, 59, 999);
+      return { from: from.toISOString(), to: to.toISOString() };
+    } else {
+      const dayOfWeek = currentDate.getDay();
+      const from = new Date(year, month, date - dayOfWeek, 0, 0, 0);
+      const to = new Date(from);
+      to.setDate(to.getDate() + 7);
+      to.setMilliseconds(-1);
+      return { from: from.toISOString(), to: to.toISOString() };
+    }
+  }, [view, currentDate]);
+
+  const appointments = trpc.appointment.list.useQuery(bounds, { refetchInterval: 5000, refetchOnWindowFocus: true });
   const clients = trpc.customer.list.useQuery();
   const services = trpc.service.list.useQuery();
   const teamMembers = trpc.team.list.useQuery();
+  const quotesQuery = trpc.quote.list.useQuery(undefined, { refetchInterval: 5000, refetchOnWindowFocus: true });
   const utils = trpc.useUtils();
+
+  const handleNavigate = (delta: number) => {
+    const next = new Date(currentDate);
+    if (view === "day") next.setDate(next.getDate() + delta);
+    else if (view === "week") next.setDate(next.getDate() + delta * 7);
+    else if (view === "month") next.setMonth(next.getMonth() + delta);
+    setCurrentDate(next);
+  };
+
+  const viewTitle = useMemo(() => {
+    if (view === "all") return "Todos os agendamentos cadastrados";
+    if (view === "day") {
+      return currentDate.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" });
+    }
+    if (view === "month") {
+      return currentDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    }
+    const dayOfWeek = currentDate.getDay();
+    const startWeek = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() - dayOfWeek);
+    const endWeek = new Date(startWeek);
+    endWeek.setDate(endWeek.getDate() + 6);
+    return `Semana: ${startWeek.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })} a ${endWeek.toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}`;
+  }, [view, currentDate]);
+
   const getNextAppointmentSlot = () => {
     const d = new Date();
     d.setMinutes(d.getMinutes() + 30);
@@ -1250,17 +1303,386 @@ function Agenda() {
     const pad = (n: number) => String(n).padStart(2, "0");
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
-  const create = trpc.appointment.create.useMutation({ onSuccess: () => { toast.success("Atendimento adicionado à agenda."); utils.appointment.list.invalidate(); setOpen(false); } });
+
+  const create = trpc.appointment.create.useMutation({
+    onSuccess: () => {
+      toast.success("Atendimento adicionado à agenda.");
+      utils.appointment.list.invalidate();
+      setOpen(false);
+    }
+  });
+
+  const scheduleQuoteMutation = trpc.quote.convertToAppointment.useMutation({
+    onSuccess: () => {
+      toast.success("Orçamento agendado com sucesso na sua agenda!");
+      utils.appointment.list.invalidate();
+      utils.quote.list.invalidate();
+      setQuoteScheduleOpen(false);
+      setSelectedQuoteToSchedule(null);
+    },
+    onError: err => {
+      toast.error(err.message || "Erro ao agendar orçamento.");
+    }
+  });
+
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ clientId: "", serviceId: "", teamMemberId: "", startsAt: getNextAppointmentSlot(), durationMinutes: "60", amount: "", location: "", notes: "", status: "confirmado" });
+
+  const [quoteScheduleOpen, setQuoteScheduleOpen] = useState(false);
+  const [selectedQuoteToSchedule, setSelectedQuoteToSchedule] = useState<any | null>(null);
+  const [quoteScheduleForm, setQuoteScheduleForm] = useState({
+    startsAt: getNextAppointmentSlot(),
+    durationMinutes: "60",
+    location: "",
+    notes: ""
+  });
+
   const handleOpenNew = () => {
     setForm({ clientId: "", serviceId: "", teamMemberId: "", startsAt: getNextAppointmentSlot(), durationMinutes: "60", amount: "", location: "", notes: "", status: "confirmado" });
     setOpen(true);
   };
-  const submit = async () => { if (!form.startsAt || isNaN(new Date(form.startsAt).getTime())) return toast.error("Escolha data e horário válidos."); try { await create.mutateAsync({ clientId: form.clientId ? Number(form.clientId) : undefined, serviceId: form.serviceId ? Number(form.serviceId) : undefined, teamMemberId: form.teamMemberId ? Number(form.teamMemberId) : undefined, startsAt: new Date(form.startsAt).toISOString(), durationMinutes: Number(form.durationMinutes), amountCents: parseBrlToCents(form.amount), location: form.location || undefined, notes: form.notes || undefined, status: (form.status || "confirmado") as any, paymentStatus: "pendente" }); } catch (error) { toast.error(error instanceof Error ? error.message : "Não foi possível salvar."); } };
-  return <Page title="Agenda" eyebrow="Organize seus horários" description="Veja seus próximos atendimentos e mantenha o dia sob controle." help={<HelpButton title="Como funciona a Agenda?"><p><strong>A Agenda</strong> reúne todos os seus atendimentos. Use as abas Dia / Semana / Mês para navegar e o botão verde para adicionar um novo horário.</p><p><strong>O que cada status significa:</strong></p><ul className="list-disc pl-5 space-y-1"><li><strong>Agendado</strong> — horário marcado, aguardando confirmação.</li><li><strong>Confirmado</strong> — o cliente confirmou a presença.</li><li><strong>Em andamento</strong> — o atendimento está acontecendo agora.</li><li><strong>Concluído</strong> — finalizado com sucesso.</li><li><strong>Cancelado</strong> — não vai acontecer.</li><li><strong>Não compareceu</strong> — o cliente não apareceu no horário.</li></ul><p>Mude o status pelo seletor ao lado de cada atendimento. Você também pode editar ou excluir clicando nos ícones.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><div className="flex rounded-xl bg-white p-1 shadow-sm">{(["day","week","month"] as const).map((key) => { const label = key === "day" ? "Dia" : key === "week" ? "Semana" : "Mês"; return <Button key={key} variant="ghost" onClick={() => setView(key)} className={cn("h-9 rounded-lg px-3 text-xs", view === key ? "bg-[#173a34] text-white hover:bg-[#28564d] hover:text-white" : "text-[#71867f]")}>{label}</Button>; })}</div><Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button onClick={handleOpenNew} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Novo atendimento</Button></DialogTrigger><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Novo atendimento</DialogTitle><DialogDescription>Reserve um horário para um cliente.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Cliente" value={form.clientId} onChange={value => setForm({ ...form, clientId: value })} placeholder="Selecionar cliente" options={(clients.data || []).map(c => ({ value: String(c.id), label: c.name }))} /><FormSelect label="Serviço" value={form.serviceId} onChange={value => { const selected = services.data?.find(s => String(s.id) === value); setForm({ ...form, serviceId: value, amount: selected ? formatBrlInput(selected.priceCents) : form.amount, durationMinutes: selected ? String(selected.durationMinutes) : form.durationMinutes }); }} placeholder="Selecionar serviço" options={(services.data || []).filter(s => s.active).map(s => ({ value: String(s.id), label: s.name }))} /></div>{Boolean(teamMembers.data?.length) && <FormSelect label="Profissional / Parceiro(a)" value={form.teamMemberId} onChange={value => setForm({ ...form, teamMemberId: value })} placeholder="Eu mesmo(a) (Titular)" options={[{ value: "", label: "Eu mesmo(a) (Titular)" }, ...(teamMembers.data || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role})` }))]} />}<div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Situação" value={form.status} onChange={value => setForm({ ...form, status: value })} options={[["confirmado","Confirmado"],["agendado","Agendado"],["concluido","Concluído"]].map(([value,label]) => ({ value, label }))} /><div><Label className="mb-2 block">Data e horário</Label><Input type="datetime-local" value={form.startsAt} onChange={e => setForm({ ...form, startsAt: e.target.value })} /></div></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} /><Field label="Valor" prefix="R$ " value={form.amount} onChange={value => setForm({ ...form, amount: value })} /></div><div><Field label="Local" value={form.location} onChange={value => setForm({ ...form, location: value })} placeholder="Endereço ou link" /></div><div><Label className="mb-2 block">Observações</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div></div><DialogFooter><Button onClick={submit} disabled={create.isPending} className="rounded-xl bg-[#173a34] text-white">Salvar atendimento</Button></DialogFooter></DialogContent></Dialog></div>}>
-    <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader className="border-b border-[#edf1eb] pb-4"><div className="flex items-center justify-between"><div><CardTitle className="text-lg text-[#173a34]">{view === "day" ? "Hoje" : view === "month" ? "Este mês" : "Próximos 7 dias"}</CardTitle><p className="mt-1 text-sm text-[#82948e]">Toque em um atendimento para acompanhar o status.</p></div><div className="hidden items-center gap-2 text-xs text-[#82948e] sm:flex"><span className="h-2 w-2 rounded-full bg-[#d9f56a]" /> Hoje</div></div></CardHeader><CardContent className="p-0">{appointments.isLoading ? <div className="p-8 text-[#82948e]">Carregando agenda…</div> : appointments.data?.length ? <div className="divide-y divide-[#edf1eb]">{appointments.data.map(item => <AppointmentRow key={item.id} item={item} clients={clients.data || []} services={services.data || []} teamMembers={teamMembers.data || []} />)}</div> : <div className="p-8"><EmptyState icon={CalendarDays} title="Sua agenda está livre" description="Adicione seu primeiro atendimento para começar a organizar o dia." action={<Button onClick={handleOpenNew} className="rounded-xl bg-[#173a34] text-white"><Plus className="mr-2 h-4 w-4" /> Novo atendimento</Button>} /></div>}</CardContent></Card>
-  </Page>;
+
+  const handleOpenScheduleQuote = (quote: any) => {
+    setSelectedQuoteToSchedule(quote);
+    setQuoteScheduleForm({
+      startsAt: getNextAppointmentSlot(),
+      durationMinutes: "60",
+      location: quote.notes?.includes("Endereço:") ? quote.notes.replace(/^Endereço:\s*/, "") : "",
+      notes: quote.description || ""
+    });
+    setQuoteScheduleOpen(true);
+  };
+
+  const submit = async () => {
+    if (!form.startsAt || isNaN(new Date(form.startsAt).getTime())) return toast.error("Escolha data e horário válidos.");
+    try {
+      await create.mutateAsync({
+        clientId: form.clientId ? Number(form.clientId) : undefined,
+        serviceId: form.serviceId ? Number(form.serviceId) : undefined,
+        teamMemberId: form.teamMemberId ? Number(form.teamMemberId) : undefined,
+        startsAt: new Date(form.startsAt).toISOString(),
+        durationMinutes: Number(form.durationMinutes),
+        amountCents: parseBrlToCents(form.amount),
+        location: form.location || undefined,
+        notes: form.notes || undefined,
+        status: (form.status || "confirmado") as any,
+        paymentStatus: "pendente"
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar.");
+    }
+  };
+
+  const submitQuoteSchedule = async () => {
+    if (!selectedQuoteToSchedule) return;
+    if (!quoteScheduleForm.startsAt || isNaN(new Date(quoteScheduleForm.startsAt).getTime())) {
+      return toast.error("Selecione data e horário válidos para o atendimento.");
+    }
+    scheduleQuoteMutation.mutate({
+      id: selectedQuoteToSchedule.id,
+      startsAt: new Date(quoteScheduleForm.startsAt).toISOString(),
+      durationMinutes: Number(quoteScheduleForm.durationMinutes) || 60,
+      location: quoteScheduleForm.location || undefined,
+      notes: quoteScheduleForm.notes || undefined
+    });
+  };
+
+  const acceptedQuotes = useMemo(() => {
+    return (quotesQuery.data || []).filter(q => q.status === "aceito");
+  }, [quotesQuery.data]);
+
+  return (
+    <Page
+      title="Agenda"
+      eyebrow="Organize seus horários"
+      description="Veja seus próximos atendimentos e mantenha o dia sob controle."
+      help={
+        <HelpButton title="Como funciona a Agenda?">
+          <p><strong>A Agenda</strong> reúne todos os seus atendimentos. Use as abas <strong>Dia / Semana / Mês / Todos</strong> e as setas para navegar nos períodos.</p>
+          <p><strong>Orçamentos Aceitos:</strong> Quando um cliente aprova sua proposta, um aviso destacado aparece aqui permitindo marcar a data e horário em 1 clique.</p>
+          <p><strong>Status dos atendimentos:</strong></p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong>Agendado</strong> — horário marcado, aguardando confirmação.</li>
+            <li><strong>Confirmado</strong> — o cliente confirmou a presença.</li>
+            <li><strong>Em andamento</strong> — o atendimento está acontecendo agora.</li>
+            <li><strong>Concluído</strong> — finalizado com sucesso.</li>
+            <li><strong>Cancelado</strong> — não vai acontecer.</li>
+            <li><strong>Não compareceu</strong> — o cliente não apareceu no horário.</li>
+          </ul>
+        </HelpButton>
+      }
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-xl bg-white p-1 shadow-sm">
+            {(["day", "week", "month", "all"] as const).map((key) => {
+              const label = key === "day" ? "Dia" : key === "week" ? "Semana" : key === "month" ? "Mês" : "Todos";
+              return (
+                <Button
+                  key={key}
+                  variant="ghost"
+                  onClick={() => setView(key)}
+                  className={cn(
+                    "h-9 rounded-lg px-3 text-xs",
+                    view === key ? "bg-[#173a34] text-white hover:bg-[#28564d] hover:text-white" : "text-[#71867f]"
+                  )}
+                >
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={handleOpenNew} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]">
+                <Plus className="mr-2 h-4 w-4" /> Novo atendimento
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
+              <DialogHeader>
+                <DialogTitle>Novo atendimento</DialogTitle>
+                <DialogDescription>Reserve um horário para um cliente.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-3">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormSelect
+                    label="Cliente"
+                    value={form.clientId}
+                    onChange={value => setForm({ ...form, clientId: value })}
+                    placeholder="Selecionar cliente"
+                    options={(clients.data || []).map(c => ({ value: String(c.id), label: c.name }))}
+                  />
+                  <FormSelect
+                    label="Serviço"
+                    value={form.serviceId}
+                    onChange={value => {
+                      const selected = services.data?.find(s => String(s.id) === value);
+                      setForm({
+                        ...form,
+                        serviceId: value,
+                        amount: selected ? formatBrlInput(selected.priceCents) : form.amount,
+                        durationMinutes: selected ? String(selected.durationMinutes) : form.durationMinutes
+                      });
+                    }}
+                    placeholder="Selecionar serviço"
+                    options={(services.data || []).filter(s => s.active).map(s => ({ value: String(s.id), label: s.name }))}
+                  />
+                </div>
+                {Boolean(teamMembers.data?.length) && (
+                  <FormSelect
+                    label="Profissional / Parceiro(a)"
+                    value={form.teamMemberId}
+                    onChange={value => setForm({ ...form, teamMemberId: value })}
+                    placeholder="Eu mesmo(a) (Titular)"
+                    options={[{ value: "", label: "Eu mesmo(a) (Titular)" }, ...(teamMembers.data || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role})` }))]}
+                  />
+                )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormSelect
+                    label="Situação"
+                    value={form.status}
+                    onChange={value => setForm({ ...form, status: value })}
+                    options={[["confirmado", "Confirmado"], ["agendado", "Agendado"], ["concluido", "Concluído"]].map(([value, label]) => ({ value, label }))}
+                  />
+                  <div>
+                    <Label className="mb-2 block">Data e horário</Label>
+                    <Input type="datetime-local" value={form.startsAt} onChange={e => setForm({ ...form, startsAt: e.target.value })} />
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} />
+                  <Field label="Valor" prefix="R$ " value={form.amount} onChange={value => setForm({ ...form, amount: value })} />
+                </div>
+                <div>
+                  <Field label="Local" value={form.location} onChange={value => setForm({ ...form, location: value })} placeholder="Endereço ou link" />
+                </div>
+                <div>
+                  <Label className="mb-2 block">Observações</Label>
+                  <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={submit} disabled={create.isPending} className="rounded-xl bg-[#173a34] text-white">
+                  Salvar atendimento
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      }
+    >
+      {/* Modal para agendar Orçamento Aprovado */}
+      <Dialog open={quoteScheduleOpen} onOpenChange={setQuoteScheduleOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
+          <DialogHeader>
+            <DialogTitle>Agendar Atendimento do Orçamento #{selectedQuoteToSchedule?.id}</DialogTitle>
+            <DialogDescription>
+              Marque no calendário a data para executar o serviço aceito por <strong>{selectedQuoteToSchedule?.clientName || "Cliente"}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="rounded-2xl border border-lime-300 bg-[#f7faf2] p-4 text-xs text-[#284b42]">
+              <p><strong>Valor orçado:</strong> {money(selectedQuoteToSchedule?.totalCents)}</p>
+              <p className="mt-1"><strong>Condições de pagamento:</strong> {selectedQuoteToSchedule?.paymentTerms || "Acerto direto com o prestador"}</p>
+            </div>
+            <div>
+              <Label className="mb-2 block">Data e horário do atendimento</Label>
+              <Input
+                type="datetime-local"
+                value={quoteScheduleForm.startsAt}
+                onChange={e => setQuoteScheduleForm({ ...quoteScheduleForm, startsAt: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Duração estimada (minutos)"
+                value={quoteScheduleForm.durationMinutes}
+                onChange={value => setQuoteScheduleForm({ ...quoteScheduleForm, durationMinutes: value })}
+              />
+              <Field
+                label="Local do atendimento"
+                value={quoteScheduleForm.location}
+                onChange={value => setQuoteScheduleForm({ ...quoteScheduleForm, location: value })}
+                placeholder="Endereço do cliente ou local combinado"
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block">Observações para o atendimento</Label>
+              <Textarea
+                value={quoteScheduleForm.notes}
+                onChange={e => setQuoteScheduleForm({ ...quoteScheduleForm, notes: e.target.value })}
+                placeholder="Instruções, materiais a levar, etc."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={submitQuoteSchedule}
+              disabled={scheduleQuoteMutation.isPending}
+              className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"
+            >
+              Confirmar e colocar na Agenda
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Banner de Orçamentos Aprovados aguardando agendamento */}
+      {acceptedQuotes.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-lime-300 bg-[#f7faf2] p-4 text-sm text-[#284b42] shadow-xs">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#eef5d2] text-[#819815]">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-bold text-[#173a34]">
+                  {acceptedQuotes.length} proposta{acceptedQuotes.length > 1 ? "s" : ""} aprovada{acceptedQuotes.length > 1 ? "s" : ""} aguardando data na agenda!
+                </p>
+                <p className="text-xs text-[#5f756d]">
+                  Seus clientes aceitaram o orçamento. Marque o dia e horário para realizar o serviço.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {acceptedQuotes.slice(0, 2).map(q => (
+                <Button
+                  key={q.id}
+                  size="sm"
+                  onClick={() => handleOpenScheduleQuote(q)}
+                  className="rounded-xl bg-[#173a34] text-xs text-white hover:bg-[#28564d]"
+                >
+                  <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#d9f56a]" /> Agendar #{q.id} ({q.clientName || "Cliente"})
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]">
+        <CardHeader className="border-b border-[#edf1eb] pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-lg text-[#173a34] capitalize">{viewTitle}</CardTitle>
+                {view !== "all" && (
+                  <div className="flex items-center gap-1 ml-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleNavigate(-1)}
+                      className="h-8 w-8 p-0 rounded-lg border-[#dce5dc]"
+                      title="Período anterior"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentDate(new Date())}
+                      className="h-8 px-2.5 rounded-lg text-xs border-[#dce5dc]"
+                    >
+                      Hoje
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleNavigate(1)}
+                      className="h-8 w-8 p-0 rounded-lg border-[#dce5dc]"
+                      title="Próximo período"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-[#82948e]">Toque em um atendimento para acompanhar ou alterar o status.</p>
+            </div>
+            <div className="hidden items-center gap-2 text-xs text-[#82948e] sm:flex">
+              <span className="h-2 w-2 rounded-full bg-[#d9f56a]" /> Atualizado em tempo real
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {appointments.isLoading ? (
+            <div className="p-8 text-[#82948e]">Carregando agenda…</div>
+          ) : appointments.data?.length ? (
+            <div className="divide-y divide-[#edf1eb]">
+              {appointments.data.map(item => (
+                <AppointmentRow
+                  key={item.id}
+                  item={item}
+                  clients={clients.data || []}
+                  services={services.data || []}
+                  teamMembers={teamMembers.data || []}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="p-8">
+              <EmptyState
+                icon={CalendarDays}
+                title="Sua agenda está livre neste período"
+                description={view !== "all" ? "Nenhum atendimento para o período selecionado. Use as setas para outros períodos ou adicione um novo." : "Adicione seu primeiro atendimento para começar a organizar o dia."}
+                action={
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {view !== "all" && (
+                      <Button variant="outline" onClick={() => setView("all")} className="rounded-xl border-[#dce5dc]">
+                        Ver todos os agendamentos
+                      </Button>
+                    )}
+                    <Button onClick={handleOpenNew} className="rounded-xl bg-[#173a34] text-white">
+                      <Plus className="mr-2 h-4 w-4" /> Novo atendimento
+                    </Button>
+                  </div>
+                }
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </Page>
+  );
 }
 function AppointmentRow({ item, clients, services, teamMembers }: { item: any; clients: any[]; services: any[]; teamMembers?: any[] }) {
   const updateStatus = trpc.appointment.updateStatus.useMutation(); const update = trpc.appointment.update.useMutation(); const cancel = trpc.appointment.cancel.useMutation(); const utils = trpc.useUtils(); const [open, setOpen] = useState(false);
@@ -1475,15 +1897,667 @@ function Services() {
 function ServiceDialog({ form, setForm, submit, pending, editing }: { form: any; setForm: (form: any) => void; submit: () => void; pending: boolean; editing: boolean }) { return <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle><DialogDescription>As alterações refletem na agenda e na página pública.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><ServiceNameField label="Nome do serviço" value={form.name} onChange={value => setForm({ ...form, name: value })} onSelectCatalog={(name, description) => setForm({ ...form, name, description: description || form.description })} placeholder="Ex.: Troca de chuveiro, Instalação de tomadas..." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Preço" prefix="R$ " value={form.price} onChange={value => setForm({ ...form, price: value })} /><Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} /></div><FormSelect label="Modalidade" value={form.modality} onChange={value => setForm({ ...form, modality: value })} options={Object.entries(modalityLabel).map(([value,label]) => ({ value, label }))} /><div><Label className="mb-2 block">Descrição</Label><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div></div><DialogFooter><Button onClick={submit} disabled={pending} className="rounded-xl bg-[#173a34] text-white">{editing ? "Salvar alterações" : "Salvar serviço"}</Button></DialogFooter></DialogContent>; }
 
 function Requests() {
-  const requests = trpc.request.list.useQuery(); const utils = trpc.useUtils();
-  const update = trpc.request.updateStatus.useMutation({ onSuccess: () => { toast.success("Solicitação atualizada."); utils.request.list.invalidate(); } });
-  const convertClient = trpc.request.convertToClient.useMutation({ onSuccess: () => { toast.success("Solicitação convertida em cliente."); utils.request.list.invalidate(); utils.customer.list.invalidate(); } });
-  const convertAppointment = trpc.request.convertToAppointment.useMutation({ onSuccess: () => { toast.success("Atendimento criado na agenda."); utils.request.list.invalidate(); utils.appointment.list.invalidate(); } }); const convertQuote = trpc.request.convertToQuote.useMutation({ onSuccess: data => { toast.success("Orçamento criado."); utils.request.list.invalidate(); utils.quote.list.invalidate(); navigator.clipboard?.writeText(`${window.location.origin}/orcamento/${data.token}`); } });
-  return <Page title="Solicitações" eyebrow="Novos clientes" description="Pedidos que chegaram pela sua página pública, sem exigir cadastro do cliente." help={<HelpButton title="Como funciona Solicitações?"><p><strong>Solicitações</strong> são pedidos que clientes fazem pela sua página pública, sem precisar criar conta.</p><p><strong>Fluxo de status:</strong></p><ul className="list-disc pl-5 space-y-1"><li><strong>Nova</strong> — acabou de chegar, aguarda sua análise.</li><li><strong>Em análise</strong> — você está avaliando o pedido.</li><li><strong>Orçamento enviado</strong> — você criou e enviou uma proposta.</li><li><strong>Agendada</strong> — virou um atendimento na agenda.</li><li><strong>Arquivada</strong> — encerrada sem conversão.</li></ul><p>Use os botões para <strong>virar cliente</strong>, <strong>criar orçamento</strong> ou <strong>criar atendimento</strong> diretamente.</p></HelpButton>}><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardContent className="p-0">{requests.data?.length ? <div className="divide-y divide-[#edf1eb]">{requests.data.map(request => <div key={request.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815]"><ClipboardList className="h-5 w-5" /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-[#284b42]">{request.requesterName}</h3><StatusBadge status={request.status} /></div><p className="mt-1 text-sm text-[#82948e]">{formatPhone(request.requesterPhone)}{request.requesterEmail ? ` · ${request.requesterEmail}` : ""}</p><p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[#526d64]">{request.description}</p><div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[#8b9c96]"><span><Clock3 className="mr-1 inline h-3.5 w-3.5" />Recebida em {dateLabel(request.createdAt)}</span>{request.address && <span><MapPin className="mr-1 inline h-3.5 w-3.5" />{request.address}</span>}{request.attachments?.map(file => <a key={file.id} href={file.fileUrl} target="_blank" rel="noreferrer" className="text-[#496b98] hover:underline"><Paperclip className="mr-1 inline h-3.5 w-3.5" />{file.fileName}</a>)}</div><div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={() => convertClient.mutate({ id: request.id })} disabled={Boolean(request.clientId) || convertClient.isPending} className="h-9 rounded-lg border-[#dce5dc] bg-white text-xs">{request.clientId ? "Cliente cadastrado" : "Virar cliente"}</Button><Button variant="outline" onClick={() => convertQuote.mutate({ id: request.id, sendNow: true })} disabled={convertQuote.isPending} className="h-9 rounded-lg border-[#dce5dc] bg-white text-xs">Criar orçamento</Button><Button onClick={() => convertAppointment.mutate({ id: request.id })} disabled={!request.clientId || convertAppointment.isPending} className="h-9 rounded-lg bg-[#173a34] text-xs text-white">Criar atendimento</Button></div></div><Select value={request.status} onValueChange={value => update.mutate({ id: request.id, status: value as any })}><SelectTrigger className="h-9 w-[170px] rounded-lg border-[#dce5dc] bg-white text-xs"><SelectValue /></SelectTrigger><SelectContent>{["nova","em_analise","orcamento_enviado","agendada","arquivada"].map(value => <SelectItem key={value} value={value}>{statusLabel[value]}</SelectItem>)}</SelectContent></Select></div>)}</div> : <div className="p-8"><div className="mx-auto max-w-xl text-center"><div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-3xl bg-[#eef5d2] text-[#819815] shadow-sm"><ClipboardList className="h-8 w-8" /></div><h3 className="text-xl font-bold text-[#173a34]">Como funcionam as solicitações?</h3><p className="mt-2 text-sm leading-6 text-[#6d837c]">Os clientes chegam através da sua página pública e cartão digital — <strong>sem precisar criar conta nem instalar aplicativos</strong>.</p><div className="mt-8 space-y-3 text-left"><div className="flex items-start gap-3.5 rounded-2xl border border-[#e4ebe0] bg-[#f9fbf8] p-4"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#eef5d2] font-bold text-sm text-[#819815]">1</div><div><p className="text-sm font-bold text-[#284b42]">Você divulga seu link ou cartão virtual</p><p className="mt-0.5 text-xs text-[#71867f]">Compartilhe no WhatsApp, Instagram, bio ou envie direto quando alguém pedir seu contato.</p></div></div><div className="flex items-start gap-3.5 rounded-2xl border border-[#e4ebe0] bg-[#f9fbf8] p-4"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#e3f3e8] font-bold text-sm text-[#3e885c]">2</div><div><p className="text-sm font-bold text-[#284b42]">O cliente solicita o serviço pelo navegador</p><p className="mt-0.5 text-xs text-[#71867f]">Ele informa nome, WhatsApp, descreve o que precisa, pode anexar fotos e indicar o local.</p></div></div><div className="flex items-start gap-3.5 rounded-2xl border border-[#e4ebe0] bg-[#f9fbf8] p-4"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#e8eef8] font-bold text-sm text-[#496b98]">3</div><div><p className="text-sm font-bold text-[#284b42]">O pedido cai instantaneamente aqui</p><p className="mt-0.5 text-xs text-[#71867f]">Você visualiza todos os dados, fotos e informações para avaliar com rapidez.</p></div></div><div className="flex items-start gap-3.5 rounded-2xl border border-[#e4ebe0] bg-[#f9fbf8] p-4"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#d9f56a] font-bold text-sm text-[#173a34]">4</div><div><p className="text-sm font-bold text-[#284b42]">Você responde em 1 clique</p><p className="mt-0.5 text-xs text-[#71867f]">Basta clicar em <strong>"Criar orçamento"</strong> para enviar proposta digital, <strong>"Virar cliente"</strong> ou <strong>"Criar atendimento"</strong>.</p></div></div></div><div className="mt-8 flex justify-center"><Button onClick={() => window.location.href = "/cartao"} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Share2 className="mr-2 h-4 w-4" /> Acessar e compartilhar meu cartão</Button></div></div></div>}</CardContent></Card></Page>;
+  const requests = trpc.request.list.useQuery(undefined, { refetchInterval: 5000, refetchOnWindowFocus: true });
+  const services = trpc.service.list.useQuery();
+  const utils = trpc.useUtils();
+
+  const update = trpc.request.updateStatus.useMutation({
+    onSuccess: () => {
+      toast.success("Situação da solicitação atualizada.");
+      utils.request.list.invalidate();
+    }
+  });
+
+  const convertClient = trpc.request.convertToClient.useMutation({
+    onSuccess: () => {
+      toast.success("Solicitação convertida em cliente!");
+      utils.request.list.invalidate();
+      utils.customer.list.invalidate();
+    }
+  });
+
+  const convertAppointment = trpc.request.convertToAppointment.useMutation({
+    onSuccess: () => {
+      toast.success("Atendimento criado com sucesso na sua Agenda!");
+      utils.request.list.invalidate();
+      utils.appointment.list.invalidate();
+      setAppointmentModalOpen(false);
+      setSelectedRequestForAppointment(null);
+    },
+    onError: err => {
+      toast.error(err.message || "Erro ao agendar atendimento.");
+    }
+  });
+
+  const createQuote = trpc.quote.create.useMutation({
+    onSuccess: data => {
+      if (data.token) {
+        toast.success("Orçamento criado e link gerado com sucesso!");
+        setGeneratedQuoteUrl(`${window.location.origin}/orcamento/${data.token}`);
+      } else {
+        toast.success("Orçamento salvo.");
+      }
+      utils.request.list.invalidate();
+      utils.quote.list.invalidate();
+      setQuoteModalOpen(false);
+      setSelectedRequestForQuote(null);
+    },
+    onError: err => {
+      toast.error(err.message || "Erro ao criar orçamento.");
+    }
+  });
+
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [selectedRequestForQuote, setSelectedRequestForQuote] = useState<any | null>(null);
+  const [quoteForm, setQuoteForm] = useState({
+    serviceId: "",
+    description: "",
+    discount: "",
+    paymentTerms: "PIX direto ou Cartão",
+    notes: "",
+    validUntil: "",
+    items: [{ description: "", quantity: "1", unitPrice: "100,00" }]
+  });
+
+  const [appointmentModalOpen, setAppointmentModalOpen] = useState(false);
+  const [selectedRequestForAppointment, setSelectedRequestForAppointment] = useState<any | null>(null);
+  const [appointmentForm, setAppointmentForm] = useState({
+    serviceId: "",
+    startsAt: "",
+    durationMinutes: "60",
+    amount: "",
+    location: "",
+    notes: ""
+  });
+
+  const [generatedQuoteUrl, setGeneratedQuoteUrl] = useState<string | null>(null);
+
+  const getNextAppointmentSlot = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + 30);
+    d.setMinutes(d.getMinutes() >= 30 ? 30 : 0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const handleOpenQuoteModal = (req: any) => {
+    setSelectedRequestForQuote(req);
+    const matchedService = services.data?.find(s => s.id === req.serviceId) || services.data?.[0];
+    const initialPrice = matchedService ? formatBrlInput(matchedService.priceCents) : "150,00";
+    setQuoteForm({
+      serviceId: matchedService ? String(matchedService.id) : "",
+      description: req.description || "Prestação de serviços solicitados",
+      discount: "",
+      paymentTerms: "PIX à vista na conclusão ou Cartão de Crédito",
+      notes: req.address ? `Local do serviço: ${req.address}` : "",
+      validUntil: "",
+      items: [
+        {
+          description: req.description || (matchedService ? matchedService.name : "Serviço solicitado"),
+          quantity: "1",
+          unitPrice: initialPrice
+        }
+      ]
+    });
+    setQuoteModalOpen(true);
+  };
+
+  const handleOpenAppointmentModal = (req: any) => {
+    setSelectedRequestForAppointment(req);
+    const matchedService = services.data?.find(s => s.id === req.serviceId) || services.data?.[0];
+    let defaultStart = getNextAppointmentSlot();
+    if (req.desiredAt) {
+      try {
+        const d = new Date(req.desiredAt);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        defaultStart = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T09:00`;
+      } catch (e) {}
+    }
+    setAppointmentForm({
+      serviceId: matchedService ? String(matchedService.id) : "",
+      startsAt: defaultStart,
+      durationMinutes: matchedService ? String(matchedService.durationMinutes) : "60",
+      amount: matchedService ? formatBrlInput(matchedService.priceCents) : "150,00",
+      location: req.address || "",
+      notes: req.description || ""
+    });
+    setAppointmentModalOpen(true);
+  };
+
+  const submitQuote = () => {
+    if (!selectedRequestForQuote) return;
+    if (!quoteForm.items.every(it => it.description.trim() && Number(it.quantity) > 0)) {
+      return toast.error("Preencha a descrição e valor de cada item do orçamento.");
+    }
+    createQuote.mutate({
+      requestId: selectedRequestForQuote.id,
+      clientId: selectedRequestForQuote.clientId || undefined,
+      serviceId: quoteForm.serviceId ? Number(quoteForm.serviceId) : undefined,
+      description: quoteForm.description || undefined,
+      discountCents: parseBrlToCents(quoteForm.discount),
+      notes: quoteForm.notes || undefined,
+      paymentTerms: quoteForm.paymentTerms || undefined,
+      validUntil: quoteForm.validUntil ? new Date(`${quoteForm.validUntil}T23:59:59`).toISOString() : undefined,
+      sendNow: true,
+      items: quoteForm.items.map(it => ({
+        description: it.description,
+        quantity: Number(it.quantity),
+        unitPriceCents: parseBrlToCents(it.unitPrice)
+      }))
+    });
+  };
+
+  const submitAppointment = () => {
+    if (!selectedRequestForAppointment) return;
+    if (!appointmentForm.startsAt || isNaN(new Date(appointmentForm.startsAt).getTime())) {
+      return toast.error("Selecione data e horário válidos para o atendimento.");
+    }
+    convertAppointment.mutate({
+      id: selectedRequestForAppointment.id,
+      serviceId: appointmentForm.serviceId ? Number(appointmentForm.serviceId) : undefined,
+      startsAt: new Date(appointmentForm.startsAt).toISOString(),
+      durationMinutes: Number(appointmentForm.durationMinutes) || 60,
+      amountCents: parseBrlToCents(appointmentForm.amount),
+      location: appointmentForm.location || undefined,
+      notes: appointmentForm.notes || undefined
+    });
+  };
+
+  const paymentPresets = [
+    "PIX à vista na conclusão",
+    "Cartão de Crédito/Débito",
+    "50% de entrada + 50% na conclusão",
+    "Dinheiro à vista",
+    "A combinar com o profissional"
+  ];
+
+  return (
+    <Page
+      title="Solicitações"
+      eyebrow="Novos clientes"
+      description="Pedidos que chegaram pela sua página pública, sem exigir cadastro do cliente."
+      help={
+        <HelpButton title="Como funciona Solicitações?">
+          <p><strong>Solicitações</strong> são pedidos que novos clientes fazem pela sua página pública e cartão digital, sem precisar criar conta.</p>
+          <p><strong>O que cada botão faz:</strong></p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong>Criar orçamento</strong> — abre o painel para precificar itens, definir formas de pagamento e gerar o link seguro para o cliente aprovar.</li>
+            <li><strong>Criar atendimento</strong> — abre o painel para escolher data e horário e marcar direto na sua Agenda.</li>
+            <li><strong>Virar cliente</strong> — salva o contato na sua lista de clientes para atendimentos futuros.</li>
+          </ul>
+        </HelpButton>
+      }
+    >
+      {/* Diálogo de Link Gerado */}
+      <Dialog open={Boolean(generatedQuoteUrl)} onOpenChange={v => !v && setGeneratedQuoteUrl(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
+          <DialogHeader>
+            <DialogTitle>🎉 Orçamento Criado com Sucesso!</DialogTitle>
+            <DialogDescription>
+              O link seguro da proposta está pronto para envio ao cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <div className="rounded-xl border border-lime-300 bg-[#f7faf2] p-4 text-sm text-[#284b42]">
+              <p className="font-semibold">Link da proposta digital:</p>
+              <p className="mt-1 break-all text-xs font-mono text-[#526d64] bg-white p-2 rounded-lg border border-[#dce5dc]">
+                {generatedQuoteUrl}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button
+                onClick={() => {
+                  if (generatedQuoteUrl) {
+                    navigator.clipboard?.writeText(generatedQuoteUrl);
+                    toast.success("Link do orçamento copiado!");
+                  }
+                }}
+                className="flex-1 rounded-xl bg-[#173a34] text-white"
+              >
+                <Copy className="mr-2 h-4 w-4" /> Copiar Link
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (generatedQuoteUrl) window.open(generatedQuoteUrl, "_blank");
+                }}
+                className="rounded-xl border-[#dce5dc]"
+              >
+                <ExternalLink className="mr-2 h-4 w-4" /> Visualizar Proposta
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Criar Orçamento a partir da Solicitação */}
+      <Dialog open={quoteModalOpen} onOpenChange={setQuoteModalOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
+          <DialogHeader>
+            <DialogTitle>Criar Orçamento para {selectedRequestForQuote?.requesterName}</DialogTitle>
+            <DialogDescription>
+              Monte os itens, preços e formas de pagamento para enviar uma proposta clara ao cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="rounded-2xl border border-[#dce5dc] bg-[#fbfcf9] p-3.5 text-xs text-[#526d64]">
+              <p><strong>Pedido do cliente:</strong> "{selectedRequestForQuote?.description}"</p>
+              {selectedRequestForQuote?.address && <p className="mt-1"><strong>Endereço:</strong> {selectedRequestForQuote.address}</p>}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormSelect
+                label="Serviço de referência"
+                value={quoteForm.serviceId}
+                onChange={val => {
+                  const s = services.data?.find(item => String(item.id) === val);
+                  setQuoteForm({
+                    ...quoteForm,
+                    serviceId: val,
+                    items: s ? [{ description: s.name, quantity: "1", unitPrice: formatBrlInput(s.priceCents) }] : quoteForm.items
+                  });
+                }}
+                placeholder="Selecionar serviço do catálogo"
+                options={(services.data || []).filter(s => s.active).map(s => ({ value: String(s.id), label: `${s.name} (${money(s.priceCents)})` }))}
+              />
+              <Field
+                label="Desconto (opcional)"
+                prefix="R$ "
+                value={quoteForm.discount}
+                onChange={val => setQuoteForm({ ...quoteForm, discount: val })}
+                placeholder="0,00"
+              />
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <Label className="text-sm font-semibold text-[#173a34]">Itens do Orçamento</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuoteForm({ ...quoteForm, items: [...quoteForm.items, { description: "", quantity: "1", unitPrice: "50,00" }] })}
+                  className="h-8 rounded-lg border-[#dce5dc] text-xs"
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar item
+                </Button>
+              </div>
+              <div className="space-y-3">
+                {quoteForm.items.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 rounded-xl border border-[#dce5dc] bg-white p-2.5">
+                    <Input
+                      value={item.description}
+                      onChange={e => setQuoteForm({
+                        ...quoteForm,
+                        items: quoteForm.items.map((it, i) => i === idx ? { ...it, description: e.target.value } : it)
+                      })}
+                      placeholder="Descrição do serviço ou material"
+                      className="flex-1 border-0 shadow-none text-sm"
+                    />
+                    <Input
+                      type="number"
+                      min="1"
+                      value={item.quantity}
+                      onChange={e => setQuoteForm({
+                        ...quoteForm,
+                        items: quoteForm.items.map((it, i) => i === idx ? { ...it, quantity: e.target.value } : it)
+                      })}
+                      className="w-16 text-center text-sm border-[#dce5dc]"
+                      title="Quantidade"
+                    />
+                    <div className="w-28">
+                      <Input
+                        value={item.unitPrice}
+                        onChange={e => setQuoteForm({
+                          ...quoteForm,
+                          items: quoteForm.items.map((it, i) => i === idx ? { ...it, unitPrice: e.target.value } : it)
+                        })}
+                        placeholder="0,00"
+                        className="text-right text-sm border-[#dce5dc]"
+                        title="Valor unitário"
+                      />
+                    </div>
+                    {quoteForm.items.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setQuoteForm({ ...quoteForm, items: quoteForm.items.filter((_, i) => i !== idx) })}
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block">Formas e condições de pagamento</Label>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {paymentPresets.map(preset => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => setQuoteForm({ ...quoteForm, paymentTerms: quoteForm.paymentTerms ? `${quoteForm.paymentTerms} ou ${preset}` : preset })}
+                    className="rounded-full border border-[#dce5dc] bg-white px-2.5 py-1 text-xs text-[#4c6960] hover:bg-[#eef5d2] transition-colors"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+              <Input
+                value={quoteForm.paymentTerms}
+                onChange={e => setQuoteForm({ ...quoteForm, paymentTerms: e.target.value })}
+                placeholder="Ex.: PIX à vista ou Cartão em até 3x sem juros"
+              />
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block">Observações e garantias</Label>
+              <Textarea
+                value={quoteForm.notes}
+                onChange={e => setQuoteForm({ ...quoteForm, notes: e.target.value })}
+                placeholder="Ex.: Garantia de 90 dias, materiais inclusos, prazo de execução..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={submitQuote}
+              disabled={createQuote.isPending}
+              className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"
+            >
+              Criar e Gerar Link do Orçamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Criar Atendimento a partir da Solicitação */}
+      <Dialog open={appointmentModalOpen} onOpenChange={setAppointmentModalOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
+          <DialogHeader>
+            <DialogTitle>Agendar Atendimento para {selectedRequestForAppointment?.requesterName}</DialogTitle>
+            <DialogDescription>
+              Marque o dia e horário na sua Agenda para realizar este serviço.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="rounded-2xl border border-[#dce5dc] bg-[#fbfcf9] p-3.5 text-xs text-[#526d64]">
+              <p><strong>Telefone:</strong> {formatPhone(selectedRequestForAppointment?.requesterPhone)}</p>
+              {selectedRequestForAppointment?.requesterEmail && <p className="mt-0.5"><strong>E-mail:</strong> {selectedRequestForAppointment.requesterEmail}</p>}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormSelect
+                label="Serviço"
+                value={appointmentForm.serviceId}
+                onChange={val => {
+                  const s = services.data?.find(item => String(item.id) === val);
+                  setAppointmentForm({
+                    ...appointmentForm,
+                    serviceId: val,
+                    amount: s ? formatBrlInput(s.priceCents) : appointmentForm.amount,
+                    durationMinutes: s ? String(s.durationMinutes) : appointmentForm.durationMinutes
+                  });
+                }}
+                placeholder="Selecionar serviço"
+                options={(services.data || []).filter(s => s.active).map(s => ({ value: String(s.id), label: `${s.name} (${money(s.priceCents)})` }))}
+              />
+              <div>
+                <Label className="mb-2 block">Data e horário</Label>
+                <Input
+                  type="datetime-local"
+                  value={appointmentForm.startsAt}
+                  onChange={e => setAppointmentForm({ ...appointmentForm, startsAt: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Duração (minutos)"
+                value={appointmentForm.durationMinutes}
+                onChange={val => setAppointmentForm({ ...appointmentForm, durationMinutes: val })}
+              />
+              <Field
+                label="Valor do atendimento"
+                prefix="R$ "
+                value={appointmentForm.amount}
+                onChange={val => setAppointmentForm({ ...appointmentForm, amount: val })}
+              />
+            </div>
+
+            <Field
+              label="Local"
+              value={appointmentForm.location}
+              onChange={val => setAppointmentForm({ ...appointmentForm, location: val })}
+              placeholder="Endereço do cliente ou local do serviço"
+            />
+
+            <div>
+              <Label className="mb-2 block">Observações para o atendimento</Label>
+              <Textarea
+                value={appointmentForm.notes}
+                onChange={e => setAppointmentForm({ ...appointmentForm, notes: e.target.value })}
+                placeholder="Detalhes adicionais sobre o serviço..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={submitAppointment}
+              disabled={convertAppointment.isPending}
+              className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"
+            >
+              Confirmar e Adicionar à Agenda
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Guia Visual do Fluxo das Solicitações */}
+      <div className="mb-6 grid gap-2.5 sm:grid-cols-4 text-xs">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
+          <div className="flex items-center gap-1.5 font-bold text-amber-900">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            <span>1. Nova Solicitação</span>
+          </div>
+          <p className="mt-1 text-amber-800/80 leading-snug">
+            Chegou pela sua página. Avalie a descrição e os anexos.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-3.5 shadow-sm">
+          <div className="flex items-center gap-1.5 font-bold text-blue-900">
+            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            <span>2. Orçamento Enviado</span>
+          </div>
+          <p className="mt-1 text-blue-800/80 leading-snug">
+            Você montou a proposta com valores e enviou o link ao cliente.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-lime-200 bg-lime-50/70 p-3.5 shadow-sm">
+          <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            <span>3. Proposta Aprovada</span>
+          </div>
+          <p className="mt-1 text-emerald-800/80 leading-snug">
+            O cliente aprovou! Você recebe aviso imediato para marcar data.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-[#dce5dc] bg-white p-3.5 shadow-sm">
+          <div className="flex items-center gap-1.5 font-bold text-[#284b42]">
+            <span className="h-2 w-2 rounded-full bg-[#173a34]" />
+            <span>4. Agendada</span>
+          </div>
+          <p className="mt-1 text-[#668076] leading-snug">
+            Data e horário marcados no seu calendário da Agenda.
+          </p>
+        </div>
+      </div>
+
+      <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]">
+        <CardContent className="p-0">
+          {requests.data?.length ? (
+            <div className="divide-y divide-[#edf1eb]">
+              {requests.data.map(request => (
+                <div key={request.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815]">
+                    <ClipboardList className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold text-[#284b42]">{request.requesterName}</h3>
+                      <StatusBadge status={request.status} />
+                    </div>
+                    <p className="mt-1 text-sm text-[#82948e]">
+                      {formatPhone(request.requesterPhone)}
+                      {request.requesterEmail ? ` · ${request.requesterEmail}` : ""}
+                    </p>
+                    <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[#526d64]">{request.description}</p>
+                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[#8b9c96]">
+                      <span>
+                        <Clock3 className="mr-1 inline h-3.5 w-3.5" />
+                        Recebida em {dateLabel(request.createdAt)}
+                      </span>
+                      {request.address && (
+                        <span>
+                          <MapPin className="mr-1 inline h-3.5 w-3.5" />
+                          {request.address}
+                        </span>
+                      )}
+                      {request.attachments?.map(file => (
+                        <a
+                          key={file.id}
+                          href={file.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#496b98] hover:underline"
+                        >
+                          <Paperclip className="mr-1 inline h-3.5 w-3.5" />
+                          {file.fileName}
+                        </a>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => convertClient.mutate({ id: request.id })}
+                        disabled={Boolean(request.clientId) || convertClient.isPending}
+                        className="h-9 rounded-lg border-[#dce5dc] bg-white text-xs text-[#4c6960]"
+                      >
+                        {request.clientId ? "✓ Cliente cadastrado" : "Virar cliente"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleOpenQuoteModal(request)}
+                        className="h-9 rounded-lg border-[#dce5dc] bg-white text-xs font-semibold text-[#173a34] hover:bg-[#f0f7f2]"
+                      >
+                        <FileText className="mr-1.5 h-3.5 w-3.5 text-[#3e885c]" /> Criar orçamento
+                      </Button>
+                      <Button
+                        onClick={() => handleOpenAppointmentModal(request)}
+                        className="h-9 rounded-lg bg-[#173a34] text-xs text-white hover:bg-[#28564d]"
+                      >
+                        <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#d9f56a]" /> Criar atendimento
+                      </Button>
+                    </div>
+                  </div>
+                  <Select
+                    value={request.status}
+                    onValueChange={value => update.mutate({ id: request.id, status: value as any })}
+                  >
+                    <SelectTrigger className="h-9 w-[170px] rounded-lg border-[#dce5dc] bg-white text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["nova", "em_analise", "orcamento_enviado", "agendada", "arquivada"].map(value => (
+                        <SelectItem key={value} value={value}>
+                          {statusLabel[value]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8">
+              <div className="mx-auto max-w-xl text-center">
+                <div className="mx-auto mb-5 grid h-16 w-16 place-items-center rounded-3xl bg-[#eef5d2] text-[#819815] shadow-sm">
+                  <ClipboardList className="h-8 w-8" />
+                </div>
+                <h3 className="text-xl font-bold text-[#173a34]">Como funcionam as solicitações?</h3>
+                <p className="mt-2 text-sm leading-6 text-[#6d837c]">
+                  Os clientes chegam através da sua página pública e cartão digital — <strong>sem precisar criar conta nem instalar aplicativos</strong>.
+                </p>
+                <div className="mt-8 space-y-3 text-left">
+                  <div className="flex items-start gap-3.5 rounded-2xl border border-[#e4ebe0] bg-[#f9fbf8] p-4">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#eef5d2] font-bold text-sm text-[#819815]">
+                      1
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#284b42]">Você divulga seu link ou cartão virtual</p>
+                      <p className="mt-0.5 text-xs text-[#71867f]">
+                        Compartilhe no WhatsApp, Instagram, bio ou envie direto quando alguém pedir seu contato.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3.5 rounded-2xl border border-[#e4ebe0] bg-[#f9fbf8] p-4">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#e3f3e8] font-bold text-sm text-[#3e885c]">
+                      2
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#284b42]">O cliente solicita o serviço pelo navegador</p>
+                      <p className="mt-0.5 text-xs text-[#71867f]">
+                        Ele informa nome, WhatsApp, descreve o que precisa, pode anexar fotos e indicar o local.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3.5 rounded-2xl border border-[#e4ebe0] bg-[#f9fbf8] p-4">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#e8eef8] font-bold text-sm text-[#496b98]">
+                      3
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#284b42]">O pedido cai instantaneamente aqui</p>
+                      <p className="mt-0.5 text-xs text-[#71867f]">
+                        Você visualiza todos os dados, fotos e informações para avaliar com rapidez.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3.5 rounded-2xl border border-[#e4ebe0] bg-[#f9fbf8] p-4">
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#d9f56a] font-bold text-sm text-[#173a34]">
+                      4
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-[#284b42]">Você responde em 1 clique</p>
+                      <p className="mt-0.5 text-xs text-[#71867f]">
+                        Basta clicar em <strong>"Criar orçamento"</strong> para enviar proposta digital, <strong>"Virar cliente"</strong> ou <strong>"Criar atendimento"</strong>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    onClick={() => window.location.href = "/cartao"}
+                    className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"
+                  >
+                    <Share2 className="mr-2 h-4 w-4" /> Acessar e compartilhar meu cartão
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </Page>
+  );
 }
 
 function Quotes() {
-  const quotes = trpc.quote.list.useQuery();
+  const quotes = trpc.quote.list.useQuery(undefined, { refetchInterval: 5000, refetchOnWindowFocus: true });
   const clients = trpc.customer.list.useQuery();
   const services = trpc.service.list.useQuery();
   const profileQuery = trpc.profile.get.useQuery();
@@ -1495,6 +2569,61 @@ function Quotes() {
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [search, setSearch] = useState<string>("");
   const [receiptQuote, setReceiptQuote] = useState<ReceiptData | null>(null);
+
+  const [scheduleQuoteModalOpen, setScheduleQuoteModalOpen] = useState(false);
+  const [selectedQuoteForSchedule, setSelectedQuoteForSchedule] = useState<any | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    startsAt: "",
+    durationMinutes: "60",
+    location: "",
+    notes: ""
+  });
+
+  const getNextAppointmentSlot = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + 30);
+    d.setMinutes(d.getMinutes() >= 30 ? 30 : 0, 0, 0);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const scheduleQuoteMutation = trpc.quote.convertToAppointment.useMutation({
+    onSuccess: () => {
+      toast.success("Orçamento agendado com sucesso na sua Agenda!");
+      utils.quote.list.invalidate();
+      utils.appointment.list.invalidate();
+      setScheduleQuoteModalOpen(false);
+      setSelectedQuoteForSchedule(null);
+    },
+    onError: err => {
+      toast.error(err.message || "Erro ao agendar orçamento.");
+    }
+  });
+
+  const handleOpenScheduleModal = (quote: any) => {
+    setSelectedQuoteForSchedule(quote);
+    setScheduleForm({
+      startsAt: getNextAppointmentSlot(),
+      durationMinutes: "60",
+      location: quote.notes?.includes("Endereço:") ? quote.notes.replace(/^Endereço:\s*/, "") : (quote.notes || ""),
+      notes: quote.description || ""
+    });
+    setScheduleQuoteModalOpen(true);
+  };
+
+  const submitScheduleQuote = () => {
+    if (!selectedQuoteForSchedule) return;
+    if (!scheduleForm.startsAt || isNaN(new Date(scheduleForm.startsAt).getTime())) {
+      return toast.error("Selecione data e horário válidos.");
+    }
+    scheduleQuoteMutation.mutate({
+      id: selectedQuoteForSchedule.id,
+      startsAt: new Date(scheduleForm.startsAt).toISOString(),
+      durationMinutes: Number(scheduleForm.durationMinutes) || 60,
+      location: scheduleForm.location || undefined,
+      notes: scheduleForm.notes || undefined
+    });
+  };
 
   const initialForm = {
     clientId: "",
@@ -1789,6 +2918,62 @@ function Quotes() {
         </DialogContent>
       </Dialog>
 
+      {/* Modal para agendar Atendimento a partir do Orçamento Aceito */}
+      <Dialog open={scheduleQuoteModalOpen} onOpenChange={setScheduleQuoteModalOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
+          <DialogHeader>
+            <DialogTitle>Agendar Atendimento — Orçamento #{selectedQuoteForSchedule?.id}</DialogTitle>
+            <DialogDescription>
+              Marque o dia e horário para executar o serviço aceito por <strong>{selectedQuoteForSchedule?.clientName || "Cliente"}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-3">
+            <div className="rounded-2xl border border-lime-300 bg-[#f7faf2] p-4 text-xs text-[#284b42]">
+              <p><strong>Valor orçado:</strong> {money(selectedQuoteForSchedule?.totalCents)}</p>
+              <p className="mt-1"><strong>Condições de pagamento:</strong> {selectedQuoteForSchedule?.paymentTerms || "Acerto direto com o prestador"}</p>
+            </div>
+            <div>
+              <Label className="mb-2 block">Data e horário do atendimento</Label>
+              <Input
+                type="datetime-local"
+                value={scheduleForm.startsAt}
+                onChange={e => setScheduleForm({ ...scheduleForm, startsAt: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field
+                label="Duração estimada (minutos)"
+                value={scheduleForm.durationMinutes}
+                onChange={val => setScheduleForm({ ...scheduleForm, durationMinutes: val })}
+              />
+              <Field
+                label="Local do atendimento"
+                value={scheduleForm.location}
+                onChange={val => setScheduleForm({ ...scheduleForm, location: val })}
+                placeholder="Endereço ou local combinado"
+              />
+            </div>
+            <div>
+              <Label className="mb-2 block">Observações para o atendimento</Label>
+              <Textarea
+                value={scheduleForm.notes}
+                onChange={e => setScheduleForm({ ...scheduleForm, notes: e.target.value })}
+                placeholder="Instruções, materiais a levar, etc."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={submitScheduleQuote}
+              disabled={scheduleQuoteMutation.isPending}
+              className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"
+            >
+              Confirmar e colocar na Agenda
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {createdToken && (
         <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-[#d9e7bf] bg-[#f1f7dd] p-4 text-sm text-[#53674a] sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1986,6 +3171,26 @@ function Quotes() {
                             className="rounded-xl border-[#dce5dc] bg-white text-xs text-[#4c6960]"
                           >
                             <Link2 className="mr-1.5 h-3.5 w-3.5" /> Copiar link
+                          </Button>
+                        )}
+                        {quote.status !== "rascunho" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`/orcamento/${quote.secureToken}`, "_blank")}
+                            className="rounded-xl border-[#dce5dc] bg-white text-xs text-[#4c6960] hover:bg-[#f5f8f2]"
+                            title="Visualizar e imprimir proposta em PDF"
+                          >
+                            <Printer className="mr-1.5 h-3.5 w-3.5 text-[#4c6960]" /> Imprimir PDF
+                          </Button>
+                        )}
+                        {quote.status === "aceito" && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenScheduleModal(quote)}
+                            className="rounded-xl bg-[#173a34] text-xs font-semibold text-white hover:bg-[#28564d]"
+                          >
+                            <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#d9f56a]" /> Agendar na Agenda
                           </Button>
                         )}
                         {quote.status === "aceito" && (
@@ -2714,18 +3919,22 @@ function SettingsPage() {
     pixKeyType: profile.data.pixKeyType || "cpf",
   };
 
-  const save = () => update.mutate({
-    ...current,
-    professionCategory: current.professionCategory || undefined,
-    city: current.city || undefined,
-    serviceRegion: current.serviceRegion || undefined,
-    bio: current.bio || undefined,
-    phone: current.phone || undefined,
-    whatsapp: current.whatsapp || undefined,
-    avatarUrl: current.avatarUrl || undefined,
-    pixKey: current.pixKey || undefined,
-    pixKeyType: current.pixKeyType || undefined,
-  });
+  const save = () => {
+    const spellBio = current.bio ? checkServiceSpelling(current.bio) : null;
+    const finalBio = spellBio?.hasCorrection ? spellBio.correctedText : current.bio;
+    update.mutate({
+      ...current,
+      professionCategory: current.professionCategory || undefined,
+      city: current.city || undefined,
+      serviceRegion: current.serviceRegion || undefined,
+      bio: finalBio || undefined,
+      phone: current.phone || undefined,
+      whatsapp: current.whatsapp || undefined,
+      avatarUrl: current.avatarUrl || undefined,
+      pixKey: current.pixKey || undefined,
+      pixKeyType: current.pixKeyType || undefined,
+    });
+  };
 
   return (
     <Page
@@ -3369,7 +4578,12 @@ function FormSelect({ label, value, onChange, options, placeholder = "Selecionar
   );
 }
 
-export function PublicProfile({ slug }: { slug: string }) { const query = trpc.publicProfile.bySlug.useQuery({ slug }); const create = trpc.request.createPublic.useMutation({ onSuccess: () => { toast.success("Solicitação enviada."); setSent(true); } }); const [sent, setSent] = useState(false); const [open, setOpen] = useState(false); const [form, setForm] = useState({ requesterName: "", requesterPhone: "", requesterEmail: "", serviceId: "", description: "", address: "", desiredAt: "", preferredTime: "" }); const [files, setFiles] = useState<File[]>([]); if (query.isLoading) return <LoadingScreen />; if (!query.data) return <div className="grid min-h-screen place-items-center bg-[#f5f7f2] text-[#58716b]">Profissional não encontrado.</div>; const { profile, services } = query.data; const submit = () => { if (!form.requesterName || !form.requesterPhone || !form.description) return toast.error("Preencha nome, telefone e conte o que você precisa."); Promise.all(files.map(file => new Promise<any>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: String(reader.result) }); reader.onerror = reject; reader.readAsDataURL(file); }))).then(attachments => create.mutate({ slug, requesterName: form.requesterName, requesterPhone: form.requesterPhone, requesterEmail: form.requesterEmail || undefined, serviceId: form.serviceId ? Number(form.serviceId) : undefined, description: form.description, address: form.address || undefined, desiredAt: form.desiredAt ? new Date(form.desiredAt).toISOString() : undefined, preferredTime: form.preferredTime || undefined, attachments })); }; return <div className="min-h-screen bg-[#f5f7f2]"><header className="border-b border-[#dce5dc] bg-white"><div className="container flex h-20 sm:h-24 items-center justify-between py-2"><Link href="/" className="flex items-center py-1"><img src="/logo.png" alt="MeuAutônomo" className="h-14 sm:h-16 w-auto object-contain" /></Link><span className="text-xs font-semibold text-[#82948e] bg-[#f5f8f2] px-3 py-1.5 rounded-full border border-[#dce5dc]">Cartão profissional</span></div></header><main className="container max-w-5xl py-8 md:py-14"><div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]"><Card className="overflow-hidden rounded-[28px] border-0 bg-[#173a34] text-white shadow-[0_18px_55px_rgba(19,42,39,0.16)]"><CardContent className="p-7 sm:p-10"><div className="grid h-20 w-20 place-items-center rounded-[24px] bg-[#d9f56a] text-3xl font-bold text-[#173a34]">{profile.avatarUrl ? <img src={profile.avatarUrl} alt={profile.displayName} className="h-full w-full rounded-[24px] object-cover" /> : profile.displayName.charAt(0).toUpperCase()}</div><h1 className="mt-6 text-3xl font-bold tracking-tight">{profile.displayName}</h1><p className="mt-2 text-xl text-[#d9f56a]">{profile.professionName}</p><p className="mt-6 text-sm leading-7 text-white/70">{profile.bio || "Profissional autônomo pronto para ajudar você."}</p><div className="mt-8 space-y-3 text-sm text-white/70">{profile.serviceRegion && <p><MapPin className="mr-2 inline h-4 w-4 text-[#d9f56a]" />Atende em {profile.serviceRegion}</p>}{profile.whatsapp && <p><Share2 className="mr-2 inline h-4 w-4 text-[#d9f56a]" />{formatPhone(profile.whatsapp)}</p>}</div><Button onClick={() => setOpen(true)} className="mt-8 h-12 w-full rounded-xl bg-[#d9f56a] text-[#173a34] hover:bg-[#e8ff8e]">Solicitar serviço <ArrowRight className="ml-2 h-4 w-4" /></Button>{profile.whatsapp && <Button variant="outline" onClick={() => window.open(`https://wa.me/${profile.whatsapp?.replace(/\D/g, "")}`, "_blank")} className="mt-3 h-12 w-full rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10">Falar pelo WhatsApp</Button>}</CardContent></Card><div><p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">Serviços</p><h2 className="mb-6 text-2xl font-bold text-[#173a34]">Como posso ajudar?</h2><div className="space-y-3">{services.length ? services.map(service => <Card key={service.id} className="rounded-[22px] border-0 bg-white shadow-[0_8px_26px_rgba(19,42,39,0.04)]"><CardContent className="flex items-center gap-4 p-5"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815]"><BriefcaseBusiness className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h3 className="font-bold text-[#284b42]">{service.name}</h3><p className="mt-1 text-sm text-[#82948e]">{service.description || modalityLabel[service.modality]}</p></div>{profile.showPrices && <strong className="text-[#173a34]">{money(service.priceCents)}</strong>}</CardContent></Card>) : <EmptyState icon={BriefcaseBusiness} title="Serviços em atualização" description="Entre em contato para saber mais." />}</div><p className="mt-8 text-center text-xs text-[#9aa9a3]">Ao solicitar, você não precisa criar uma conta.</p></div></div></main><Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>{sent ? "Solicitação enviada" : "Solicitar serviço"}</DialogTitle><DialogDescription>{sent ? "Obrigado. O profissional recebeu seu pedido e entrará em contato." : `Conte para ${profile.displayName.split(" ")[0]} o que você precisa.`}</DialogDescription></DialogHeader>{sent ? <div className="py-8 text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#e3f3e8] text-[#3e885c]"><CheckCircle2 className="h-8 w-8" /></div><p className="mt-4 text-sm text-[#71867f]">Você já pode fechar esta janela.</p></div> : <div className="grid gap-4 py-3"><div className="grid gap-4 sm:grid-cols-2"><Field label="Seu nome" value={form.requesterName} onChange={value => setForm({ ...form, requesterName: value })} /><Field label="WhatsApp ou telefone" value={form.requesterPhone} onChange={value => setForm({ ...form, requesterPhone: value })} /></div><Field label="E-mail (opcional)" value={form.requesterEmail} onChange={value => setForm({ ...form, requesterEmail: value })} /><FormSelect label="Serviço desejado" value={form.serviceId} onChange={value => setForm({ ...form, serviceId: value })} placeholder="Ainda não sei" options={services.map(s => ({ value: String(s.id), label: s.name }))} /><div><Label className="mb-2 block">O que você precisa?</Label><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Descreva o serviço, medidas, contexto…" className="min-h-28" /></div><Field label="Endereço (se necessário)" value={form.address} onChange={value => setForm({ ...form, address: value })} /><div><Label className="mb-2 block">Fotos ou anexos <span className="font-normal text-[#9bad9a]">(até 3 arquivos de 5 MB)</span></Label><Input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={event => { const selected = Array.from(event.target.files || []).filter(file => file.size <= 5_000_000).slice(0, 3); setFiles(selected); }} className="rounded-xl border-[#dce5dc] bg-[#fbfcf9]" />{files.length > 0 && <p className="mt-2 text-xs text-[#82948e]"><Paperclip className="mr-1 inline h-3.5 w-3.5" />{files.length} arquivo(s) selecionado(s)</p>}</div><div className="grid gap-4 sm:grid-cols-2"><div><Label className="mb-2 block">Data desejada</Label><Input type="date" value={form.desiredAt} onChange={e => setForm({ ...form, desiredAt: e.target.value })} /></div><Field label="Horário preferencial" value={form.preferredTime} onChange={value => setForm({ ...form, preferredTime: value })} placeholder="Ex.: à tarde" /></div></div>}<DialogFooter>{!sent && <Button onClick={submit} disabled={create.isPending} className="rounded-xl bg-[#173a34] text-white"><Send className="mr-2 h-4 w-4" /> Enviar solicitação</Button>}</DialogFooter></DialogContent></Dialog></div>; }
+export function PublicProfile({ slug }: { slug: string }) { const query = trpc.publicProfile.bySlug.useQuery({ slug }); const create = trpc.request.createPublic.useMutation({ onSuccess: () => { toast.success("Solicitação enviada."); setSent(true); } }); const [sent, setSent] = useState(false); const [open, setOpen] = useState(false); const [form, setForm] = useState({ requesterName: "", requesterPhone: "", requesterEmail: "", serviceId: "", description: "", address: "", desiredAt: "", preferredTime: "" }); const [files, setFiles] = useState<File[]>([]); if (query.isLoading) return <LoadingScreen />; if (!query.data) return <div className="grid min-h-screen place-items-center bg-[#f5f7f2] text-[#58716b]">Profissional não encontrado.</div>; const { profile, services } = query.data; const submit = () => {
+  if (!form.requesterName || !form.requesterPhone || !form.description) return toast.error("Preencha nome, telefone e conte o que você precisa.");
+  const spellDesc = form.description ? checkServiceSpelling(form.description) : null;
+  const finalDescription = spellDesc?.hasCorrection ? spellDesc.correctedText : form.description;
+  Promise.all(files.map(file => new Promise<any>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: String(reader.result) }); reader.onerror = reject; reader.readAsDataURL(file); }))).then(attachments => create.mutate({ slug, requesterName: form.requesterName, requesterPhone: form.requesterPhone, requesterEmail: form.requesterEmail || undefined, serviceId: form.serviceId ? Number(form.serviceId) : undefined, description: finalDescription, address: form.address || undefined, desiredAt: form.desiredAt ? new Date(form.desiredAt).toISOString() : undefined, preferredTime: form.preferredTime || undefined, attachments }));
+}; return <div className="min-h-screen bg-[#f5f7f2]"><header className="border-b border-[#dce5dc] bg-white"><div className="container flex h-20 sm:h-24 items-center justify-between py-2"><Link href="/" className="flex items-center py-1"><img src="/logo.png" alt="MeuAutônomo" className="h-14 sm:h-16 w-auto object-contain" /></Link><span className="text-xs font-semibold text-[#82948e] bg-[#f5f8f2] px-3 py-1.5 rounded-full border border-[#dce5dc]">Cartão profissional</span></div></header><main className="container max-w-5xl py-8 md:py-14"><div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]"><Card className="overflow-hidden rounded-[28px] border-0 bg-[#173a34] text-white shadow-[0_18px_55px_rgba(19,42,39,0.16)]"><CardContent className="p-7 sm:p-10"><div className="grid h-20 w-20 place-items-center rounded-[24px] bg-[#d9f56a] text-3xl font-bold text-[#173a34]">{profile.avatarUrl ? <img src={profile.avatarUrl} alt={profile.displayName} className="h-full w-full rounded-[24px] object-cover" /> : profile.displayName.charAt(0).toUpperCase()}</div><h1 className="mt-6 text-3xl font-bold tracking-tight">{profile.displayName}</h1><p className="mt-2 text-xl text-[#d9f56a]">{profile.professionName}</p><p className="mt-6 text-sm leading-7 text-white/70">{profile.bio || "Profissional autônomo pronto para ajudar você."}</p><div className="mt-8 space-y-3 text-sm text-white/70">{profile.serviceRegion && <p><MapPin className="mr-2 inline h-4 w-4 text-[#d9f56a]" />Atende em {profile.serviceRegion}</p>}{profile.whatsapp && <p><Share2 className="mr-2 inline h-4 w-4 text-[#d9f56a]" />{formatPhone(profile.whatsapp)}</p>}</div><Button onClick={() => setOpen(true)} className="mt-8 h-12 w-full rounded-xl bg-[#d9f56a] text-[#173a34] hover:bg-[#e8ff8e]">Solicitar serviço <ArrowRight className="ml-2 h-4 w-4" /></Button>{profile.whatsapp && <Button variant="outline" onClick={() => window.open(`https://wa.me/${profile.whatsapp?.replace(/\D/g, "")}`, "_blank")} className="mt-3 h-12 w-full rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10">Falar pelo WhatsApp</Button>}</CardContent></Card><div><p className="mb-3 text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">Serviços</p><h2 className="mb-6 text-2xl font-bold text-[#173a34]">Como posso ajudar?</h2><div className="space-y-3">{services.length ? services.map(service => <Card key={service.id} className="rounded-[22px] border-0 bg-white shadow-[0_8px_26px_rgba(19,42,39,0.04)]"><CardContent className="flex items-center gap-4 p-5"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815]"><BriefcaseBusiness className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h3 className="font-bold text-[#284b42]">{service.name}</h3><p className="mt-1 text-sm text-[#82948e]">{service.description || modalityLabel[service.modality]}</p></div>{profile.showPrices && <strong className="text-[#173a34]">{money(service.priceCents)}</strong>}</CardContent></Card>) : <EmptyState icon={BriefcaseBusiness} title="Serviços em atualização" description="Entre em contato para saber mais." />}</div><p className="mt-8 text-center text-xs text-[#9aa9a3]">Ao solicitar, você não precisa criar uma conta.</p></div></div></main><Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>{sent ? "Solicitação enviada" : "Solicitar serviço"}</DialogTitle><DialogDescription>{sent ? "Obrigado. O profissional recebeu seu pedido e entrará em contato." : `Conte para ${profile.displayName.split(" ")[0]} o que você precisa.`}</DialogDescription></DialogHeader>{sent ? <div className="py-8 text-center"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#e3f3e8] text-[#3e885c]"><CheckCircle2 className="h-8 w-8" /></div><p className="mt-4 text-sm text-[#71867f]">Você já pode fechar esta janela.</p></div> : <div className="grid gap-4 py-3"><div className="grid gap-4 sm:grid-cols-2"><Field label="Seu nome" value={form.requesterName} onChange={value => setForm({ ...form, requesterName: value })} /><Field label="WhatsApp ou telefone" value={form.requesterPhone} onChange={value => setForm({ ...form, requesterPhone: value })} /></div><Field label="E-mail (opcional)" value={form.requesterEmail} onChange={value => setForm({ ...form, requesterEmail: value })} /><FormSelect label="Serviço desejado" value={form.serviceId} onChange={value => setForm({ ...form, serviceId: value })} placeholder="Ainda não sei" options={services.map(s => ({ value: String(s.id), label: s.name }))} /><div><Label className="mb-2 block">O que você precisa?</Label><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Descreva o serviço, medidas, contexto…" className="min-h-28" /></div><Field label="Endereço (se necessário)" value={form.address} onChange={value => setForm({ ...form, address: value })} /><div><Label className="mb-2 block">Fotos ou anexos <span className="font-normal text-[#9bad9a]">(até 3 arquivos de 5 MB)</span></Label><Input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple onChange={event => { const selected = Array.from(event.target.files || []).filter(file => file.size <= 5_000_000).slice(0, 3); setFiles(selected); }} className="rounded-xl border-[#dce5dc] bg-[#fbfcf9]" />{files.length > 0 && <p className="mt-2 text-xs text-[#82948e]"><Paperclip className="mr-1 inline h-3.5 w-3.5" />{files.length} arquivo(s) selecionado(s)</p>}</div><div className="grid gap-4 sm:grid-cols-2"><div><Label className="mb-2 block">Data desejada</Label><Input type="date" value={form.desiredAt} onChange={e => setForm({ ...form, desiredAt: e.target.value })} /></div><Field label="Horário preferencial" value={form.preferredTime} onChange={value => setForm({ ...form, preferredTime: value })} placeholder="Ex.: à tarde" /></div></div>}<DialogFooter>{!sent && <Button onClick={submit} disabled={create.isPending} className="rounded-xl bg-[#173a34] text-white"><Send className="mr-2 h-4 w-4" /> Enviar solicitação</Button>}</DialogFooter></DialogContent></Dialog></div>; }
 
 export function PublicQuote({ token }: { token: string }) {
   const query = trpc.quote.getPublic.useQuery({ token });
@@ -3429,15 +4643,57 @@ export function PublicQuote({ token }: { token: string }) {
   return (
     <div className="min-h-screen bg-[#f5f7f2] px-4 py-8">
       <div className="mx-auto max-w-2xl">
-        <div className="mb-8 flex items-center justify-between">
-          <img src="/logo.png" alt="MeuAutônomo" className="h-14 sm:h-16 w-auto object-contain" />
-          <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-[#526d64] border border-[#dce5dc]">
-            Proposta Digital
-          </span>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 no-print">
+          <img src="/logo.png" alt="MeuAutônomo" className="h-12 sm:h-14 w-auto object-contain" />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
+              className="rounded-xl border-[#dce5dc] bg-white text-xs font-semibold text-[#284b42] hover:bg-[#f0f7f2] shadow-xs"
+            >
+              <Printer className="mr-1.5 h-3.5 w-3.5 text-[#173a34]" /> Imprimir / Salvar PDF
+            </Button>
+            {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.share({
+                    title: `Orçamento #${quote.id} - ${profile?.displayName || "MeuAutônomo"}`,
+                    text: `Olá! Aqui está a proposta de orçamento no valor de ${money(quote.totalCents)}:`,
+                    url: window.location.href,
+                  }).catch(() => {});
+                }}
+                className="rounded-xl border-[#dce5dc] bg-white text-xs font-medium text-[#284b42]"
+              >
+                <Share2 className="mr-1.5 h-3.5 w-3.5 text-[#25D366]" /> Compartilhar
+              </Button>
+            )}
+            <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-[#526d64] border border-[#dce5dc]">
+              Proposta Digital
+            </span>
+          </div>
         </div>
 
-        <Card className="rounded-[28px] border-0 bg-white shadow-[0_18px_55px_rgba(19,42,39,0.08)]">
+        <Card id="printable-quote" className="printable-document rounded-[28px] border-0 bg-white shadow-[0_18px_55px_rgba(19,42,39,0.08)]">
           <CardContent className="p-6 sm:p-10">
+            {/* Cabeçalho impresso oficial visível apenas na impressão/PDF */}
+            <div className="hidden print:flex items-center justify-between pb-6 mb-6 border-b border-[#edf1eb]">
+              <div className="flex items-center gap-3">
+                <img src="/logo.png" alt="MeuAutônomo" className="h-10 w-auto" />
+                <div>
+                  <h2 className="text-base font-bold text-[#173a34]">MeuAutônomo</h2>
+                  <p className="text-[11px] text-[#71867f]">Plataforma de Gestão Profissional</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#8aa500] block">Proposta Oficial</span>
+                <span className="text-base font-black text-[#173a34]">Orçamento #{quote.id}</span>
+                <p className="text-[11px] text-[#71867f]">{new Date(quote.createdAt).toLocaleDateString("pt-BR")}</p>
+              </div>
+            </div>
+
             <div className="flex items-start justify-between gap-4 border-b border-[#edf1eb] pb-7">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">Proposta de Serviço</p>
@@ -3590,7 +4846,7 @@ export function PublicQuote({ token }: { token: string }) {
                   </div>
                 )}
 
-                <div className="mt-6 rounded-2xl border border-[#c5e2ce] bg-white/70 p-4 text-left">
+                <div className="mt-6 rounded-2xl border border-[#c5e2ce] bg-white/70 p-4 text-left no-print">
                   <p className="text-xs font-semibold text-[#284b42]">
                     Precisa do comprovante ou precisa alterar algum item?
                   </p>
@@ -3602,9 +4858,9 @@ export function PublicQuote({ token }: { token: string }) {
                       variant="outline"
                       size="sm"
                       onClick={() => window.print()}
-                      className="rounded-xl border-[#b3d7bf] bg-white text-xs text-[#284b42] hover:bg-[#f0f7f2]"
+                      className="rounded-xl border-[#b3d7bf] bg-white text-xs font-semibold text-[#284b42] hover:bg-[#f0f7f2]"
                     >
-                      <FileText className="mr-1.5 h-3.5 w-3.5" /> Salvar / Imprimir comprovante
+                      <Printer className="mr-1.5 h-3.5 w-3.5 text-[#173a34]" /> Salvar / Imprimir Comprovante PDF
                     </Button>
                     <Button
                       variant="outline"
@@ -3632,7 +4888,7 @@ export function PublicQuote({ token }: { token: string }) {
                 </div>
               </div>
             ) : quote.status === "alteracao_solicitada" ? (
-              <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-950">
+              <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-950 no-print">
                 <Clock3 className="mx-auto mb-3 h-9 w-9 text-amber-600" />
                 <h3 className="text-lg font-bold text-amber-900">Alteração Solicitada</h3>
                 <p className="mt-2 text-sm leading-6 text-amber-800">
@@ -3643,13 +4899,13 @@ export function PublicQuote({ token }: { token: string }) {
                 </p>
               </div>
             ) : quote.status === "recusado" ? (
-              <div className="mt-8 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center text-rose-950">
+              <div className="mt-8 rounded-2xl border border-rose-200 bg-rose-50 p-6 text-center text-rose-950 no-print">
                 <X className="mx-auto mb-2 h-8 w-8 text-rose-600" />
                 <h3 className="text-lg font-bold text-rose-900">Orçamento Recusado</h3>
                 <p className="mt-1 text-sm text-rose-700">Esta proposta foi marcada como recusada.</p>
               </div>
             ) : ["enviado", "rascunho"].includes(quote.status) ? (
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              <div className="mt-8 grid gap-3 sm:grid-cols-2 no-print">
                 <Button
                   onClick={() => setAcceptModalOpen(true)}
                   className="h-12 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"
@@ -3662,6 +4918,13 @@ export function PublicQuote({ token }: { token: string }) {
                   className="h-12 rounded-xl border-[#dce5dc] bg-white text-[#4c6960] hover:bg-[#f5f8f2]"
                 >
                   <Pencil className="mr-2 h-4 w-4" /> Solicitar alteração
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.print()}
+                  className="h-11 rounded-xl border-[#dce5dc] bg-white text-xs font-semibold text-[#284b42] hover:bg-[#f5f8f2] sm:col-span-2"
+                >
+                  <Printer className="mr-1.5 h-4 w-4 text-[#173a34]" /> Imprimir / Salvar Proposta em PDF
                 </Button>
                 <Button
                   onClick={handleRefuseQuote}

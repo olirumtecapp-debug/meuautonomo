@@ -57,6 +57,10 @@ export async function enviarEmail({ para, assunto, texto, html, replyTo }: Envia
         replyTo: replyTo || GMAIL_USER,
         text: texto || "",
         html: html || undefined,
+        headers: {
+          "X-Entity-Ref-ID": `quote-${Date.now()}`,
+          "X-Auto-Response-Suppress": "OOF, AutoReply",
+        },
       });
 
       console.log(`[Email Gmail] ✅ E-mail enviado com sucesso para ${para} (ID: ${info.messageId})`);
@@ -134,7 +138,7 @@ export interface ModeloOrcamentoAprovadoParams {
 
 export function modeloOrcamentoAprovado(params: ModeloOrcamentoAprovadoParams) {
   const totalFormatado = (params.totalCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const assunto = `✅ Orçamento Aprovado — ${params.profissionalNome} (Proposta #${params.orcamentoId})`;
+  const assunto = `Comprovante: Proposta #${params.orcamentoId} Aprovada — ${params.profissionalNome}`;
 
   const itensTexto = params.items
     .map(it => `• ${it.description} (${it.quantity}x de R$ ${(it.unitPriceCents / 100).toFixed(2)}) = R$ ${(it.totalCents / 100).toFixed(2)}`)

@@ -1734,7 +1734,11 @@ async function enviarEmail({ para, assunto, texto, html, replyTo }) {
         subject: assunto,
         replyTo: replyTo || GMAIL_USER,
         text: texto || "",
-        html: html || void 0
+        html: html || void 0,
+        headers: {
+          "X-Entity-Ref-ID": `quote-${Date.now()}`,
+          "X-Auto-Response-Suppress": "OOF, AutoReply"
+        }
       });
       console.log(`[Email Gmail] \u2705 E-mail enviado com sucesso para ${para} (ID: ${info.messageId})`);
       return { ok: true, id: info.messageId };
@@ -1790,7 +1794,7 @@ ${texto || "(HTML enviado)"}`);
 }
 function modeloOrcamentoAprovado(params) {
   const totalFormatado = (params.totalCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const assunto = `\u2705 Or\xE7amento Aprovado \u2014 ${params.profissionalNome} (Proposta #${params.orcamentoId})`;
+  const assunto = `Comprovante: Proposta #${params.orcamentoId} Aprovada \u2014 ${params.profissionalNome}`;
   const itensTexto = params.items.map((it) => `\u2022 ${it.description} (${it.quantity}x de R$ ${(it.unitPriceCents / 100).toFixed(2)}) = R$ ${(it.totalCents / 100).toFixed(2)}`).join("\n");
   const texto = [
     `Ol\xE1, ${params.clienteNome}!`,
@@ -2670,22 +2674,50 @@ var appRouter = router({
       await db.update(requests).set({ clientId }).where(eq4(requests.id, request.id));
       return { success: true, clientId };
     }),
-    convertToAppointment: protectedProcedure.input(z2.object({ id: z2.number(), startsAt: z2.string().datetime().optional() })).mutation(async ({ ctx, input }) => {
+    convertToAppointment: protectedProcedure.input(z2.object({
+      id: z2.number(),
+      startsAt: z2.string().datetime().optional(),
+      serviceId: z2.number().optional(),
+      amountCents: z2.number().int().optional(),
+      location: z2.string().optional(),
+      notes: z2.string().optional()
+    })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const request = (await db.select().from(requests).where(and2(eq4(requests.id, input.id), eq4(requests.profileId, profile.id))).limit(1))[0];
       if (!request) throw new TRPCError3({ code: "NOT_FOUND", message: "Solicita\xE7\xE3o n\xE3o encontrada." });
-      if (!request.clientId) throw new TRPCError3({ code: "PRECONDITION_FAILED", message: "Converta a solicita\xE7\xE3o em cliente antes de agendar." });
-      if (!input.startsAt && !request.desiredAt) throw new TRPCError3({ code: "BAD_REQUEST", message: "Informe uma data para o atendimento." });
-      const service = request.serviceId ? await getOwnedService(profile.id, request.serviceId) : void 0;
-      const start = new Date(input.startsAt ?? request.desiredAt);
+      let effectiveClientId = request.clientId;
+      if (!effectiveClientId) {
+        const insertedClient = await db.insert(clients).values({
+          profileId: profile.id,
+          name: request.requesterName || "Cliente",
+          phone: request.requesterPhone,
+          email: request.requesterEmail,
+          address: request.address
+        });
+        effectiveClientId = Number(insertedClient[0].insertId);
+        await db.update(requests).set({ clientId: effectiveClientId }).where(eq4(requests.id, request.id));
+      }
+      const effectiveServiceId = input.serviceId ?? request.serviceId ?? void 0;
+      const service = effectiveServiceId ? await getOwnedService(profile.id, effectiveServiceId) : void 0;
+      const start = input.startsAt ? new Date(input.startsAt) : request.desiredAt ? new Date(request.desiredAt) : new Date(Date.now() + 24 * 3600 * 1e3);
       const durationMinutes = service?.durationMinutes ?? 60;
-      const availabilityRow = (await db.select().from(availability).where(eq4(availability.profileId, profile.id)).limit(1))[0];
-      if (!isWithinAvailability(start, durationMinutes, availabilityRow)) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio est\xE1 fora da sua disponibilidade." });
-      const conflictRows = await db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado")));
-      if (conflictRows.some((item) => new Date(item.startsAt).getTime() < start.getTime() + durationMinutes * 6e4 && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 6e4)) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio j\xE1 est\xE1 ocupado." });
-      const inserted = await db.insert(appointments).values({ profileId: profile.id, clientId: request.clientId, serviceId: request.serviceId, startsAt: start, durationMinutes, location: request.address, amountCents: service?.priceCents ?? 0, notes: request.description, status: "agendado", paymentStatus: "pendente" });
+      const amountCents = input.amountCents ?? service?.priceCents ?? 0;
+      const location = input.location ?? request.address ?? "";
+      const notes = input.notes ?? request.description ?? "";
+      const inserted = await db.insert(appointments).values({
+        profileId: profile.id,
+        clientId: effectiveClientId,
+        serviceId: effectiveServiceId,
+        startsAt: start,
+        durationMinutes,
+        location,
+        amountCents,
+        notes,
+        status: "confirmado",
+        paymentStatus: "pendente"
+      });
       await db.update(requests).set({ status: "agendada" }).where(eq4(requests.id, request.id));
       return { success: true, appointmentId: Number(inserted[0].insertId) };
     }),
@@ -2862,7 +2894,7 @@ var appRouter = router({
           try {
             const profile = (await db.select().from(professionalProfiles).where(eq4(professionalProfiles.id, quote.profileId)).limit(1))[0];
             const items = await db.select().from(quoteItems).where(eq4(quoteItems.quoteId, quote.id));
-            const publicUrl = process.env.PUBLIC_URL || "https://meuautonome-vmrf8enk.manus.space";
+            const publicUrl = process.env.APP_URL || process.env.PUBLIC_URL || "https://meuautonomo.com.br";
             const linkProposta = `${publicUrl}/orcamento/${quote.secureToken}`;
             const emailData = modeloOrcamentoAprovado({
               clienteNome: input.clientName || "Cliente",
@@ -2897,6 +2929,57 @@ var appRouter = router({
       }
       await db.update(quotes).set(updateData).where(eq4(quotes.id, quote.id));
       return { success: true };
+    }),
+    convertToAppointment: protectedProcedure.input(z2.object({
+      id: z2.number(),
+      startsAt: z2.string().datetime(),
+      durationMinutes: z2.number().int().min(15).max(1440).default(60),
+      location: z2.string().max(600).optional(),
+      notes: z2.string().max(1200).optional()
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      const quote = (await db.select().from(quotes).where(and2(eq4(quotes.id, input.id), eq4(quotes.profileId, profile.id))).limit(1))[0];
+      if (!quote) throw new TRPCError3({ code: "NOT_FOUND", message: "Or\xE7amento n\xE3o encontrado." });
+      let effectiveClientId = quote.clientId;
+      if (!effectiveClientId && quote.clientName) {
+        const existing = (await db.select().from(clients).where(and2(eq4(clients.profileId, profile.id), eq4(clients.name, quote.clientName))).limit(1))[0];
+        if (existing) {
+          effectiveClientId = existing.id;
+        } else {
+          const ins = await db.insert(clients).values({
+            profileId: profile.id,
+            name: quote.clientName,
+            email: quote.clientEmail || null,
+            phone: null
+          });
+          effectiveClientId = Number(ins[0].insertId);
+          await db.update(quotes).set({ clientId: effectiveClientId }).where(eq4(quotes.id, quote.id));
+        }
+      }
+      const inserted = await db.insert(appointments).values({
+        profileId: profile.id,
+        clientId: effectiveClientId ?? null,
+        serviceId: quote.serviceId ?? null,
+        startsAt: new Date(input.startsAt),
+        durationMinutes: input.durationMinutes,
+        location: input.location || "",
+        amountCents: quote.totalCents,
+        notes: input.notes || quote.description || "",
+        status: "confirmado",
+        paymentStatus: "pendente"
+      });
+      if (quote.requestId) {
+        await db.update(requests).set({ status: "agendada" }).where(eq4(requests.id, quote.requestId));
+      }
+      await createNotification(
+        profile.id,
+        "Atendimento agendado",
+        `O or\xE7amento #${quote.id} foi inclu\xEDdo na sua agenda para ${new Date(input.startsAt).toLocaleDateString("pt-BR")}.`,
+        "appointment"
+      );
+      return { success: true, appointmentId: Number(inserted[0].insertId) };
     })
   }),
   payment: router({

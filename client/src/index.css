@@ -219,16 +219,22 @@
   }
 }
 
-/* Regras de impressão para geração de PDF limpo do Recibo */
+/* Regras de impressão para geração de PDF limpo do Recibo e do Orçamento */
 @media print {
   body * {
     visibility: hidden !important;
   }
   #printable-receipt,
-  #printable-receipt * {
+  #printable-receipt *,
+  #printable-quote,
+  #printable-quote *,
+  .printable-document,
+  .printable-document * {
     visibility: visible !important;
   }
-  #printable-receipt {
+  #printable-receipt,
+  #printable-quote,
+  .printable-document {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
@@ -238,6 +244,12 @@
     background: #ffffff !important;
     color: #173a34 !important;
     box-shadow: none !important;
+    border: none !important;
+  }
+  .no-print,
+  .no-print * {
+    display: none !important;
+    visibility: hidden !important;
   }
 }
 

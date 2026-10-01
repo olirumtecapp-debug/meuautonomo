@@ -629,22 +629,56 @@ export const appRouter = router({
       await db.update(requests).set({ clientId }).where(eq(requests.id, request.id));
       return { success: true, clientId };
     }),
-    convertToAppointment: protectedProcedure.input(z.object({ id: z.number(), startsAt: z.string().datetime().optional() })).mutation(async ({ ctx, input }) => {
+    convertToAppointment: protectedProcedure.input(z.object({
+      id: z.number(),
+      startsAt: z.string().datetime().optional(),
+      serviceId: z.number().optional(),
+      amountCents: z.number().int().optional(),
+      location: z.string().optional(),
+      notes: z.string().optional(),
+    })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const request = (await db.select().from(requests).where(and(eq(requests.id, input.id), eq(requests.profileId, profile.id))).limit(1))[0];
       if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitação não encontrada." });
-      if (!request.clientId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Converta a solicitação em cliente antes de agendar." });
-      if (!input.startsAt && !request.desiredAt) throw new TRPCError({ code: "BAD_REQUEST", message: "Informe uma data para o atendimento." });
-      const service = request.serviceId ? await getOwnedService(profile.id, request.serviceId) : undefined;
-      const start = new Date(input.startsAt ?? request.desiredAt!);
+      
+      let effectiveClientId = request.clientId;
+      if (!effectiveClientId) {
+        const insertedClient = (await db.insert(clients).values({
+          profileId: profile.id,
+          name: request.requesterName || "Cliente",
+          phone: request.requesterPhone,
+          email: request.requesterEmail,
+          address: request.address,
+        })) as unknown as [{ insertId: number }];
+        effectiveClientId = Number(insertedClient[0].insertId);
+        await db.update(requests).set({ clientId: effectiveClientId }).where(eq(requests.id, request.id));
+      }
+
+      const effectiveServiceId = input.serviceId ?? request.serviceId ?? undefined;
+      const service = effectiveServiceId ? await getOwnedService(profile.id, effectiveServiceId) : undefined;
+      const start = input.startsAt
+        ? new Date(input.startsAt)
+        : (request.desiredAt ? new Date(request.desiredAt) : new Date(Date.now() + 24 * 3600 * 1000));
       const durationMinutes = service?.durationMinutes ?? 60;
-      const availabilityRow = (await db.select().from(availability).where(eq(availability.profileId, profile.id)).limit(1))[0];
-      if (!isWithinAvailability(start, durationMinutes, availabilityRow)) throw new TRPCError({ code: "CONFLICT", message: "Esse horário está fora da sua disponibilidade." });
-      const conflictRows = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado")));
-      if (conflictRows.some(item => new Date(item.startsAt).getTime() < start.getTime() + durationMinutes * 60_000 && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 60_000)) throw new TRPCError({ code: "CONFLICT", message: "Esse horário já está ocupado." });
-      const inserted = (await db.insert(appointments).values({ profileId: profile.id, clientId: request.clientId, serviceId: request.serviceId, startsAt: start, durationMinutes, location: request.address, amountCents: service?.priceCents ?? 0, notes: request.description, status: "agendado", paymentStatus: "pendente" })) as unknown as [{ insertId: number }];
+      const amountCents = input.amountCents ?? service?.priceCents ?? 0;
+      const location = input.location ?? request.address ?? "";
+      const notes = input.notes ?? request.description ?? "";
+
+      const inserted = (await db.insert(appointments).values({
+        profileId: profile.id,
+        clientId: effectiveClientId,
+        serviceId: effectiveServiceId,
+        startsAt: start,
+        durationMinutes,
+        location,
+        amountCents,
+        notes,
+        status: "confirmado",
+        paymentStatus: "pendente",
+      })) as unknown as [{ insertId: number }];
+
       await db.update(requests).set({ status: "agendada" }).where(eq(requests.id, request.id));
       return { success: true, appointmentId: Number(inserted[0].insertId) };
     }),
@@ -841,7 +875,7 @@ export const appRouter = router({
           try {
             const profile = (await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, quote.profileId)).limit(1))[0];
             const items = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quote.id));
-            const publicUrl = process.env.PUBLIC_URL || "https://meuautonome-vmrf8enk.manus.space";
+            const publicUrl = process.env.APP_URL || process.env.PUBLIC_URL || "https://meuautonomo.com.br";
             const linkProposta = `${publicUrl}/orcamento/${quote.secureToken}`;
 
             const emailData = modeloOrcamentoAprovado({
@@ -879,6 +913,65 @@ export const appRouter = router({
       await db.update(quotes).set(updateData).where(eq(quotes.id, quote.id));
       return { success: true };
     }),
+
+    convertToAppointment: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        startsAt: z.string().datetime(),
+        durationMinutes: z.number().int().min(15).max(1440).default(60),
+        location: z.string().max(600).optional(),
+        notes: z.string().max(1200).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const profile = await requireProfile(ctx.user.id);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        const quote = (await db.select().from(quotes).where(and(eq(quotes.id, input.id), eq(quotes.profileId, profile.id))).limit(1))[0];
+        if (!quote) throw new TRPCError({ code: "NOT_FOUND", message: "Orçamento não encontrado." });
+
+        let effectiveClientId = quote.clientId;
+        if (!effectiveClientId && quote.clientName) {
+          const existing = (await db.select().from(clients).where(and(eq(clients.profileId, profile.id), eq(clients.name, quote.clientName))).limit(1))[0];
+          if (existing) {
+            effectiveClientId = existing.id;
+          } else {
+            const ins = (await db.insert(clients).values({
+              profileId: profile.id,
+              name: quote.clientName,
+              email: quote.clientEmail || null,
+              phone: null,
+            })) as unknown as [{ insertId: number }];
+            effectiveClientId = Number(ins[0].insertId);
+            await db.update(quotes).set({ clientId: effectiveClientId }).where(eq(quotes.id, quote.id));
+          }
+        }
+
+        const inserted = (await db.insert(appointments).values({
+          profileId: profile.id,
+          clientId: effectiveClientId ?? null,
+          serviceId: quote.serviceId ?? null,
+          startsAt: new Date(input.startsAt),
+          durationMinutes: input.durationMinutes,
+          location: input.location || "",
+          amountCents: quote.totalCents,
+          notes: input.notes || quote.description || "",
+          status: "confirmado",
+          paymentStatus: "pendente",
+        })) as unknown as [{ insertId: number }];
+
+        if (quote.requestId) {
+          await db.update(requests).set({ status: "agendada" }).where(eq(requests.id, quote.requestId));
+        }
+
+        await createNotification(
+          profile.id,
+          "Atendimento agendado",
+          `O orçamento #${quote.id} foi incluído na sua agenda para ${new Date(input.startsAt).toLocaleDateString("pt-BR")}.`,
+          "appointment"
+        );
+
+        return { success: true, appointmentId: Number(inserted[0].insertId) };
+      }),
   }),
 
   payment: router({

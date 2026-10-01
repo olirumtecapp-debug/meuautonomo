@@ -398,14 +398,39 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
 
 function NotificationsBell() {
   const [, setLocation] = useLocation();
-  const notifications = trpc.notification.list.useQuery();
-  const unread = trpc.notification.unreadCount.useQuery();
+  const notifications = trpc.notification.list.useQuery(undefined, {
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
+  });
+  const unread = trpc.notification.unreadCount.useQuery(undefined, {
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
+  });
   const markRead = trpc.notification.markRead.useMutation({
     onSuccess: () => {
       notifications.refetch();
       unread.refetch();
     },
   });
+
+  const prevCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    const currentCount = unread.data?.count ?? 0;
+    if (prevCountRef.current !== null && currentCount > prevCountRef.current) {
+      const latest = notifications.data?.[0];
+      if (latest && !latest.read) {
+        toast.info(latest.title || "Nova notificação", {
+          description: latest.body || "Você recebeu uma nova atualização no seu espaço.",
+          duration: 6000,
+          action: {
+            label: "Ver",
+            onClick: () => handleNotificationClick(latest),
+          },
+        });
+      }
+    }
+    prevCountRef.current = currentCount;
+  }, [unread.data?.count, notifications.data]);
 
   const handleNotificationClick = (item: {
     id: number;
