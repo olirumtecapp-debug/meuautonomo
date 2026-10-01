@@ -1412,9 +1412,102 @@ async function handleAsaasWebhook(req, res) {
   }
 }
 
+// server/routes/asaas-checkout.ts
+init_schema();
+import { eq as eq3 } from "drizzle-orm";
+var ASAAS_API_URL = "https://api.asaas.com/v3";
+var ASAAS_API_KEY = process.env.ASAAS_API_KEY || "";
+var ASAAS_PLANS = {
+  solo: {
+    plan: "solo",
+    title: "MeuAut\xF4nomo PRO Solo \u2013 Vital\xEDcio",
+    value: 49.9,
+    paymentId: "pay_zhlfko0mdc480t69",
+    invoiceUrl: "https://www.asaas.com/i/zhlfko0mdc480t69",
+    payload: "00020101021226800014br.gov.bcb.pix2558pix.asaas.com/qr/cobv/b2cb693e-dfa7-47f6-a94a-641d9e4462ee5204000053039865802BR5924Murilo Ferreira da Silva6015Sao Bernardo do61080976105062070503***63041D9D",
+    encodedImage: "iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAADh0lEQVR4Xu2XQW4cORAE+9b//9E+q29aRWQV2zKwkOE9uAwUZ4ZNZmbkHMgR7OvjN8c/18/Kr44lvxtLfjf+F/lcjvtz99y8UG42WgqYKm96yamkciFnTiLWxa4KO73kXBJJIlaeZuIdjVCnlxxOPsRzJwpt4QqPY27Jv4GshMvmq1ElTUvOJ5VliSXi3jIrSyOX9JJjSU48Z/4rr0ov+Z+vP0x+HXEMeO6PnRw9qx+CSw4lzZqo4Ef9stNRbV4DnFyIJceSWOx0kwP0ecS6ImfTv+wlx5FgGE37Nlq5rshXJJI7tORIEhtVJ/EkbQlT62RBl5xKVgbMJXRr6XUVh04LlhxK/qAjXoAERFxmd+6E+pJTyc4kZlGtXgWwr4fr9w4tOY00VE6yfixUiJRGQMeSQ0nsC6nFYlGqxS0Flie55FjSjGKO/cHJZKOqV+G0LjmXROmJ2QKF5K1lvNV3ftlLjiRhPk1jgZJy4TojTDJLjiXVnhN4quFQp7CqXC05lVQrFIe1EnRDNqQc7PEv9ZITSSS4MuEtIuUye7cKdi05mNQEv9OSB/PFMy1Pl6Ziyakkfo07tp8IhBRrcdQl38w88n79wL49+NwIrDyYn/6fzpLjyKweL4EzRZLs3hV9SaAtOZXE+HITNEjFouhDnr3GkqNJTP1y0xEmiGmmN7rkUDIeZtKE3UXB5aVZRXyWHEp2osSGzF1YvcvPvuclh5J10Ni3Uxw2VjZNE+XJLjmWvCKydRSnhHVoFme35GAy+6qI9RniSYFCqlW5D0tOJot56rzPwk72aW8Te8mxZI5cGscuD122meTONyw5lYxwIn3uJG9w5yxyDwwuOZbkvAOJc85GIrHoluIZS04lSyUMCCVJ0EYeaUhGdMmhJA4atudcwegpFRHiqbHkVPLRUfSX3UR1qBLpgZqbsORE0iQF9RTuHrvortaEnx/v0JKjyM9lqcSztSRVeNQE9yO85FCSbC5CpGR6dGnqmayvv9RLDiQJ864UBWZrJ57STrBeci7pYG9FSvKwJ4s0na9ZcigZifPNVEhTvbptP6slx5KlMb2cF6MEeGtP6ZV/SS05kiy/kuGw64qEt/PVlhxPminfpTfkRcPoL/l3kN4CFB/G6llucc/XX/aSo8iPTnvaPqrgsvX0pSrFS04liV+ILaMQr6QJZTPJLTmV/M2x5Hdjye/GHyH/BVAfLbkLV973AAAAAElFTkSuQmCC"
+  },
+  team: {
+    plan: "team",
+    title: "MeuAut\xF4nomo PRO Equipe \u2013 Vital\xEDcio",
+    value: 89.9,
+    paymentId: "pay_44zhds3co79fyqe4",
+    invoiceUrl: "https://www.asaas.com/i/44zhds3co79fyqe4",
+    payload: "00020101021226800014br.gov.bcb.pix2558pix.asaas.com/qr/cobv/05bf6317-f01e-4d1e-a578-0f7e98c8c9095204000053039865802BR5924Murilo Ferreira da Silva6015Sao Bernardo do61080976105062070503***63041762",
+    encodedImage: "iVBORw0KGgoAAAANSUhEUgAAAcIAAAHCAQAAAABUY/ToAAADjElEQVR4Xu2XwW7bMBBEedP//1E/izfX82aWcgIUDtJDNsDSFsWdnTc6kHKb9fjm+LM+K18dQ74bQ74b/0XuxbhU7nXtS8qz8qKWdLUs95BdSTOXqICXqkPRWAks95B9SUlFuDSCx3Zr1ZZvyOYkHnkP6prEZPEZ8leQD219lsU70YqThuxPItvh7uIN9kqRqtHks3vItqR23Hv+lU/cQ/7z88PkGVsCHfUv73tWnAedkjOGbEre3iwfebNdOFI4NHeFDtmUVOM67ToQLJznkQe43H6zh+xIstLOY+Qmh2czFcH5UP/8JgzZkBR4J8RyiZETJuvYVp2EIduR6vHWIgDZQemcwIrDft2/8UP2I6/Ya5YXjAK7EQLIGLIt6V4w7GqJx5IYtStS6pBNybS5b5+DVIZyNNxzuMaQTUmX+yOi8nZJwrB1DBav+JBNSRrBiVCvJkmO1VJCYoZsS0rBI7v2XjaWSSSS7XcE/JBdyafJAF0guwPQ9IHhi2fIrmQB1tWXUuBlIV178Q3Zl0zrQScraTdEAjlg2/9mD9mQ9EhNFwbvpU/d4stThuxKeocPSssHIjZSEnoihmxKbv36+he42lxHS7QXRx2yLemtvu8C+bLxHI87lnnnN37IfmT1bd611QpSFLJWyru1IXuTxb9WzA5yrK8hW5ObLVZfq7hxoJmqIyCNqCHbkjQeMLLLXHHGRDkqQbqGbEqacxN+cRTqupWEZx6yKbn9AqPJUwHEuUsHl5+gZw3ZlaRcmrGHYbabu+N0dzVkU9LW6BC0ntM5Ik4gfdVDhuxLqoE7+y13ZblWSCSHDdmWzFpd06SIMhKGQ3AOx5BdSZXSBEki6ERYlsGK04bsS6ZfzqWe7aiqPd+8xpBtSTvtSkZEYG5OOIFDtiXlQUfDr6XPBFboGJKYv3SGbEliPReNUq0B18AzZFeyjLKehmpWYM+1Cghc23/pDNmQ3HfbDkUk7UaJssGPGLIpKS8HIKw9VjSJvOPPI4bsSj6On03mANhom1MT79blkzBkT5IR8pjVVh4+x0XTd8iupCW2XpDNbDdUSYp7WQ3ZlozmK2UppIknG0pRy/+TGrIlmT6q9Gr7gLCCLm3pBR/yN5CoqnMcvDb6kjTkbyDF4n61CVZPbixa7U9v9pCdyLgRdImzb5Fqi8vih2xLnl03qzuGSFq5bSHikE3Jb44h340h340fIf8CbeG9KUGkMBgAAAAASUVORK5CYII="
+  }
+};
+var pendingUserCheckouts = /* @__PURE__ */ new Map();
+async function createPixPayment(req, res) {
+  try {
+    const plan = req.body?.plan;
+    if (!plan || !ASAAS_PLANS[plan]) {
+      return res.status(400).json({ error: "Plano inv\xE1lido. Use 'solo' ou 'team'." });
+    }
+    try {
+      const authUser = await sdk.authenticateRequest(req);
+      if (authUser?.id) {
+        pendingUserCheckouts.set(authUser.id, { plan, timestamp: Date.now() });
+      }
+    } catch {
+    }
+    const planData = ASAAS_PLANS[plan];
+    return res.status(200).json({
+      paymentId: planData.paymentId,
+      invoiceUrl: planData.invoiceUrl,
+      encodedImage: planData.encodedImage,
+      payload: planData.payload
+    });
+  } catch (error) {
+    console.error("[Asaas CreatePix Error]:", error);
+    return res.status(500).json({ error: error.message || "Erro ao carregar PIX." });
+  }
+}
+async function getPaymentStatus(req, res) {
+  try {
+    const { paymentId } = req.params;
+    try {
+      const authUser = await sdk.authenticateRequest(req);
+      if (authUser?.id) {
+        const db = await getDb();
+        const profiles = await db.select({ isPro: professionalProfiles.isPro, plan: professionalProfiles.plan }).from(professionalProfiles).where(eq3(professionalProfiles.userId, authUser.id)).limit(1);
+        if (profiles.length > 0 && profiles[0].isPro) {
+          return res.status(200).json({
+            status: "CONFIRMED",
+            confirmed: true,
+            plan: profiles[0].plan
+          });
+        }
+      }
+    } catch {
+    }
+    if (paymentId && ASAAS_API_KEY) {
+      try {
+        const resAsaas = await fetch(`${ASAAS_API_URL}/payments/${paymentId}`, {
+          headers: { access_token: ASAAS_API_KEY }
+        });
+        if (resAsaas.ok) {
+          const payment = await resAsaas.json();
+          const confirmed = payment.status === "RECEIVED" || payment.status === "CONFIRMED" || payment.status === "RECEIVED_IN_CASH";
+          return res.status(200).json({
+            status: payment.status,
+            confirmed,
+            value: payment.value
+          });
+        }
+      } catch {
+      }
+    }
+    return res.status(200).json({ status: "PENDING", confirmed: false });
+  } catch (error) {
+    console.error("[Asaas PaymentStatus Error]:", error);
+    return res.status(500).json({ error: error.message || "Erro ao consultar status." });
+  }
+}
+
 // server/routers.ts
 init_schema();
-import { and as and2, desc as desc2, eq as eq3, gte, lt, ne } from "drizzle-orm";
+import { and as and2, desc as desc2, eq as eq4, gte, lt, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z as z2 } from "zod";
 import { TRPCError as TRPCError3 } from "@trpc/server";
@@ -2070,21 +2163,21 @@ async function requireProfile(userId) {
 async function getOwnedService(profileId, serviceId) {
   const db = await getDb();
   if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel." });
-  const result = await db.select().from(services).where(and2(eq3(services.id, serviceId), eq3(services.profileId, profileId))).limit(1);
+  const result = await db.select().from(services).where(and2(eq4(services.id, serviceId), eq4(services.profileId, profileId))).limit(1);
   if (!result[0]) throw new TRPCError3({ code: "NOT_FOUND", message: "Servi\xE7o n\xE3o encontrado." });
   return result[0];
 }
 async function getOwnedClient(profileId, clientId) {
   const db = await getDb();
   if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel." });
-  const result = await db.select().from(clients).where(and2(eq3(clients.id, clientId), eq3(clients.profileId, profileId))).limit(1);
+  const result = await db.select().from(clients).where(and2(eq4(clients.id, clientId), eq4(clients.profileId, profileId))).limit(1);
   if (!result[0]) throw new TRPCError3({ code: "NOT_FOUND", message: "Cliente n\xE3o encontrado." });
   return result[0];
 }
 async function getOwnedTeamMember(profileId, memberId) {
   const db = await getDb();
   if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel." });
-  const result = await db.select().from(teamMembers).where(and2(eq3(teamMembers.id, memberId), eq3(teamMembers.profileId, profileId))).limit(1);
+  const result = await db.select().from(teamMembers).where(and2(eq4(teamMembers.id, memberId), eq4(teamMembers.profileId, profileId))).limit(1);
   if (!result[0]) throw new TRPCError3({ code: "NOT_FOUND", message: "Profissional parceiro(a) n\xE3o encontrado." });
   return result[0];
 }
@@ -2272,7 +2365,7 @@ var appRouter = router({
         if (/* @__PURE__ */ new Date() > new Date(profile.planExpiresAt)) {
           const db = await getDb();
           if (db) {
-            await db.update(professionalProfiles).set({ plan: "free", isPro: false }).where(eq3(professionalProfiles.id, profile.id));
+            await db.update(professionalProfiles).set({ plan: "free", isPro: false }).where(eq4(professionalProfiles.id, profile.id));
           }
           return { ...profile, plan: "free", isPro: false };
         }
@@ -2300,7 +2393,7 @@ var appRouter = router({
       const current = await getProfileByUserId(ctx.user.id);
       try {
         if (current) {
-          await db.update(professionalProfiles).set({ ...input, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null }).where(eq3(professionalProfiles.id, current.id));
+          await db.update(professionalProfiles).set({ ...input, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null }).where(eq4(professionalProfiles.id, current.id));
         } else {
           const slugOwner = await getProfileBySlug(input.slug);
           const slug = slugOwner && slugOwner.userId !== ctx.user.id ? `${input.slug}-${nanoid(6).toLowerCase()}`.slice(0, 100) : input.slug;
@@ -2316,8 +2409,8 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const existing = await db.select().from(availability).where(eq3(availability.profileId, profile.id)).limit(1);
-      if (existing[0]) await db.update(availability).set({ schedule: input.schedule, unavailableDays: input.unavailableDays ?? null }).where(eq3(availability.profileId, profile.id));
+      const existing = await db.select().from(availability).where(eq4(availability.profileId, profile.id)).limit(1);
+      if (existing[0]) await db.update(availability).set({ schedule: input.schedule, unavailableDays: input.unavailableDays ?? null }).where(eq4(availability.profileId, profile.id));
       else await db.insert(availability).values({ profileId: profile.id, schedule: input.schedule, unavailableDays: input.unavailableDays ?? null });
       return { success: true };
     }),
@@ -2325,7 +2418,7 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const result = await db.select().from(availability).where(eq3(availability.profileId, profile.id)).limit(1);
+      const result = await db.select().from(availability).where(eq4(availability.profileId, profile.id)).limit(1);
       return result[0] ?? null;
     }),
     uploadAvatar: protectedProcedure.input(z2.object({ fileName: z2.string().max(180), mimeType: z2.enum(["image/jpeg", "image/png", "image/webp"]), dataUrl: z2.string().max(7e6) })).mutation(async ({ ctx, input }) => {
@@ -2337,7 +2430,7 @@ var appRouter = router({
       const stored = await storagePut(`profiles/${profile.id}/avatar-${input.fileName}`, buffer, input.mimeType);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(professionalProfiles).set({ avatarUrl: stored.url }).where(eq3(professionalProfiles.id, profile.id));
+      await db.update(professionalProfiles).set({ avatarUrl: stored.url }).where(eq4(professionalProfiles.id, profile.id));
       return { success: true, avatarUrl: stored.url };
     })
   }),
@@ -2346,7 +2439,7 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      return db.select().from(services).where(eq3(services.profileId, profile.id)).orderBy(desc2(services.active), desc2(services.createdAt));
+      return db.select().from(services).where(eq4(services.profileId, profile.id)).orderBy(desc2(services.active), desc2(services.createdAt));
     }),
     create: protectedProcedure.input(z2.object({ name: z2.string().min(2).max(160), description: z2.string().max(1e3).optional(), durationMinutes: z2.number().int().min(15).max(1440), priceCents: z2.number().int().min(0), modality })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
@@ -2360,7 +2453,7 @@ var appRouter = router({
       await getOwnedService(profile.id, input.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, priceCents: input.priceCents, modality: input.modality, active: input.active }).where(eq3(services.id, input.id));
+      await db.update(services).set({ name: input.name, description: input.description ?? null, durationMinutes: input.durationMinutes, priceCents: input.priceCents, modality: input.modality, active: input.active }).where(eq4(services.id, input.id));
       return { success: true };
     }),
     remove: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
@@ -2368,7 +2461,7 @@ var appRouter = router({
       await getOwnedService(profile.id, input.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(services).set({ active: false }).where(eq3(services.id, input.id));
+      await db.update(services).set({ active: false }).where(eq4(services.id, input.id));
       return { success: true };
     })
   }),
@@ -2377,7 +2470,7 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions = input?.includeArchived ? eq3(clients.profileId, profile.id) : and2(eq3(clients.profileId, profile.id), eq3(clients.archived, false));
+      const conditions = input?.includeArchived ? eq4(clients.profileId, profile.id) : and2(eq4(clients.profileId, profile.id), eq4(clients.archived, false));
       return db.select().from(clients).where(conditions).orderBy(desc2(clients.createdAt));
     }),
     create: protectedProcedure.input(z2.object({ name: z2.string().min(2).max(160), phone: z2.string().max(40).optional(), whatsapp: z2.string().max(40).optional(), email: z2.string().email().optional().or(z2.literal("")), address: z2.string().max(600).optional(), notes: z2.string().max(1200).optional() })).mutation(async ({ ctx, input }) => {
@@ -2392,7 +2485,7 @@ var appRouter = router({
       await getOwnedClient(profile.id, input.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(clients).set({ name: input.name, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null, archived: input.archived }).where(eq3(clients.id, input.id));
+      await db.update(clients).set({ name: input.name, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null, archived: input.archived }).where(eq4(clients.id, input.id));
       return { success: true };
     }),
     history: protectedProcedure.input(z2.object({ id: z2.number() })).query(async ({ ctx, input }) => {
@@ -2401,9 +2494,9 @@ var appRouter = router({
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const client = await getOwnedClient(profile.id, input.id);
       const [clientAppointments, clientQuotes, clientPayments] = await Promise.all([
-        db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), eq3(appointments.clientId, input.id))).orderBy(desc2(appointments.startsAt)),
-        db.select().from(quotes).where(and2(eq3(quotes.profileId, profile.id), eq3(quotes.clientId, input.id))).orderBy(desc2(quotes.createdAt)),
-        db.select().from(payments).where(and2(eq3(payments.profileId, profile.id), eq3(payments.clientId, input.id))).orderBy(desc2(payments.createdAt))
+        db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), eq4(appointments.clientId, input.id))).orderBy(desc2(appointments.startsAt)),
+        db.select().from(quotes).where(and2(eq4(quotes.profileId, profile.id), eq4(quotes.clientId, input.id))).orderBy(desc2(quotes.createdAt)),
+        db.select().from(payments).where(and2(eq4(payments.profileId, profile.id), eq4(payments.clientId, input.id))).orderBy(desc2(payments.createdAt))
       ]);
       return { client, appointments: clientAppointments, quotes: clientQuotes, payments: clientPayments };
     }),
@@ -2412,11 +2505,11 @@ var appRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       await getOwnedClient(profile.id, input.id);
-      const related = await db.select({ id: appointments.id }).from(appointments).where(and2(eq3(appointments.profileId, profile.id), eq3(appointments.clientId, input.id))).limit(1);
+      const related = await db.select({ id: appointments.id }).from(appointments).where(and2(eq4(appointments.profileId, profile.id), eq4(appointments.clientId, input.id))).limit(1);
       if (related[0]) {
-        await db.update(clients).set({ archived: true }).where(eq3(clients.id, input.id));
+        await db.update(clients).set({ archived: true }).where(eq4(clients.id, input.id));
       } else {
-        await db.delete(clients).where(and2(eq3(clients.id, input.id), eq3(clients.profileId, profile.id)));
+        await db.delete(clients).where(and2(eq4(clients.id, input.id), eq4(clients.profileId, profile.id)));
       }
       return { success: true };
     })
@@ -2426,7 +2519,7 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions = [eq3(appointments.profileId, profile.id)];
+      const conditions = [eq4(appointments.profileId, profile.id)];
       if (input?.from) conditions.push(gte(appointments.startsAt, new Date(input.from)));
       if (input?.to) conditions.push(lt(appointments.startsAt, new Date(input.to)));
       return db.select().from(appointments).where(and2(...conditions)).orderBy(appointments.startsAt);
@@ -2451,12 +2544,12 @@ var appRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const start = new Date(input.startsAt);
-      const availabilityRow = (await db.select().from(availability).where(eq3(availability.profileId, profile.id)).limit(1))[0];
+      const availabilityRow = (await db.select().from(availability).where(eq4(availability.profileId, profile.id)).limit(1))[0];
       if (!isWithinAvailability(start, input.durationMinutes, availabilityRow)) {
         throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio est\xE1 fora da sua disponibilidade." });
       }
       const end = new Date(start.getTime() + input.durationMinutes * 6e4);
-      const sameDay = await db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado")));
+      const sameDay = await db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado")));
       const conflict = sameDay.some((item) => {
         const t1 = input.teamMemberId ?? 0;
         const t2 = item.teamMemberId ?? 0;
@@ -2487,9 +2580,9 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const result = await db.select().from(appointments).where(and2(eq3(appointments.id, input.id), eq3(appointments.profileId, profile.id))).limit(1);
+      const result = await db.select().from(appointments).where(and2(eq4(appointments.id, input.id), eq4(appointments.profileId, profile.id))).limit(1);
       if (!result[0]) throw new TRPCError3({ code: "NOT_FOUND" });
-      await db.update(appointments).set({ status: input.status, paymentStatus: input.paymentStatus ?? result[0].paymentStatus, paymentMethod: input.paymentMethod ?? result[0].paymentMethod }).where(eq3(appointments.id, input.id));
+      await db.update(appointments).set({ status: input.status, paymentStatus: input.paymentStatus ?? result[0].paymentStatus, paymentMethod: input.paymentMethod ?? result[0].paymentMethod }).where(eq4(appointments.id, input.id));
       return { success: true };
     }),
     update: protectedProcedure.input(z2.object({ id: z2.number(), teamMemberId: z2.number().nullable().optional(), clientId: z2.number().optional(), serviceId: z2.number().optional(), startsAt: z2.string().datetime(), durationMinutes: z2.number().int().min(15).max(1440), location: z2.string().max(600).optional(), amountCents: z2.number().int().min(0), notes: z2.string().max(1200).optional() })).mutation(async ({ ctx, input }) => {
@@ -2499,13 +2592,13 @@ var appRouter = router({
       if (input.teamMemberId) await getOwnedTeamMember(profile.id, input.teamMemberId);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const existing = (await db.select().from(appointments).where(and2(eq3(appointments.id, input.id), eq3(appointments.profileId, profile.id))).limit(1))[0];
+      const existing = (await db.select().from(appointments).where(and2(eq4(appointments.id, input.id), eq4(appointments.profileId, profile.id))).limit(1))[0];
       if (!existing) throw new TRPCError3({ code: "NOT_FOUND", message: "Atendimento n\xE3o encontrado." });
       const start = new Date(input.startsAt);
-      const availabilityRow = (await db.select().from(availability).where(eq3(availability.profileId, profile.id)).limit(1))[0];
+      const availabilityRow = (await db.select().from(availability).where(eq4(availability.profileId, profile.id)).limit(1))[0];
       if (!isWithinAvailability(start, input.durationMinutes, availabilityRow)) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio est\xE1 fora da sua disponibilidade." });
       const end = new Date(start.getTime() + input.durationMinutes * 6e4).getTime();
-      const sameDay = await db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado"), ne(appointments.id, input.id)));
+      const sameDay = await db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado"), ne(appointments.id, input.id)));
       const effectiveTeamMemberId = input.teamMemberId !== void 0 ? input.teamMemberId : existing.teamMemberId;
       if (sameDay.some((item) => {
         const t1 = effectiveTeamMemberId ?? 0;
@@ -2513,14 +2606,14 @@ var appRouter = router({
         if (t1 !== t2) return false;
         return new Date(item.startsAt).getTime() < end && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 6e4;
       })) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio j\xE1 est\xE1 ocupado para este profissional." });
-      await db.update(appointments).set({ clientId: input.clientId ?? null, serviceId: input.serviceId ?? null, teamMemberId: input.teamMemberId !== void 0 ? input.teamMemberId : existing.teamMemberId, startsAt: start, durationMinutes: input.durationMinutes, location: input.location ?? null, amountCents: input.amountCents, notes: input.notes ?? null }).where(eq3(appointments.id, input.id));
+      await db.update(appointments).set({ clientId: input.clientId ?? null, serviceId: input.serviceId ?? null, teamMemberId: input.teamMemberId !== void 0 ? input.teamMemberId : existing.teamMemberId, startsAt: start, durationMinutes: input.durationMinutes, location: input.location ?? null, amountCents: input.amountCents, notes: input.notes ?? null }).where(eq4(appointments.id, input.id));
       return { success: true };
     }),
     cancel: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(appointments).set({ status: "cancelado" }).where(and2(eq3(appointments.id, input.id), eq3(appointments.profileId, profile.id)));
+      await db.update(appointments).set({ status: "cancelado" }).where(and2(eq4(appointments.id, input.id), eq4(appointments.profileId, profile.id)));
       return { success: true };
     })
   }),
@@ -2529,8 +2622,8 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const rows = await db.select().from(requests).where(eq3(requests.profileId, profile.id)).orderBy(desc2(requests.createdAt));
-      return Promise.all(rows.map(async (request) => ({ ...request, attachments: await db.select().from(requestAttachments).where(eq3(requestAttachments.requestId, request.id)) })));
+      const rows = await db.select().from(requests).where(eq4(requests.profileId, profile.id)).orderBy(desc2(requests.createdAt));
+      return Promise.all(rows.map(async (request) => ({ ...request, attachments: await db.select().from(requestAttachments).where(eq4(requestAttachments.requestId, request.id)) })));
     }),
     createPublic: publicProcedure.input(z2.object({ slug: z2.string(), requesterName: z2.string().min(2).max(160), requesterPhone: z2.string().min(8).max(40), requesterEmail: z2.string().email().optional().or(z2.literal("")), serviceId: z2.number().optional(), description: z2.string().min(10).max(3e3), address: z2.string().max(600).optional(), desiredAt: z2.string().datetime().optional(), preferredTime: z2.string().max(80).optional(), attachments: z2.array(z2.object({ name: z2.string().max(180), mimeType: z2.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]), size: z2.number().int().positive().max(5e6), dataUrl: z2.string().max(7e6) })).max(3).optional() })).mutation(async ({ input }) => {
       const profile = await getProfileBySlug(input.slug);
@@ -2538,7 +2631,7 @@ var appRouter = router({
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const existingClient = await db.select().from(clients).where(and2(eq3(clients.profileId, profile.id), eq3(clients.phone, input.requesterPhone))).limit(1);
+      const existingClient = await db.select().from(clients).where(and2(eq4(clients.profileId, profile.id), eq4(clients.phone, input.requesterPhone))).limit(1);
       let clientId = existingClient[0]?.id;
       if (!clientId) {
         const insert2 = await db.insert(clients).values({ profileId: profile.id, name: input.requesterName, phone: input.requesterPhone, email: input.requesterEmail || null });
@@ -2562,45 +2655,45 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(requests).set({ status: input.status }).where(and2(eq3(requests.id, input.id), eq3(requests.profileId, profile.id)));
+      await db.update(requests).set({ status: input.status }).where(and2(eq4(requests.id, input.id), eq4(requests.profileId, profile.id)));
       return { success: true };
     }),
     convertToClient: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const request = (await db.select().from(requests).where(and2(eq3(requests.id, input.id), eq3(requests.profileId, profile.id))).limit(1))[0];
+      const request = (await db.select().from(requests).where(and2(eq4(requests.id, input.id), eq4(requests.profileId, profile.id))).limit(1))[0];
       if (!request) throw new TRPCError3({ code: "NOT_FOUND", message: "Solicita\xE7\xE3o n\xE3o encontrada." });
       if (request.clientId) return { success: true, clientId: request.clientId };
       const inserted = await db.insert(clients).values({ profileId: profile.id, name: request.requesterName, phone: request.requesterPhone, email: request.requesterEmail, address: request.address });
       const clientId = Number(inserted[0].insertId);
-      await db.update(requests).set({ clientId }).where(eq3(requests.id, request.id));
+      await db.update(requests).set({ clientId }).where(eq4(requests.id, request.id));
       return { success: true, clientId };
     }),
     convertToAppointment: protectedProcedure.input(z2.object({ id: z2.number(), startsAt: z2.string().datetime().optional() })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const request = (await db.select().from(requests).where(and2(eq3(requests.id, input.id), eq3(requests.profileId, profile.id))).limit(1))[0];
+      const request = (await db.select().from(requests).where(and2(eq4(requests.id, input.id), eq4(requests.profileId, profile.id))).limit(1))[0];
       if (!request) throw new TRPCError3({ code: "NOT_FOUND", message: "Solicita\xE7\xE3o n\xE3o encontrada." });
       if (!request.clientId) throw new TRPCError3({ code: "PRECONDITION_FAILED", message: "Converta a solicita\xE7\xE3o em cliente antes de agendar." });
       if (!input.startsAt && !request.desiredAt) throw new TRPCError3({ code: "BAD_REQUEST", message: "Informe uma data para o atendimento." });
       const service = request.serviceId ? await getOwnedService(profile.id, request.serviceId) : void 0;
       const start = new Date(input.startsAt ?? request.desiredAt);
       const durationMinutes = service?.durationMinutes ?? 60;
-      const availabilityRow = (await db.select().from(availability).where(eq3(availability.profileId, profile.id)).limit(1))[0];
+      const availabilityRow = (await db.select().from(availability).where(eq4(availability.profileId, profile.id)).limit(1))[0];
       if (!isWithinAvailability(start, durationMinutes, availabilityRow)) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio est\xE1 fora da sua disponibilidade." });
-      const conflictRows = await db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado")));
+      const conflictRows = await db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart(start)), lt(appointments.startsAt, dayEnd(start)), ne(appointments.status, "cancelado")));
       if (conflictRows.some((item) => new Date(item.startsAt).getTime() < start.getTime() + durationMinutes * 6e4 && start.getTime() < new Date(item.startsAt).getTime() + item.durationMinutes * 6e4)) throw new TRPCError3({ code: "CONFLICT", message: "Esse hor\xE1rio j\xE1 est\xE1 ocupado." });
       const inserted = await db.insert(appointments).values({ profileId: profile.id, clientId: request.clientId, serviceId: request.serviceId, startsAt: start, durationMinutes, location: request.address, amountCents: service?.priceCents ?? 0, notes: request.description, status: "agendado", paymentStatus: "pendente" });
-      await db.update(requests).set({ status: "agendada" }).where(eq3(requests.id, request.id));
+      await db.update(requests).set({ status: "agendada" }).where(eq4(requests.id, request.id));
       return { success: true, appointmentId: Number(inserted[0].insertId) };
     }),
     convertToQuote: protectedProcedure.input(z2.object({ id: z2.number(), discountCents: z2.number().int().min(0).default(0), sendNow: z2.boolean().default(true) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const request = (await db.select().from(requests).where(and2(eq3(requests.id, input.id), eq3(requests.profileId, profile.id))).limit(1))[0];
+      const request = (await db.select().from(requests).where(and2(eq4(requests.id, input.id), eq4(requests.profileId, profile.id))).limit(1))[0];
       if (!request) throw new TRPCError3({ code: "NOT_FOUND", message: "Solicita\xE7\xE3o n\xE3o encontrada." });
       const service = request.serviceId ? await getOwnedService(profile.id, request.serviceId) : void 0;
       const item = { description: service?.name || "Servi\xE7o solicitado", quantity: 1, unitPriceCents: service?.priceCents || 0 };
@@ -2622,7 +2715,7 @@ var appRouter = router({
         status: input.sendNow ? "enviado" : "rascunho"
       });
       await db.insert(quoteItems).values({ quoteId: Number(insert[0].insertId), ...item, totalCents: item.unitPriceCents });
-      await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(eq3(requests.id, request.id));
+      await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(eq4(requests.id, request.id));
       return { success: true, quoteId: Number(insert[0].insertId), token: secureToken };
     })
   }),
@@ -2631,14 +2724,14 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const rows = await db.select().from(quotes).where(eq3(quotes.profileId, profile.id)).orderBy(desc2(quotes.createdAt));
+      const rows = await db.select().from(quotes).where(eq4(quotes.profileId, profile.id)).orderBy(desc2(quotes.createdAt));
       return Promise.all(
         rows.map(async (q) => {
           let clientName = q.clientName;
           let clientEmail = q.clientEmail;
           let clientPhone = null;
           if (q.clientId) {
-            const c = (await db.select().from(clients).where(eq3(clients.id, q.clientId)).limit(1))[0];
+            const c = (await db.select().from(clients).where(eq4(clients.id, q.clientId)).limit(1))[0];
             if (c) {
               clientName = clientName || c.name;
               clientEmail = clientEmail || c.email;
@@ -2646,7 +2739,7 @@ var appRouter = router({
             }
           }
           if (q.requestId) {
-            const r = (await db.select().from(requests).where(eq3(requests.id, q.requestId)).limit(1))[0];
+            const r = (await db.select().from(requests).where(eq4(requests.id, q.requestId)).limit(1))[0];
             if (r) {
               clientName = clientName || r.requesterName;
               clientEmail = clientEmail || r.requesterEmail;
@@ -2658,7 +2751,7 @@ var appRouter = router({
             clientName: clientName || null,
             clientEmail: clientEmail || null,
             clientPhone: clientPhone || null,
-            items: await db.select().from(quoteItems).where(eq3(quoteItems.quoteId, q.id))
+            items: await db.select().from(quoteItems).where(eq4(quoteItems.quoteId, q.id))
           };
         })
       );
@@ -2667,15 +2760,15 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const existing = (await db.select().from(quotes).where(and2(eq3(quotes.id, input.id), eq3(quotes.profileId, profile.id))).limit(1))[0];
+      const existing = (await db.select().from(quotes).where(and2(eq4(quotes.id, input.id), eq4(quotes.profileId, profile.id))).limit(1))[0];
       if (!existing) {
         throw new TRPCError3({ code: "NOT_FOUND", message: "Or\xE7amento n\xE3o encontrado." });
       }
-      await db.delete(quoteItems).where(eq3(quoteItems.quoteId, input.id));
-      await db.delete(quotes).where(and2(eq3(quotes.id, input.id), eq3(quotes.profileId, profile.id)));
+      await db.delete(quoteItems).where(eq4(quoteItems.quoteId, input.id));
+      await db.delete(quotes).where(and2(eq4(quotes.id, input.id), eq4(quotes.profileId, profile.id)));
       if (existing.requestId) {
         try {
-          await db.update(requests).set({ status: "em_analise" }).where(and2(eq3(requests.id, existing.requestId), eq3(requests.profileId, profile.id)));
+          await db.update(requests).set({ status: "em_analise" }).where(and2(eq4(requests.id, existing.requestId), eq4(requests.profileId, profile.id)));
         } catch (e) {
         }
       }
@@ -2693,7 +2786,7 @@ var appRouter = router({
       const insert = await db.insert(quotes).values({ profileId: profile.id, clientId: input.clientId ?? null, requestId: input.requestId ?? null, serviceId: input.serviceId ?? null, description: input.description ?? null, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? null, paymentTerms: input.paymentTerms ?? null, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : null, secureToken, status: input.sendNow ? "enviado" : "rascunho" });
       const quoteId = Number(insert[0].insertId);
       await db.insert(quoteItems).values(input.items.map((item) => ({ quoteId, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
-      if (input.requestId) await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(and2(eq3(requests.id, input.requestId), eq3(requests.profileId, profile.id)));
+      if (input.requestId) await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(and2(eq4(requests.id, input.requestId), eq4(requests.profileId, profile.id)));
       if (input.sendNow) await createNotification(profile.id, "Or\xE7amento enviado", "Seu or\xE7amento est\xE1 dispon\xEDvel por um link p\xFAblico.", "quote");
       return { success: true, quoteId, token: input.sendNow ? secureToken : null };
     }),
@@ -2701,13 +2794,13 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const existing = (await db.select().from(quotes).where(and2(eq3(quotes.id, input.id), eq3(quotes.profileId, profile.id))).limit(1))[0];
+      const existing = (await db.select().from(quotes).where(and2(eq4(quotes.id, input.id), eq4(quotes.profileId, profile.id))).limit(1))[0];
       if (!existing) throw new TRPCError3({ code: "NOT_FOUND", message: "Or\xE7amento n\xE3o encontrado." });
       const subtotalCents = input.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
       const totalCents = Math.max(0, subtotalCents - input.discountCents);
-      await db.delete(quoteItems).where(eq3(quoteItems.quoteId, input.id));
+      await db.delete(quoteItems).where(eq4(quoteItems.quoteId, input.id));
       await db.insert(quoteItems).values(input.items.map((item) => ({ quoteId: input.id, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
-      await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : "rascunho", respondedAt: null }).where(eq3(quotes.id, input.id));
+      await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : "rascunho", respondedAt: null }).where(eq4(quotes.id, input.id));
       if (input.sendNow) await createNotification(profile.id, "Or\xE7amento revisado e reenviado", "A proposta atualizada est\xE1 dispon\xEDvel no link do cliente.", "quote");
       return { success: true, token: input.sendNow ? existing.secureToken : null };
     }),
@@ -2715,11 +2808,11 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const existing = (await db.select().from(quotes).where(and2(eq3(quotes.id, input.id), eq3(quotes.profileId, profile.id))).limit(1))[0];
+      const existing = (await db.select().from(quotes).where(and2(eq4(quotes.id, input.id), eq4(quotes.profileId, profile.id))).limit(1))[0];
       if (!existing) throw new TRPCError3({ code: "NOT_FOUND", message: "Or\xE7amento n\xE3o encontrado." });
-      await db.update(quotes).set({ status: "enviado" }).where(eq3(quotes.id, input.id));
+      await db.update(quotes).set({ status: "enviado" }).where(eq4(quotes.id, input.id));
       if (existing.requestId) {
-        await db.update(requests).set({ status: "orcamento_enviado" }).where(and2(eq3(requests.id, existing.requestId), eq3(requests.profileId, profile.id)));
+        await db.update(requests).set({ status: "orcamento_enviado" }).where(and2(eq4(requests.id, existing.requestId), eq4(requests.profileId, profile.id)));
       }
       await createNotification(profile.id, "Or\xE7amento publicado", "O or\xE7amento foi publicado e o link do cliente foi ativado.", "quote");
       return { success: true, token: existing.secureToken };
@@ -2727,16 +2820,16 @@ var appRouter = router({
     getPublic: publicProcedure.input(z2.object({ token: z2.string().min(10) })).query(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const quote = (await db.select().from(quotes).where(eq3(quotes.secureToken, input.token)).limit(1))[0];
+      const quote = (await db.select().from(quotes).where(eq4(quotes.secureToken, input.token)).limit(1))[0];
       if (!quote || quote.status === "rascunho") throw new TRPCError3({ code: "NOT_FOUND", message: "Este or\xE7amento est\xE1 em rascunho e ainda n\xE3o foi liberado para visualiza\xE7\xE3o p\xFAblica." });
-      const profile = (await db.select().from(professionalProfiles).where(eq3(professionalProfiles.id, quote.profileId)).limit(1))[0];
-      const items = await db.select().from(quoteItems).where(eq3(quoteItems.quoteId, quote.id));
+      const profile = (await db.select().from(professionalProfiles).where(eq4(professionalProfiles.id, quote.profileId)).limit(1))[0];
+      const items = await db.select().from(quoteItems).where(eq4(quoteItems.quoteId, quote.id));
       return { quote, profile, items };
     }),
     respondPublic: publicProcedure.input(z2.object({ token: z2.string().min(10), action: z2.enum(["aceito", "recusado", "alteracao_solicitada"]), clientName: z2.string().optional(), clientEmail: z2.string().email().optional().or(z2.literal("")), changeRequestText: z2.string().max(1200).optional() })).mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const quote = (await db.select().from(quotes).where(eq3(quotes.secureToken, input.token)).limit(1))[0];
+      const quote = (await db.select().from(quotes).where(eq4(quotes.secureToken, input.token)).limit(1))[0];
       if (!quote || quote.status === "rascunho") throw new TRPCError3({ code: "FORBIDDEN", message: "Este or\xE7amento est\xE1 em rascunho e n\xE3o pode receber respostas p\xFAblicas." });
       const updateData = { status: input.action, respondedAt: /* @__PURE__ */ new Date() };
       if (input.action === "alteracao_solicitada" && input.changeRequestText) {
@@ -2767,8 +2860,8 @@ var appRouter = router({
         );
         if (input.clientEmail) {
           try {
-            const profile = (await db.select().from(professionalProfiles).where(eq3(professionalProfiles.id, quote.profileId)).limit(1))[0];
-            const items = await db.select().from(quoteItems).where(eq3(quoteItems.quoteId, quote.id));
+            const profile = (await db.select().from(professionalProfiles).where(eq4(professionalProfiles.id, quote.profileId)).limit(1))[0];
+            const items = await db.select().from(quoteItems).where(eq4(quoteItems.quoteId, quote.id));
             const publicUrl = process.env.PUBLIC_URL || "https://meuautonome-vmrf8enk.manus.space";
             const linkProposta = `${publicUrl}/orcamento/${quote.secureToken}`;
             const emailData = modeloOrcamentoAprovado({
@@ -2802,7 +2895,7 @@ var appRouter = router({
       } else {
         await createNotification(quote.profileId, "Or\xE7amento recusado", "O cliente recusou a proposta.", "quote_response");
       }
-      await db.update(quotes).set(updateData).where(eq3(quotes.id, quote.id));
+      await db.update(quotes).set(updateData).where(eq4(quotes.id, quote.id));
       return { success: true };
     })
   }),
@@ -2811,13 +2904,13 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions = [eq3(payments.profileId, profile.id)];
+      const conditions = [eq4(payments.profileId, profile.id)];
       if (input?.from) conditions.push(gte(payments.createdAt, new Date(input.from)));
       if (input?.to) conditions.push(lt(payments.createdAt, new Date(input.to)));
       const [rows, profileClients, profileServices] = await Promise.all([
         db.select().from(payments).where(and2(...conditions)).orderBy(desc2(payments.createdAt)),
-        db.select({ id: clients.id, name: clients.name }).from(clients).where(eq3(clients.profileId, profile.id)),
-        db.select({ id: services.id, name: services.name }).from(services).where(eq3(services.profileId, profile.id))
+        db.select({ id: clients.id, name: clients.name }).from(clients).where(eq4(clients.profileId, profile.id)),
+        db.select({ id: services.id, name: services.name }).from(services).where(eq4(services.profileId, profile.id))
       ]);
       const clientMap = new Map(profileClients.map((c) => [c.id, c.name]));
       const serviceMap = new Map(profileServices.map((s) => [s.id, s.name]));
@@ -2848,7 +2941,7 @@ var appRouter = router({
       let resolvedServiceId = input.serviceId ?? null;
       let resolvedTeamMemberId = input.teamMemberId ?? null;
       if (resolvedAppointmentId) {
-        const appRow = (await db.select().from(appointments).where(and2(eq3(appointments.id, resolvedAppointmentId), eq3(appointments.profileId, profile.id))).limit(1))[0];
+        const appRow = (await db.select().from(appointments).where(and2(eq4(appointments.id, resolvedAppointmentId), eq4(appointments.profileId, profile.id))).limit(1))[0];
         if (appRow) {
           if (!resolvedClientId && appRow.clientId) resolvedClientId = appRow.clientId;
           if (!resolvedServiceId && appRow.serviceId) resolvedServiceId = appRow.serviceId;
@@ -2856,8 +2949,8 @@ var appRouter = router({
         }
       } else if (resolvedClientId) {
         const candidateApps = await db.select().from(appointments).where(and2(
-          eq3(appointments.profileId, profile.id),
-          eq3(appointments.clientId, resolvedClientId),
+          eq4(appointments.profileId, profile.id),
+          eq4(appointments.clientId, resolvedClientId),
           ne(appointments.status, "cancelado")
         )).orderBy(desc2(appointments.startsAt));
         const matched = candidateApps.find((a) => (resolvedServiceId ? a.serviceId === resolvedServiceId : true) && a.amountCents === input.amountCents && a.paymentStatus !== "pago") || candidateApps.find((a) => (resolvedServiceId ? a.serviceId === resolvedServiceId : true) && a.paymentStatus !== "pago") || candidateApps.find((a) => a.paymentStatus !== "pago");
@@ -2898,7 +2991,7 @@ var appRouter = router({
           paymentStatus: input.status,
           paymentMethod: input.method,
           teamMemberId: resolvedTeamMemberId ?? void 0
-        }).where(and2(eq3(appointments.id, resolvedAppointmentId), eq3(appointments.profileId, profile.id)));
+        }).where(and2(eq4(appointments.id, resolvedAppointmentId), eq4(appointments.profileId, profile.id)));
       }
       return { success: true };
     })
@@ -2908,7 +3001,7 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      return db.select().from(teamMembers).where(eq3(teamMembers.profileId, profile.id)).orderBy(desc2(teamMembers.createdAt));
+      return db.select().from(teamMembers).where(eq4(teamMembers.profileId, profile.id)).orderBy(desc2(teamMembers.createdAt));
     }),
     create: protectedProcedure.input(z2.object({
       name: z2.string().min(2, "Nome deve ter ao menos 2 caracteres").max(160),
@@ -2967,7 +3060,7 @@ var appRouter = router({
         color: input.color || "#e11d48",
         notes: input.notes?.trim() || null,
         active: input.active !== void 0 ? input.active : true
-      }).where(and2(eq3(teamMembers.id, input.id), eq3(teamMembers.profileId, profile.id)));
+      }).where(and2(eq4(teamMembers.id, input.id), eq4(teamMembers.profileId, profile.id)));
       return { success: true };
     }),
     toggleActive: protectedProcedure.input(z2.object({ id: z2.number(), active: z2.boolean() })).mutation(async ({ ctx, input }) => {
@@ -2975,7 +3068,7 @@ var appRouter = router({
       await getOwnedTeamMember(profile.id, input.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(teamMembers).set({ active: input.active }).where(and2(eq3(teamMembers.id, input.id), eq3(teamMembers.profileId, profile.id)));
+      await db.update(teamMembers).set({ active: input.active }).where(and2(eq4(teamMembers.id, input.id), eq4(teamMembers.profileId, profile.id)));
       return { success: true };
     }),
     remove: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
@@ -2983,7 +3076,7 @@ var appRouter = router({
       await getOwnedTeamMember(profile.id, input.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.delete(teamMembers).where(and2(eq3(teamMembers.id, input.id), eq3(teamMembers.profileId, profile.id)));
+      await db.delete(teamMembers).where(and2(eq4(teamMembers.id, input.id), eq4(teamMembers.profileId, profile.id)));
       return { success: true };
     }),
     report: protectedProcedure.input(z2.object({
@@ -2994,18 +3087,18 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const members = await db.select().from(teamMembers).where(eq3(teamMembers.profileId, profile.id));
-      const payConditions = [eq3(payments.profileId, profile.id)];
+      const members = await db.select().from(teamMembers).where(eq4(teamMembers.profileId, profile.id));
+      const payConditions = [eq4(payments.profileId, profile.id)];
       if (input?.from) payConditions.push(gte(payments.createdAt, new Date(input.from)));
       if (input?.to) payConditions.push(lt(payments.createdAt, new Date(input.to)));
-      if (input?.teamMemberId) payConditions.push(eq3(payments.teamMemberId, input.teamMemberId));
+      if (input?.teamMemberId) payConditions.push(eq4(payments.teamMemberId, input.teamMemberId));
       const periodPayments = await db.select().from(payments).where(and2(...payConditions)).orderBy(desc2(payments.createdAt));
-      const appConditions = [eq3(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
+      const appConditions = [eq4(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
       if (input?.from) appConditions.push(gte(appointments.startsAt, new Date(input.from)));
       if (input?.to) appConditions.push(lt(appointments.startsAt, new Date(input.to)));
-      if (input?.teamMemberId) appConditions.push(eq3(appointments.teamMemberId, input.teamMemberId));
+      if (input?.teamMemberId) appConditions.push(eq4(appointments.teamMemberId, input.teamMemberId));
       const periodAppointments = await db.select().from(appointments).where(and2(...appConditions));
-      const expConditions = [eq3(expenses.profileId, profile.id)];
+      const expConditions = [eq4(expenses.profileId, profile.id)];
       if (input?.from) expConditions.push(gte(expenses.occurredAt, new Date(input.from)));
       if (input?.to) expConditions.push(lt(expenses.occurredAt, new Date(input.to)));
       const periodExpenses = await db.select().from(expenses).where(and2(...expConditions));
@@ -3023,7 +3116,7 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions = [eq3(expenses.profileId, profile.id)];
+      const conditions = [eq4(expenses.profileId, profile.id)];
       if (input?.from) conditions.push(gte(expenses.occurredAt, new Date(input.from)));
       if (input?.to) conditions.push(lt(expenses.occurredAt, new Date(input.to)));
       return db.select().from(expenses).where(and2(...conditions)).orderBy(desc2(expenses.occurredAt));
@@ -3039,7 +3132,7 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.delete(expenses).where(and2(eq3(expenses.id, input.id), eq3(expenses.profileId, profile.id)));
+      await db.delete(expenses).where(and2(eq4(expenses.id, input.id), eq4(expenses.profileId, profile.id)));
       return { success: true };
     })
   }),
@@ -3048,20 +3141,20 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      return db.select().from(notifications).where(eq3(notifications.profileId, profile.id)).orderBy(desc2(notifications.createdAt)).limit(30);
+      return db.select().from(notifications).where(eq4(notifications.profileId, profile.id)).orderBy(desc2(notifications.createdAt)).limit(30);
     }),
     markRead: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(notifications).set({ read: true }).where(and2(eq3(notifications.id, input.id), eq3(notifications.profileId, profile.id)));
+      await db.update(notifications).set({ read: true }).where(and2(eq4(notifications.id, input.id), eq4(notifications.profileId, profile.id)));
       return { success: true };
     }),
     unreadCount: protectedProcedure.query(async ({ ctx }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const rows = await db.select({ id: notifications.id }).from(notifications).where(and2(eq3(notifications.profileId, profile.id), eq3(notifications.read, false)));
+      const rows = await db.select({ id: notifications.id }).from(notifications).where(and2(eq4(notifications.profileId, profile.id), eq4(notifications.read, false)));
       return rows.length;
     })
   }),
@@ -3075,16 +3168,16 @@ var appRouter = router({
       const from = input?.from ? new Date(input.from) : defaultFrom;
       const to = input?.to ? new Date(input.to) : new Date(now.getTime() + 1);
       const [periodAppointments, periodPayments, periodClients, profileServices] = await Promise.all([
-        db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, from), lt(appointments.startsAt, to), ne(appointments.status, "cancelado"))),
-        db.select().from(payments).where(and2(eq3(payments.profileId, profile.id), gte(payments.createdAt, from), lt(payments.createdAt, to))),
-        db.select().from(clients).where(and2(eq3(clients.profileId, profile.id), gte(clients.createdAt, from), lt(clients.createdAt, to))),
-        db.select().from(services).where(eq3(services.profileId, profile.id))
+        db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), gte(appointments.startsAt, from), lt(appointments.startsAt, to), ne(appointments.status, "cancelado"))),
+        db.select().from(payments).where(and2(eq4(payments.profileId, profile.id), gte(payments.createdAt, from), lt(payments.createdAt, to))),
+        db.select().from(clients).where(and2(eq4(clients.profileId, profile.id), gte(clients.createdAt, from), lt(clients.createdAt, to))),
+        db.select().from(services).where(eq4(services.profileId, profile.id))
       ]);
       const metrics = calculateDeduplicatedMetrics(periodAppointments, periodPayments);
       const counts = /* @__PURE__ */ new Map();
       for (const item of periodAppointments) if (item.serviceId) counts.set(item.serviceId, (counts.get(item.serviceId) || 0) + 1);
       const topServices = Array.from(counts.entries()).map(([serviceId, count]) => ({ serviceId, count, name: profileServices.find((service) => service.id === serviceId)?.name || "Servi\xE7o" })).sort((a, b) => b.count - a.count).slice(0, 5);
-      const allClientAppointments = await db.select({ clientId: appointments.clientId }).from(appointments).where(and2(eq3(appointments.profileId, profile.id), ne(appointments.status, "cancelado")));
+      const allClientAppointments = await db.select({ clientId: appointments.clientId }).from(appointments).where(and2(eq4(appointments.profileId, profile.id), ne(appointments.status, "cancelado")));
       const clientVisitCounts = /* @__PURE__ */ new Map();
       for (const item of allClientAppointments) if (item.clientId) clientVisitCounts.set(item.clientId, (clientVisitCounts.get(item.clientId) || 0) + 1);
       const recurringClientIds = Array.from(clientVisitCounts.values()).filter((count) => count > 1).length;
@@ -3096,17 +3189,17 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const today = await db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart()), lt(appointments.startsAt, dayEnd()))).orderBy(appointments.startsAt);
-      const recentRequests = await db.select().from(requests).where(and2(eq3(requests.profileId, profile.id), ne(requests.status, "arquivada"))).orderBy(desc2(requests.createdAt)).limit(4);
-      const pendingQuotes = await db.select().from(quotes).where(and2(eq3(quotes.profileId, profile.id), eq3(quotes.status, "enviado"))).orderBy(desc2(quotes.createdAt)).limit(4);
+      const today = await db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart()), lt(appointments.startsAt, dayEnd()))).orderBy(appointments.startsAt);
+      const recentRequests = await db.select().from(requests).where(and2(eq4(requests.profileId, profile.id), ne(requests.status, "arquivada"))).orderBy(desc2(requests.createdAt)).limit(4);
+      const pendingQuotes = await db.select().from(quotes).where(and2(eq4(quotes.profileId, profile.id), eq4(quotes.status, "enviado"))).orderBy(desc2(quotes.createdAt)).limit(4);
       const monthStart = /* @__PURE__ */ new Date();
       monthStart.setDate(1);
       monthStart.setHours(0, 0, 0, 0);
       const periodFrom = input?.from ? new Date(input.from) : monthStart;
       const periodTo = input?.to ? new Date(input.to) : /* @__PURE__ */ new Date();
-      const monthAppointments = await db.select().from(appointments).where(and2(eq3(appointments.profileId, profile.id), gte(appointments.startsAt, periodFrom), lt(appointments.startsAt, periodTo), ne(appointments.status, "cancelado")));
-      const monthPayments = await db.select().from(payments).where(and2(eq3(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lt(payments.createdAt, periodTo)));
-      const monthExpenses = await db.select().from(expenses).where(and2(eq3(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lt(expenses.occurredAt, periodTo)));
+      const monthAppointments = await db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), gte(appointments.startsAt, periodFrom), lt(appointments.startsAt, periodTo), ne(appointments.status, "cancelado")));
+      const monthPayments = await db.select().from(payments).where(and2(eq4(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lt(payments.createdAt, periodTo)));
+      const monthExpenses = await db.select().from(expenses).where(and2(eq4(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lt(expenses.occurredAt, periodTo)));
       const metrics = calculateDeduplicatedMetrics(monthAppointments, monthPayments, monthExpenses);
       const projected = today.reduce((sum, item) => sum + (isBillableAppointment(item.status) ? item.amountCents : 0), 0);
       const seriesMap = /* @__PURE__ */ new Map();
@@ -3157,7 +3250,7 @@ var appRouter = router({
       if (!profile) throw new TRPCError3({ code: "NOT_FOUND", message: "Profissional n\xE3o encontrado." });
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const profileServices = await db.select().from(services).where(and2(eq3(services.profileId, profile.id), eq3(services.active, true))).orderBy(services.name);
+      const profileServices = await db.select().from(services).where(and2(eq4(services.profileId, profile.id), eq4(services.active, true))).orderBy(services.name);
       return { profile, services: profileServices };
     })
   }),
@@ -3293,7 +3386,7 @@ var appRouter = router({
       const toDelete = [...ghostUserIds, ...duplicateAdminIds];
       if (toDelete.length > 0) {
         for (const id of toDelete) {
-          await db.delete(users).where(eq3(users.id, id));
+          await db.delete(users).where(eq4(users.id, id));
         }
       }
       return {
@@ -3381,7 +3474,7 @@ var appRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const cleanCode = input.code.trim().toUpperCase().replace(/\s+/g, "-");
-      const existing = await db.select().from(vouchers).where(eq3(vouchers.code, cleanCode)).limit(1);
+      const existing = await db.select().from(vouchers).where(eq4(vouchers.code, cleanCode)).limit(1);
       if (existing[0]) {
         throw new TRPCError3({ code: "CONFLICT", message: `O voucher ${cleanCode} j\xE1 existe no sistema.` });
       }
@@ -3404,7 +3497,7 @@ var appRouter = router({
       }
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(vouchers).set({ active: input.active }).where(eq3(vouchers.id, input.id));
+      await db.update(vouchers).set({ active: input.active }).where(eq4(vouchers.id, input.id));
       return { success: true };
     }),
     deleteVoucher: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
@@ -3413,8 +3506,8 @@ var appRouter = router({
       }
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.delete(voucherRedemptions).where(eq3(voucherRedemptions.voucherId, input.id));
-      await db.delete(vouchers).where(eq3(vouchers.id, input.id));
+      await db.delete(voucherRedemptions).where(eq4(voucherRedemptions.voucherId, input.id));
+      await db.delete(vouchers).where(eq4(vouchers.id, input.id));
       return { success: true };
     })
   }),
@@ -3424,7 +3517,7 @@ var appRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel." });
       const cleanCode = input.code.trim().toUpperCase();
-      const found = await db.select().from(vouchers).where(eq3(vouchers.code, cleanCode)).limit(1);
+      const found = await db.select().from(vouchers).where(eq4(vouchers.code, cleanCode)).limit(1);
       const voucher = found[0];
       if (!voucher || !voucher.active) {
         throw new TRPCError3({ code: "NOT_FOUND", message: "Voucher n\xE3o encontrado ou inativo. Verifique o c\xF3digo digitado." });
@@ -3432,7 +3525,7 @@ var appRouter = router({
       if (voucher.expiresAt && /* @__PURE__ */ new Date() > new Date(voucher.expiresAt)) {
         throw new TRPCError3({ code: "BAD_REQUEST", message: "Este voucher j\xE1 expirou." });
       }
-      const alreadyRedeemed = await db.select().from(voucherRedemptions).where(and2(eq3(voucherRedemptions.voucherId, voucher.id), eq3(voucherRedemptions.userId, ctx.user.id))).limit(1);
+      const alreadyRedeemed = await db.select().from(voucherRedemptions).where(and2(eq4(voucherRedemptions.voucherId, voucher.id), eq4(voucherRedemptions.userId, ctx.user.id))).limit(1);
       if (alreadyRedeemed[0]) {
         throw new TRPCError3({ code: "CONFLICT", message: "Voc\xEA j\xE1 resgatou este voucher anteriormente." });
       }
@@ -3445,14 +3538,14 @@ var appRouter = router({
           isVip: true,
           plan: voucher.plan || "pro",
           planExpiresAt: null
-        }).where(eq3(professionalProfiles.id, profile.id));
+        }).where(eq4(professionalProfiles.id, profile.id));
         await db.insert(voucherRedemptions).values({
           voucherId: voucher.id,
           userId: ctx.user.id,
           profileId: profile.id,
           voucherCode: cleanCode
         });
-        await db.update(vouchers).set({ usedCount: voucher.usedCount + 1 }).where(eq3(vouchers.id, voucher.id));
+        await db.update(vouchers).set({ usedCount: voucher.usedCount + 1 }).where(eq4(vouchers.id, voucher.id));
         await createNotification(
           profile.id,
           "\u2B50 VIP Total Ativado!",
@@ -3477,14 +3570,14 @@ var appRouter = router({
         isPro: true,
         plan: voucher.plan || "pro",
         planExpiresAt: newExpiresAt
-      }).where(eq3(professionalProfiles.id, profile.id));
+      }).where(eq4(professionalProfiles.id, profile.id));
       await db.insert(voucherRedemptions).values({
         voucherId: voucher.id,
         userId: ctx.user.id,
         profileId: profile.id,
         voucherCode: cleanCode
       });
-      await db.update(vouchers).set({ usedCount: voucher.usedCount + 1 }).where(eq3(vouchers.id, voucher.id));
+      await db.update(vouchers).set({ usedCount: voucher.usedCount + 1 }).where(eq4(vouchers.id, voucher.id));
       await createNotification(
         profile.id,
         `\u{1F389} Voucher de ${days} Dias Ativado!`,
@@ -3532,7 +3625,7 @@ var appRouter = router({
       let code = profile.referralCode;
       if (!code) {
         code = `${profile.slug.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase()}-${nanoid(4).toUpperCase()}`;
-        await db.update(professionalProfiles).set({ referralCode: code }).where(eq3(professionalProfiles.id, profile.id));
+        await db.update(professionalProfiles).set({ referralCode: code }).where(eq4(professionalProfiles.id, profile.id));
       }
       const appBaseUrl = process.env.PUBLIC_URL || "https://meuautonomo.vercel.app";
       const referralLink = `${appBaseUrl}/r/${code}`;
@@ -3554,7 +3647,7 @@ var appRouter = router({
       if (cleanCode === profile.referralCode) {
         throw new TRPCError3({ code: "BAD_REQUEST", message: "Voc\xEA n\xE3o pode utilizar seu pr\xF3prio c\xF3digo de indica\xE7\xE3o." });
       }
-      const referrer = await db.select().from(professionalProfiles).where(eq3(professionalProfiles.referralCode, cleanCode)).limit(1);
+      const referrer = await db.select().from(professionalProfiles).where(eq4(professionalProfiles.referralCode, cleanCode)).limit(1);
       if (!referrer[0]) {
         throw new TRPCError3({ code: "NOT_FOUND", message: "C\xF3digo de indica\xE7\xE3o n\xE3o encontrado. Verifique com seu colega." });
       }
@@ -3566,7 +3659,7 @@ var appRouter = router({
         isPro: true,
         plan: "pro",
         planExpiresAt: newExpires
-      }).where(eq3(professionalProfiles.id, profile.id));
+      }).where(eq4(professionalProfiles.id, profile.id));
       await createNotification(
         profile.id,
         "\u{1F381} B\xF4nus de Indica\xE7\xE3o Ativado!",
@@ -3580,7 +3673,7 @@ var appRouter = router({
         planExpiresAt: referrer[0].isVip ? null : refNewExpires,
         referralCount: (referrer[0].referralCount || 0) + 1,
         bonusDaysEarned: (referrer[0].bonusDaysEarned || 0) + bonusDays
-      }).where(eq3(professionalProfiles.id, referrer[0].id));
+      }).where(eq4(professionalProfiles.id, referrer[0].id));
       await createNotification(
         referrer[0].id,
         "\u{1F389} Amigo Indicado!",
@@ -3619,6 +3712,8 @@ function createExpressApp() {
   registerStorageProxy(app2);
   registerOAuthRoutes(app2);
   app2.post("/api/webhooks/asaas", handleAsaasWebhook);
+  app2.post("/api/asaas/create-pix", createPixPayment);
+  app2.get("/api/asaas/payment-status/:paymentId", getPaymentStatus);
   app2.use(
     "/api/trpc",
     createExpressMiddleware({

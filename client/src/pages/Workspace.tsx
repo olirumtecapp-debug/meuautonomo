@@ -449,7 +449,7 @@ function ServiceNameField({
     dismissed !== spellcheck.catalogSuggestion.name;
 
   const handleBlur = () => {
-    if (spellcheck.hasCorrection && spellcheck.correctedText.toLowerCase() !== value.trim().toLowerCase()) {
+    if (spellcheck.hasCorrection && spellcheck.correctedText !== value.trim()) {
       const orig = value;
       const fixed = spellcheck.correctedText;
       onChange(fixed);
