@@ -43,13 +43,6 @@ export default function PlansPage() {
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   // Estado do PIX real do Asaas
-  const [cpf, setCpf] = useState(() => {
-    try {
-      return localStorage.getItem("meuautonomo_checkout_cpf") || "";
-    } catch {
-      return "";
-    }
-  });
   const [pixLoading, setPixLoading] = useState(false);
   const [pixError, setPixError] = useState<string | null>(null);
   const [pixData, setPixData] = useState<{
@@ -67,31 +60,6 @@ export default function PlansPage() {
   const PRICE_SOLO = "R$ 49,90";
   const PRICE_TEAM = "R$ 89,90";
 
-  const handleCpfChange = (val: string) => {
-    const digits = val.replace(/\D/g, "").slice(0, 14);
-    if (digits.length <= 11) {
-      let formatted = digits;
-      if (digits.length > 9) {
-        formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
-      } else if (digits.length > 6) {
-        formatted = `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-      } else if (digits.length > 3) {
-        formatted = `${digits.slice(0, 3)}.${digits.slice(3)}`;
-      }
-      setCpf(formatted);
-    } else {
-      let formatted = digits;
-      if (digits.length > 12) {
-        formatted = `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
-      } else if (digits.length > 8) {
-        formatted = `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
-      } else {
-        formatted = `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
-      }
-      setCpf(formatted);
-    }
-  };
-
   const stopPolling = () => {
     if (pollingInterval) {
       clearInterval(pollingInterval);
@@ -99,43 +67,26 @@ export default function PlansPage() {
     }
   };
 
-  const handleOpenCheckout = (plan: "solo" | "team") => {
+  const handleOpenCheckout = async (plan: "solo" | "team") => {
     setSelectedPlan(plan);
     setPaymentSuccess(false);
     setPixData(null);
     setPixError(null);
-    setPixLoading(false);
-    setPixModalOpen(true);
-    stopPolling();
-  };
-
-  const handleGeneratePix = async () => {
-    if (!selectedPlan) return;
-    const cleanDigits = cpf.replace(/\D/g, "");
-    if (cleanDigits.length < 11) {
-      setPixError("Por favor, informe um CPF válido (11 números) ou CNPJ (14 números).");
-      return;
-    }
-
-    try {
-      localStorage.setItem("meuautonomo_checkout_cpf", cpf);
-    } catch {}
-
     setPixLoading(true);
-    setPixError(null);
+    setPixModalOpen(true);
     stopPolling();
 
     try {
       const res = await fetch("/api/asaas/create-pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: selectedPlan, cpf: cleanDigits }),
+        body: JSON.stringify({ plan }),
         credentials: "include",
       });
       const data = await res.json();
 
       if (!res.ok) {
-        setPixError(data?.error || "Erro ao gerar cobrança PIX. Verifique os dados.");
+        setPixError(data?.error || "Erro ao carregar PIX. Tente novamente.");
         setPixLoading(false);
         return;
       }
@@ -161,9 +112,9 @@ export default function PlansPage() {
         } catch {
           // silently ignore polling errors
         }
-      }, 5000); // verifica a cada 5s
+      }, 3000); // verifica a cada 3s
       setPollingInterval(interval);
-    } catch (err: any) {
+    } catch {
       setPixError("Erro de conexão. Verifique sua internet e tente novamente.");
       setPixLoading(false);
     }
@@ -581,61 +532,6 @@ export default function PlansPage() {
                 Voltar e Aproveitar
               </Button>
             </div>
-          ) : !pixData ? (
-            <div className="space-y-4 py-2">
-              <div className="flex justify-between items-center bg-[#f5f8f2] p-3.5 rounded-2xl border border-[#dce5dc]">
-                <div>
-                  <span className="text-[11px] font-bold text-[#71867f] uppercase block">Valor a Pagar</span>
-                  <span className="text-2xl font-black text-[#173a34]">
-                    {selectedPlan === "solo" ? PRICE_SOLO : PRICE_TEAM}
-                  </span>
-                </div>
-                <Badge className="bg-[#173a34] text-[#d9f56a] text-xs font-bold">
-                  PIX Asaas
-                </Badge>
-              </div>
-
-              {/* CAMPO CPF/CNPJ DO CLIENTE */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-[#173a34] block">
-                  CPF ou CNPJ do Pagador
-                </label>
-                <input
-                  type="text"
-                  placeholder="000.000.000-00"
-                  value={cpf}
-                  onChange={(e) => handleCpfChange(e.target.value)}
-                  className="w-full h-11 px-3.5 rounded-xl border border-[#dce5dc] bg-white font-medium text-sm text-[#173a34] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#173a34]"
-                />
-                <p className="text-[11px] text-[#71867f]">
-                  Exigência oficial do Banco Central para emissão do PIX.
-                </p>
-              </div>
-
-              {pixError && (
-                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
-                  {pixError}
-                </div>
-              )}
-
-              <Button
-                onClick={handleGeneratePix}
-                disabled={pixLoading || cpf.replace(/\D/g, "").length < 11}
-                className="w-full h-12 rounded-xl bg-[#173a34] hover:bg-[#122e29] text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {pixLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-[#d9f56a] border-t-transparent rounded-full animate-spin" />
-                    <span>Gerando cobrança PIX no Asaas...</span>
-                  </>
-                ) : (
-                  <>
-                    <QrCode className="w-5 h-5 text-[#d9f56a]" />
-                    <span>Gerar QR Code PIX</span>
-                  </>
-                )}
-              </Button>
-            </div>
           ) : (
             <div className="space-y-4 py-2">
               <div className="flex justify-between items-center bg-[#f5f8f2] p-3.5 rounded-2xl border border-[#dce5dc]">
@@ -646,23 +542,37 @@ export default function PlansPage() {
                   </span>
                 </div>
                 <Badge className="bg-[#173a34] text-[#d9f56a] text-xs font-bold">
-                  PIX Asaas
+                  PIX Asaas Oficial
                 </Badge>
               </div>
 
               {/* QR CODE PIX REAL DO ASAAS */}
               <div className="bg-slate-900 text-white p-5 rounded-2xl text-center space-y-3 shadow-inner">
                 <div className="w-44 h-44 bg-white p-2 rounded-2xl mx-auto flex items-center justify-center shadow">
-                  {pixData?.encodedImage && (
+                  {pixLoading && (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-8 h-8 border-4 border-[#d9f56a] border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[10px] text-slate-500 font-bold">Carregando PIX...</span>
+                    </div>
+                  )}
+                  {!pixLoading && pixError && (
+                    <div className="text-center p-2">
+                      <span className="text-red-500 text-xs font-bold block">⚠️ Erro</span>
+                      <span className="text-slate-500 text-[10px] block mt-1">{pixError}</span>
+                    </div>
+                  )}
+                  {!pixLoading && pixData?.encodedImage && (
                     <img
                       src={`data:image/png;base64,${pixData.encodedImage}`}
-                      alt="QR Code PIX"
+                      alt="QR Code PIX Asaas"
                       className="w-40 h-40 object-contain"
                     />
                   )}
                 </div>
                 <div className="text-xs font-bold text-[#d9f56a]">
-                  Abra o aplicativo do seu banco e aponte a câmera
+                  {pixLoading
+                    ? "Aguarde, carregando seu QR Code..."
+                    : "Abra o aplicativo do seu banco e aponte a câmera"}
                 </div>
                 <p className="text-[11px] text-white/70">
                   Liberação 100% automática em segundos via Webhook Asaas.
@@ -672,9 +582,9 @@ export default function PlansPage() {
               {/* BOTÃO COPIAR PIX COPIA E COLA */}
               <Button
                 onClick={handleCopyPix}
-                disabled={!pixData?.payload}
+                disabled={!pixData?.payload || pixLoading}
                 variant="outline"
-                className="w-full h-11 rounded-xl border-[#dce5dc] font-bold text-xs text-[#173a34] flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl border-[#dce5dc] font-bold text-xs text-[#173a34] flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Copy className="w-4 h-4 text-emerald-700" />
                 <span>Copiar Código PIX Copia e Cola</span>
