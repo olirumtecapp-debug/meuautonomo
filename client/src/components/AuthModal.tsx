@@ -234,7 +234,7 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
           <form onSubmit={handleRegister} className="mt-5 space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs font-bold uppercase tracking-wider text-[#38584f]">
-                Como quer ser chamado(a)?
+                Seu Nome ou Nome do Negócio
               </Label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#92a39d]" />
@@ -244,7 +244,9 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
                     setRegName(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder="Ex.: Carlos Ferreira ou Silva Eletricista"
+                  placeholder="Ex.: Carlos Ferreira ou Studio Bella"
+                  spellCheck={true}
+                  lang="pt-BR"
                   className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] pl-10 text-sm focus:border-[#173a34]"
                   disabled={isSubmitting}
                   required

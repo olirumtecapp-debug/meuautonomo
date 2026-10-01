@@ -263,3 +263,63 @@ export function checkServiceSpelling(input: string): SpellcheckResult {
       : undefined,
   };
 }
+
+const COMMON_PROFESSION_TYPOS: Record<string, string> = {
+  eletrecista: "Eletricista",
+  eletrecistas: "Eletricistas",
+  eletricissao: "Eletricista",
+  cabeleleiro: "Cabeleireiro",
+  cabeleleira: "Cabeleireira",
+  cabelereiro: "Cabeleireiro",
+  cabelereira: "Cabeleireira",
+  cabelereiros: "Cabeleireiros",
+  pedrero: "Pedreiro",
+  pedreros: "Pedreiros",
+  encandador: "Encanador",
+  encandadores: "Encanadores",
+  fisioterapista: "Fisioterapeuta",
+  fisioterapistas: "Fisioterapeutas",
+  massajista: "Massagista",
+  massajistas: "Massagistas",
+  estetisista: "Esteticista",
+  estetisistas: "Esteticistas",
+  barbero: "Barbeiro",
+  barberos: "Barbeiros",
+  manicuri: "Manicure",
+  manicuris: "Manicures",
+  pedicuri: "Pedicure",
+  pedicuris: "Pedicures",
+  mecanico: "Mecânico",
+  mecanicos: "Mecânicos",
+  psicologo: "Psicólogo",
+  psicologa: "Psicóloga",
+  nutrisao: "Nutrição",
+  nutricionisa: "Nutricionista",
+  sombrancelha: "Designer de Sobrancelhas",
+  sobranselhas: "Designer de Sobrancelhas",
+  serralhero: "Serralheiro",
+  serralheria: "Serralheria",
+  marceneiro: "Marceneiro",
+  marcenaria: "Marcenaria",
+  diarista: "Diarista",
+  confeiteiro: "Confeiteiro",
+  confeiteira: "Confeiteira",
+  tatador: "Tatuador",
+  tatuadora: "Tatuadora",
+  fotografo: "Fotógrafo",
+  fotografa: "Fotógrafa",
+};
+
+export function checkProfessionSpelling(input: string): {
+  hasCorrection: boolean;
+  correctedText: string;
+} {
+  const trimmed = input.trim();
+  if (!trimmed || trimmed.length < 3) return { hasCorrection: false, correctedText: input };
+  const lower = trimmed.toLowerCase();
+  if (COMMON_PROFESSION_TYPOS[lower]) {
+    return { hasCorrection: true, correctedText: COMMON_PROFESSION_TYPOS[lower] };
+  }
+  return { hasCorrection: false, correctedText: input };
+}
+

@@ -362,57 +362,47 @@ function PublicAddressField({
   value: string;
   onChange: (val: string) => void;
 }) {
+  const hostDomain = typeof window !== "undefined" && window.location.host
+    ? window.location.host
+    : "meuautonomo.creativeam.com.br";
+  const displayPrefix = `${hostDomain}/p/`;
+
+  const cleanValue = value === "administrador-geral" || value === "administrador" ? "" : value;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Label className="text-sm font-semibold text-[#38584f]">
-            Endereço público do seu espaço
-          </Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#edf4e8] text-[#6d8a24] hover:bg-[#d9f56a] hover:text-[#173a34] transition"
-                title="Clique para entender o que é o endereço público"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="top" align="start" className="w-80 rounded-2xl border border-[#dce5dc] bg-white p-4 shadow-xl z-50">
-              <div className="flex items-start gap-3">
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#d9f56a] text-[#173a34]">
-                  <Globe className="h-4 w-4" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#173a34]">
-                    O que é o Endereço Público?
-                  </h4>
-                  <p className="text-xs leading-relaxed text-[#5c756d]">
-                    É o link da sua página na web (seu cartão profissional digital). Seus clientes poderão abrir esse link pelo WhatsApp ou navegador para ver seus serviços e pedir orçamentos.
-                  </p>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <Label className="text-sm font-bold text-[#173a34] flex items-center gap-1.5">
+          Link do seu Cartão Digital / Perfil Profissional
+        </Label>
+        <span className="text-[11px] font-medium text-[#7a938c]">
+          Link para WhatsApp e Bio
+        </span>
       </div>
 
+      <p className="text-xs text-[#526d64] leading-relaxed">
+        Este é o link que você vai mandar para seus clientes no WhatsApp e redes sociais. Eles vão abrir esse link para ver seus serviços, fotos e pedir orçamentos.
+      </p>
+
       <div className="flex h-12 w-full items-center rounded-xl border border-[#dce5dc] bg-[#fbfcf9] shadow-sm transition focus-within:border-[#173a34] focus-within:ring-2 focus-within:ring-[#173a34]/15">
-        <span className="flex h-full shrink-0 select-none items-center border-r border-[#dce5dc] bg-[#eff5ec] px-3.5 text-xs font-bold text-[#557168] sm:text-sm">
-          meuautonomo.app/
+        <span className="flex h-full shrink-0 select-none items-center border-r border-[#dce5dc] bg-[#eff5ec] px-3.5 text-xs font-bold text-[#2d4b42] sm:text-sm">
+          {displayPrefix}
         </span>
         <input
           type="text"
-          value={value}
+          value={cleanValue}
           onChange={(e) => onChange(slugify(e.target.value))}
-          placeholder="seu-nome-ou-negocio"
+          placeholder="ex: carlos-silva ou studio-bella"
+          spellCheck={false}
           className="h-full flex-1 bg-transparent px-3 text-sm font-semibold text-[#173a34] outline-none placeholder:text-[#9bad9a]"
         />
       </div>
 
       <p className="text-xs text-[#738a82]">
-        🔗 Link do seu cartão digital. Você poderá enviar para clientes no WhatsApp ou colocar na bio do Instagram.
+        🔗 Seus clientes acessarão:{" "}
+        <strong className="text-[#173a34]">
+          https://{displayPrefix}{cleanValue || "seu-nome-ou-negocio"}
+        </strong>
       </p>
     </div>
   );
@@ -637,13 +627,25 @@ function ServiceNameField({
 function Onboarding() {
   const { user } = useAuth();
   const [step, setStep] = useState(1);
+
+  // Nunca pré-preencher com nomes de sistema/admin genéricos
+  const isSystemAdminName = Boolean(
+    user?.name &&
+    (user.name.toLowerCase().includes("admin") ||
+     user.name.toLowerCase().includes("administrador") ||
+     user.name.toLowerCase().includes("geral") ||
+     user.name.toLowerCase().includes("master"))
+  );
+  const initialName = isSystemAdminName ? "" : (user?.name || "");
+  const initialSlug = isSystemAdminName ? "" : slugify(user?.name || "");
+
   const [profession, setProfession] = useState({
-    displayName: user?.name || "",
+    displayName: initialName,
     professionCategory: "",
     professionName: "",
     city: "",
     serviceRegion: "",
-    slug: slugify(user?.name || "profissional"),
+    slug: initialSlug,
     bio: "",
   });
   const [service, setService] = useState({
@@ -669,9 +671,9 @@ function Onboarding() {
   const availabilityMutation = trpc.profile.saveAvailability.useMutation();
 
   const saveProfile = async () => {
-    if (!profession.displayName.trim()) return toast.error("Informe como quer ser chamado.");
+    if (!profession.displayName.trim()) return toast.error("Informe seu nome ou o nome do seu negócio.");
     if (!profession.professionName.trim()) return toast.error("Selecione ou informe sua profissão.");
-    if (!profession.slug.trim()) return toast.error("Informe o endereço público do seu espaço.");
+    if (!profession.slug.trim()) return toast.error("Informe o link do seu cartão digital.");
 
     try {
       await profileMutation.mutateAsync({
@@ -752,7 +754,7 @@ function Onboarding() {
                 <div className="space-y-5">
                   <div className="space-y-4">
                     <Field
-                      label="Como quer ser chamado?"
+                      label="Seu Nome Profissional ou Nome do Negócio"
                       value={profession.displayName}
                       onChange={(value) => {
                         const newSlug = !profession.slug || profession.slug === slugify(profession.displayName)
@@ -760,7 +762,9 @@ function Onboarding() {
                           : profession.slug;
                         setProfession({ ...profession, displayName: value, slug: newSlug });
                       }}
-                      placeholder="Ex.: Carlos Ferreira"
+                      placeholder="Ex.: Carlos Ferreira ou Studio Bella"
+                      helpText="Como você deseja ser apresentado aos seus clientes nos orçamentos, agendamentos e no seu cartão digital."
+                      spellCheck={true}
                     />
 
                     <StateCitySelect
@@ -794,14 +798,16 @@ function Onboarding() {
                   />
 
                   <div>
-                    <Label className="mb-2 block text-sm text-[#38584f]">
+                    <Label className="mb-2 block text-sm font-semibold text-[#38584f]">
                       Uma frase sobre seu trabalho <span className="font-normal text-[#9bad9a]">(opcional)</span>
                     </Label>
                     <Textarea
                       value={profession.bio}
                       onChange={(e) => setProfession({ ...profession, bio: e.target.value })}
-                      placeholder="Conte rapidamente como você ajuda seus clientes…"
-                      className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9]"
+                      placeholder="Conte rapidamente como você ajuda seus clientes… Ex.: Especialista em reparos residenciais rápidos com garantia e pontualidade."
+                      spellCheck={true}
+                      lang="pt-BR"
+                      className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9] text-sm"
                     />
                   </div>
                 </div>
@@ -880,14 +886,16 @@ function Onboarding() {
                   </Select>
                 </div>
                 <div className="mt-5">
-                  <Label className="mb-2 block text-sm text-[#38584f]">
+                  <Label className="mb-2 block text-sm font-semibold text-[#38584f]">
                     Descrição <span className="font-normal text-[#9bad9a]">(opcional)</span>
                   </Label>
                   <Textarea
                     value={service.description}
                     onChange={(e) => setService({ ...service, description: e.target.value })}
-                    placeholder="O que está incluído neste serviço?"
-                    className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9]"
+                    placeholder="O que está incluído neste serviço? Ex.: Atendimento completo com materiais de qualidade e garantia inclusa."
+                    spellCheck={true}
+                    lang="pt-BR"
+                    className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9] text-sm"
                   />
                 </div>
                 <div className="mt-8 flex justify-between">
@@ -1006,6 +1014,8 @@ function Field({
   placeholder,
   prefix,
   type,
+  helpText,
+  spellCheck = true,
 }: {
   label: string;
   value: string;
@@ -1013,6 +1023,8 @@ function Field({
   placeholder?: string;
   prefix?: string;
   type?: string;
+  helpText?: string;
+  spellCheck?: boolean;
 }) {
   const isPhone = type === "tel" || label.toLowerCase().includes("telefone") || label.toLowerCase().includes("whatsapp");
   const isCurrency = prefix === "R$ " || prefix === "R$" || type === "currency" || label.toLowerCase().includes("preço") || label.toLowerCase().includes("desconto") || label.toLowerCase() === "valor";
@@ -1044,8 +1056,8 @@ function Field({
   const effectiveType = isPhone ? "tel" : isCurrency ? "text" : (type || "text");
 
   return (
-    <div>
-      <Label className="mb-2 block text-sm font-semibold text-[#38584f]">{label}</Label>
+    <div className="space-y-1.5">
+      <Label className="block text-sm font-semibold text-[#38584f]">{label}</Label>
       {prefix || isCurrency ? (
         <div className="flex h-12 w-full items-center rounded-xl border border-[#dce5dc] bg-[#fbfcf9] shadow-sm transition focus-within:border-[#173a34] focus-within:ring-2 focus-within:ring-[#173a34]/15">
           <span className="flex h-full shrink-0 select-none items-center border-r border-[#dce5dc] bg-[#eff5ec] px-3.5 text-xs font-bold text-[#557168] sm:text-sm">
@@ -1058,6 +1070,8 @@ function Field({
             onChange={handleChange}
             onBlur={handleBlur}
             placeholder={effectivePlaceholder}
+            spellCheck={!isPhone && !isCurrency && spellCheck}
+            lang="pt-BR"
             className="h-full flex-1 bg-transparent px-3 text-sm font-semibold text-[#173a34] outline-none placeholder:text-[#9bad9a]"
           />
         </div>
@@ -1069,9 +1083,12 @@ function Field({
           onChange={handleChange}
           onBlur={handleBlur}
           placeholder={effectivePlaceholder}
-          className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] text-sm focus:border-[#173a34]"
+          spellCheck={!isPhone && spellCheck}
+          lang="pt-BR"
+          className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] text-sm font-medium focus:border-[#173a34]"
         />
       )}
+      {helpText && <p className="text-xs text-[#71867f] leading-relaxed">{helpText}</p>}
     </div>
   );
 }
@@ -2622,7 +2639,7 @@ export function TeamPage() {
 }
 
 
-function ProfessionalCard() { const profile = trpc.profile.get.useQuery(); if (!profile.data) return null; const shareUrl = `${window.location.origin}/p/${profile.data.slug}`; const copy = () => { navigator.clipboard?.writeText(shareUrl); toast.success("Link do cartão copiado."); }; return <Page title="Meu cartão" eyebrow="Sua presença profissional" description="Um link simples para compartilhar onde seus clientes já estão." help={<HelpButton title="Como funciona meu Cartão?"><p><strong>Meu Cartão</strong> é sua presença digital — um link público para compartilhar com clientes.</p><p><strong>Link público:</strong> Seu link único no formato <code>meuautonomo.app/p/seu-slug</code>. Clientes acessam sem precisar criar conta.</p><p><strong>Como divulgar:</strong> Coloque o link na bio do Instagram, no status do WhatsApp e em suas propostas.</p><p>Clientes que acessam seu cartão podem preencher uma solicitação que cai direto em <strong>Solicitações</strong>.</p></HelpButton>}><div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]"><Card className="overflow-hidden rounded-[28px] border-0 bg-[#173a34] text-white shadow-[0_16px_45px_rgba(19,42,39,0.18)]"><CardContent className="relative p-7 sm:p-9"><div className="absolute -right-14 -top-14 h-44 w-44 rounded-full bg-[#d9f56a]/10" /><div className="relative"><div className="mb-10 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-bold"><Sparkles className="h-4 w-4 text-[#d9f56a]" /> MeuAutônomo</span><span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/65">Cartão digital</span></div><div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#d9f56a] text-2xl font-bold text-[#173a34]">{profile.data.avatarUrl ? <img src={profile.data.avatarUrl} alt={profile.data.displayName} className="h-full w-full rounded-2xl object-cover" /> : profile.data.displayName.charAt(0).toUpperCase()}</div><h2 className="mt-5 text-3xl font-bold tracking-tight">{profile.data.displayName}</h2><p className="mt-1 text-lg text-[#d9f56a]">{profile.data.professionName}</p><p className="mt-5 max-w-sm text-sm leading-6 text-white/65">{profile.data.bio || "Profissional autônomo pronto para ajudar."}</p><div className="mt-7 space-y-2 text-sm text-white/70">{profile.data.serviceRegion && <p><MapPin className="mr-2 inline h-4 w-4 text-[#d9f56a]" />{profile.data.serviceRegion}</p>}{profile.data.whatsapp && <p><Share2 className="mr-2 inline h-4 w-4 text-[#d9f56a]" />{formatPhone(profile.data.whatsapp)}</p>}</div></div></CardContent></Card><div className="space-y-5"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815]"><Link2 className="h-5 w-5" /></div><div><h3 className="font-bold text-[#284b42]">Seu link público</h3><p className="mt-1 text-sm text-[#82948e]">Compartilhe e receba novas solicitações.</p></div></div><div className="mt-5 flex items-center gap-2 rounded-xl bg-[#f5f8f2] p-3"><span className="min-w-0 flex-1 truncate text-sm text-[#526d64]">{shareUrl}</span><Button variant="outline" onClick={copy} className="h-9 shrink-0 rounded-lg border-[#dce5dc] bg-white"><Copy className="h-4 w-4" /></Button></div><div className="mt-4 flex flex-wrap gap-2"><Button onClick={copy} className="rounded-xl bg-[#173a34] text-white"><Share2 className="mr-2 h-4 w-4" /> Compartilhar cartão</Button><a href={`/p/${profile.data.slug}`} target="_blank" rel="noreferrer"><Button variant="outline" className="rounded-xl border-[#dce5dc] bg-white text-[#4c6960]"><ExternalLink className="mr-2 h-4 w-4" /> Abrir página</Button></a></div></CardContent></Card><Card className="rounded-[24px] border-0 bg-[#f1f7dd]"><CardContent className="p-6"><p className="text-sm font-semibold text-[#52674c]">Dica de hoje</p><p className="mt-2 text-lg font-bold text-[#304d2c]">Seu cartão é seu ponto de encontro.</p><p className="mt-2 text-sm leading-6 text-[#6d805f]">Coloque o link na bio do Instagram, no status do WhatsApp e nas suas propostas.</p></CardContent></Card></div></div></Page>; }
+function ProfessionalCard() { const profile = trpc.profile.get.useQuery(); if (!profile.data) return null; const shareUrl = `${window.location.origin}/p/${profile.data.slug}`; const copy = () => { navigator.clipboard?.writeText(shareUrl); toast.success("Link do cartão copiado."); }; return <Page title="Meu cartão" eyebrow="Sua presença profissional" description="Um link simples para compartilhar onde seus clientes já estão." help={<HelpButton title="Como funciona meu Cartão?"><p><strong>Meu Cartão</strong> é sua presença digital — um link público para compartilhar com clientes.</p><p><strong>Link público:</strong> Seu link único no formato <code>meuautonomo.creativeam.com.br/p/seu-slug</code>. Clientes acessam sem precisar criar conta.</p><p><strong>Como divulgar:</strong> Coloque o link na bio do Instagram, no status do WhatsApp e em suas propostas.</p><p>Clientes que acessam seu cartão podem preencher uma solicitação que cai direto em <strong>Solicitações</strong>.</p></HelpButton>}><div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]"><Card className="overflow-hidden rounded-[28px] border-0 bg-[#173a34] text-white shadow-[0_16px_45px_rgba(19,42,39,0.18)]"><CardContent className="relative p-7 sm:p-9"><div className="absolute -right-14 -top-14 h-44 w-44 rounded-full bg-[#d9f56a]/10" /><div className="relative"><div className="mb-10 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-bold"><Sparkles className="h-4 w-4 text-[#d9f56a]" /> MeuAutônomo</span><span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/65">Cartão digital</span></div><div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#d9f56a] text-2xl font-bold text-[#173a34]">{profile.data.avatarUrl ? <img src={profile.data.avatarUrl} alt={profile.data.displayName} className="h-full w-full rounded-2xl object-cover" /> : profile.data.displayName.charAt(0).toUpperCase()}</div><h2 className="mt-5 text-3xl font-bold tracking-tight">{profile.data.displayName}</h2><p className="mt-1 text-lg text-[#d9f56a]">{profile.data.professionName}</p><p className="mt-5 max-w-sm text-sm leading-6 text-white/65">{profile.data.bio || "Profissional autônomo pronto para ajudar."}</p><div className="mt-7 space-y-2 text-sm text-white/70">{profile.data.serviceRegion && <p><MapPin className="mr-2 inline h-4 w-4 text-[#d9f56a]" />{profile.data.serviceRegion}</p>}{profile.data.whatsapp && <p><Share2 className="mr-2 inline h-4 w-4 text-[#d9f56a]" />{formatPhone(profile.data.whatsapp)}</p>}</div></div></CardContent></Card><div className="space-y-5"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815]"><Link2 className="h-5 w-5" /></div><div><h3 className="font-bold text-[#284b42]">Seu link público</h3><p className="mt-1 text-sm text-[#82948e]">Compartilhe e receba novas solicitações.</p></div></div><div className="mt-5 flex items-center gap-2 rounded-xl bg-[#f5f8f2] p-3"><span className="min-w-0 flex-1 truncate text-sm text-[#526d64]">{shareUrl}</span><Button variant="outline" onClick={copy} className="h-9 shrink-0 rounded-lg border-[#dce5dc] bg-white"><Copy className="h-4 w-4" /></Button></div><div className="mt-4 flex flex-wrap gap-2"><Button onClick={copy} className="rounded-xl bg-[#173a34] text-white"><Share2 className="mr-2 h-4 w-4" /> Compartilhar cartão</Button><a href={`/p/${profile.data.slug}`} target="_blank" rel="noreferrer"><Button variant="outline" className="rounded-xl border-[#dce5dc] bg-white text-[#4c6960]"><ExternalLink className="mr-2 h-4 w-4" /> Abrir página</Button></a></div></CardContent></Card><Card className="rounded-[24px] border-0 bg-[#f1f7dd]"><CardContent className="p-6"><p className="text-sm font-semibold text-[#52674c]">Dica de hoje</p><p className="mt-2 text-lg font-bold text-[#304d2c]">Seu cartão é seu ponto de encontro.</p><p className="mt-2 text-sm leading-6 text-[#6d805f]">Coloque o link na bio do Instagram, no status do WhatsApp e nas suas propostas.</p></CardContent></Card></div></div></Page>; }
 
 function SettingsPage() {
   const profile = trpc.profile.get.useQuery();
