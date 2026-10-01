@@ -590,29 +590,7 @@ export default function PlansPage() {
                 <span>Copiar Código PIX Copia e Cola</span>
               </Button>
 
-              {/* LINK ABRIR FATURA NO ASAAS */}
-              {pixData?.invoiceUrl && (
-                <a
-                  href={pixData.invoiceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-[#dce5dc] text-xs font-bold text-[#173a34] hover:bg-slate-50 transition"
-                >
-                  <ArrowRight className="w-4 h-4 text-emerald-700" />
-                  Abrir Fatura no Asaas
-                </a>
-              )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  stopPolling();
-                  setPixData(null);
-                }}
-                className="text-xs text-[#526d64] hover:underline block mx-auto text-center font-medium pt-1"
-              >
-                ← Alterar CPF ou gerar novo código
-              </button>
 
               {/* BOTÃO DE SIMULAÇÃO DE WEBHOOK (APENAS ADMIN) */}
               {isAdmin && (
