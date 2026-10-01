@@ -349,20 +349,38 @@ export function checkServiceSpelling(input: string): SpellcheckResult {
     // Se for espaço em branco, mantém
     if (/^\s+$/.test(w)) return w;
 
-    const lower = w.toLowerCase().replace(/[.,;:!?]/g, "");
-    const punctuation = w.slice(lower.length);
+    const match = w.match(/^([^a-zA-ZÀ-ÿ0-9]*)(.*?)([^a-zA-ZÀ-ÿ0-9]*)$/);
+    const prefix = match ? match[1] : "";
+    const core = match ? match[2] : w;
+    const suffix = match ? match[3] : "";
+    const lower = core.toLowerCase();
 
     if (COMMON_TYPOS[lower]) {
       const fixed = COMMON_TYPOS[lower];
       if (fixed.toLowerCase() !== lower) {
         changed = true;
         // Preserva primeira letra maiúscula se o original tinha
-        if (w.charAt(0) === w.charAt(0).toUpperCase()) {
-          return fixed.charAt(0).toUpperCase() + fixed.slice(1) + punctuation;
+        if (core.charAt(0) === core.charAt(0).toUpperCase()) {
+          return prefix + fixed.charAt(0).toUpperCase() + fixed.slice(1) + suffix;
         }
-        return fixed + punctuation;
+        return prefix + fixed + suffix;
       }
     }
+
+    // Regra geral para sufixos com cedilha e til comuns em serviços
+    if (lower.length >= 4) {
+      if (lower.endsWith("cao")) {
+        const fixed = lower.slice(0, -3) + "ção";
+        changed = true;
+        return prefix + (core.charAt(0) === core.charAt(0).toUpperCase() ? fixed.charAt(0).toUpperCase() + fixed.slice(1) : fixed) + suffix;
+      }
+      if (lower.endsWith("coes")) {
+        const fixed = lower.slice(0, -4) + "ções";
+        changed = true;
+        return prefix + (core.charAt(0) === core.charAt(0).toUpperCase() ? fixed.charAt(0).toUpperCase() + fixed.slice(1) : fixed) + suffix;
+      }
+    }
+
     return w;
   });
 

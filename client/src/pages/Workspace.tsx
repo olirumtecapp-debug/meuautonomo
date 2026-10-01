@@ -501,16 +501,26 @@ function ServiceNameField({
           lang="pt-BR"
           autoCorrect="on"
           autoCapitalize="sentences"
-          className="h-12 rounded-xl border-[#dce5dc] bg-white text-sm font-medium text-[#173a34] focus:border-[#173a34] focus:ring-2 focus:ring-[#173a34]/15"
+          className={cn(
+            "h-12 rounded-xl bg-white text-sm font-medium transition",
+            showCorrection
+              ? "border-2 border-amber-400 bg-amber-50/20 pr-28 text-[#173a34] focus:border-amber-500 focus:ring-2 focus:ring-amber-400/30"
+              : "border-[#dce5dc] text-[#173a34] focus:border-[#173a34] focus:ring-2 focus:ring-[#173a34]/15"
+          )}
         />
+        {showCorrection && (
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 animate-in fade-in">
+            <AlertTriangle className="h-3 w-3 text-amber-700" /> Falta acento
+          </span>
+        )}
       </div>
 
       {/* FEEDBACK DE CORREÇÃO AUTOMÁTICA COM BOTÃO DESFAZER */}
       {autoFixed && autoFixed.to === value && (
-        <div className="flex items-center justify-between gap-2 rounded-xl border border-[#d2e4c4] bg-[#f6fbf2] p-2 text-xs transition animate-in fade-in">
-          <div className="flex items-center gap-1.5 text-[#2c4b3f]">
-            <Sparkles className="h-3.5 w-3.5 text-[#708818]" />
-            <span>Corrigido automaticamente para <strong className="font-bold text-[#173a34]">"{autoFixed.to}"</strong></span>
+        <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900 transition animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-200 text-xs font-bold text-emerald-800">✓</span>
+            <span>Acentuação corrigida automaticamente de <span className="line-through text-emerald-700">"{autoFixed.from}"</span> para <strong className="font-bold text-emerald-950">"{autoFixed.to}"</strong></span>
           </div>
           <button
             type="button"
@@ -519,38 +529,45 @@ function ServiceNameField({
               setDismissed(autoFixed.to);
               setAutoFixed(null);
             }}
-            className="text-[11px] font-bold text-[#456b20] underline hover:text-[#173a34] transition cursor-pointer"
+            className="text-[11px] font-bold text-emerald-800 underline hover:text-emerald-950 transition cursor-pointer"
           >
             Desfazer
           </button>
         </div>
       )}
 
-      {/* BALÃO DE CORREÇÃO ORTOGRÁFICA ENQUANTO DIGITA */}
+      {/* ALERTA DE ERRO DE ORTOGRAFIA / ACENTUAÇÃO ENQUANTO DIGITA */}
       {showCorrection && (!autoFixed || autoFixed.to !== value) && (
-        <div className="flex items-center justify-between gap-2 rounded-xl border border-[#d2e4c4] bg-[#f6fbf2] p-2.5 text-xs transition animate-in fade-in slide-in-from-top-1">
-          <div className="flex items-center gap-2 text-[#2c4b3f]">
-            <Sparkles className="h-4 w-4 shrink-0 text-[#6f8d16]" />
-            <span>
-              Você quis dizer: <strong className="font-bold text-[#173a34]">"{spellcheck.correctedText}"</strong>?
-            </span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-xs shadow-sm transition animate-in fade-in slide-in-from-top-1">
+          <div className="flex items-start sm:items-center gap-2.5 text-amber-950">
+            <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-200 text-amber-900 shadow-sm">
+              <AlertTriangle className="h-4 w-4 text-amber-800" />
+            </div>
+            <div>
+              <p className="text-xs sm:text-sm font-bold text-amber-950 flex items-center gap-1.5">
+                Erro de ortografia detectado: palavra sem acento!
+              </p>
+              <p className="text-amber-900 text-xs mt-0.5">
+                Você digitou <span className="line-through font-semibold text-amber-800">"{value}"</span>. Em português, o correto é com acento: <strong className="font-bold underline text-amber-950 decoration-amber-600 decoration-2">"{spellcheck.correctedText}"</strong>.
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
             <button
               type="button"
               onClick={() => {
                 onChange(spellcheck.correctedText);
                 setDismissed(spellcheck.correctedText);
               }}
-              className="rounded-lg bg-[#d9f56a] px-2.5 py-1 text-[11px] font-bold text-[#173a34] shadow-sm hover:bg-[#cbf046] transition"
+              className="rounded-lg bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition cursor-pointer"
             >
-              Corrigir agora
+              Corrigir para "{spellcheck.correctedText}"
             </button>
             <button
               type="button"
               onClick={() => setDismissed(spellcheck.correctedText)}
-              className="rounded-lg px-2 py-1 text-[11px] text-[#71867f] hover:bg-black/5 transition"
-              title="Dispensar sugestão"
+              className="rounded-lg px-2.5 py-1.5 text-xs text-amber-800 hover:bg-amber-200/50 transition cursor-pointer"
+              title="Ignorar sugestão"
             >
               Ignorar
             </button>
