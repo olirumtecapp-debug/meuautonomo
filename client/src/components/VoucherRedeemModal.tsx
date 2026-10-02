@@ -101,7 +101,7 @@ export function VoucherRedeemModal({ open, onOpenChange, onSuccess }: VoucherRed
                 <Input
                   value={code}
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="Ex: VIP20DIAS, BETA20, VIPTOTAL"
+                  placeholder="Digite seu código promocional"
                   className="h-12 rounded-xl text-base uppercase font-bold tracking-wider pl-4 pr-10 border-[#cddbcf] focus-visible:ring-[#8aa500]"
                   disabled={redeemMutation.isPending}
                   autoFocus
