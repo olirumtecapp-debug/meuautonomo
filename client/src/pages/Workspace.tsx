@@ -71,7 +71,7 @@ import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { SERVICE_CATALOG } from "../data/servicesCatalog";
+import { SERVICE_CATALOG, getRecommendedServicesForProfession, getServicePlaceholderForProfession } from "../data/servicesCatalog";
 import { ALL_PROFESSIONS_FLAT, POPULAR_PROFESSIONS, findCategoryForProfession, getProfessionsByCategory } from "../data/professions";
 import { checkServiceSpelling } from "../utils/serviceSpellcheck";
 import { StateCitySelect } from "@/components/StateCitySelect";
@@ -423,7 +423,7 @@ function ServiceNameField({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onSelectCatalog?: (name: string, description?: string) => void;
+  onSelectCatalog?: (name: string, description?: string, price?: string, duration?: string) => void;
   professionName?: string;
   placeholder?: string;
   label?: string;
@@ -437,14 +437,7 @@ function ServiceNameField({
 
   const professionSuggestions = useMemo(() => {
     if (!professionName) return [];
-    const profLower = professionName.toLowerCase();
-    const found = SERVICE_CATALOG.find(
-      (c) =>
-        c.label.toLowerCase().includes(profLower) ||
-        profLower.includes(c.label.toLowerCase()) ||
-        c.id.toLowerCase().includes(profLower)
-    );
-    return found ? found.services.slice(0, 5) : [];
+    return getRecommendedServicesForProfession(professionName).slice(0, 6);
   }, [professionName]);
 
   const showCorrection = spellcheck.hasCorrection && dismissed !== spellcheck.correctedText;
@@ -629,7 +622,7 @@ function ServiceNameField({
                 type="button"
                 onClick={() => {
                   if (onSelectCatalog) {
-                    onSelectCatalog(sug.name, sug.description);
+                    onSelectCatalog(sug.name, sug.description, sug.price, sug.durationMinutes);
                   } else {
                     onChange(sug.name);
                   }
@@ -692,6 +685,14 @@ function Onboarding() {
   const profileMutation = trpc.profile.upsert.useMutation();
   const serviceMutation = trpc.service.create.useMutation();
   const availabilityMutation = trpc.profile.saveAvailability.useMutation();
+
+  const recommendedServices = useMemo(() => {
+    return getRecommendedServicesForProfession(profession.professionName, profession.professionCategory);
+  }, [profession.professionName, profession.professionCategory]);
+
+  const servicePlaceholder = useMemo(() => {
+    return getServicePlaceholderForProfession(profession.professionName);
+  }, [profession.professionName]);
 
   const saveProfile = async () => {
     if (!profession.displayName.trim()) return toast.error("Informe seu nome ou o nome do seu negócio.");
@@ -1092,24 +1093,114 @@ function Onboarding() {
                 <h1 className="mb-2 text-3xl font-bold tracking-tight text-[#173a34] sm:text-4xl">
                   Qual serviço você oferece?
                 </h1>
-                <p className="mb-8 max-w-xl text-[#6b817a]">
+                <p className="mb-6 max-w-xl text-[#6b817a]">
                   Comece com o seu principal serviço. Você poderá cadastrar outros depois.
                 </p>
+
+                {/* BLOCO DE SUGESTÕES VINCULADAS À PROFISSÃO/ATIVIDADE DO PASSO 1 */}
+                {recommendedServices.length > 0 && (
+                  <div className="mb-8 rounded-2xl border-2 border-[#173a34]/15 bg-gradient-to-br from-[#f6f9f5] via-white to-[#edf5ec] p-4 sm:p-5 shadow-sm">
+                    <div className="flex items-start sm:items-center justify-between gap-3 mb-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#173a34] text-white shadow-sm">
+                          <Sparkles className="h-4 w-4 text-[#d5eb77]" />
+                        </div>
+                        <div>
+                          <h2 className="text-sm sm:text-base font-bold text-[#173a34]">
+                            Sugestões prontas para <span className="underline decoration-[#8aa500] decoration-2 underline-offset-4">{profession.professionName || "sua atividade"}</span>
+                          </h2>
+                          <p className="text-xs text-[#526d64] mt-0.5">
+                            Clique em uma opção pronta para preencher com 1 clique (você pode ajustar os valores):
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                      {recommendedServices.map((rec) => {
+                        const isSelected = service.name.trim().toLowerCase() === rec.name.trim().toLowerCase();
+                        return (
+                          <button
+                            key={rec.name}
+                            type="button"
+                            onClick={() => {
+                              setService({
+                                ...service,
+                                name: rec.name,
+                                description: rec.description || service.description,
+                                price: rec.price || service.price || "80,00",
+                                durationMinutes: rec.durationMinutes || service.durationMinutes || "60",
+                              });
+                              toast.success(`Serviço "${rec.name}" selecionado!`, {
+                                description: "Campos preenchidos. Ajuste o valor ou tempo abaixo se desejar.",
+                              });
+                            }}
+                            className={cn(
+                              "group relative flex flex-col justify-between text-left p-3.5 rounded-xl border transition-all cursor-pointer",
+                              isSelected
+                                ? "border-[#173a34] bg-emerald-50/80 shadow-sm ring-2 ring-[#173a34]"
+                                : "border-[#d8e3dc] bg-white hover:border-[#173a34]/60 hover:bg-[#fafcfa] hover:shadow-sm"
+                            )}
+                          >
+                            <div>
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <span className="font-semibold text-xs sm:text-[13px] text-[#173a34] group-hover:text-[#0f2723] line-clamp-1">
+                                  {rec.name}
+                                </span>
+                                {isSelected ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded-md shrink-0">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700" /> Escolhido
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-[#718b82] group-hover:text-[#173a34] font-medium shrink-0">
+                                    + Escolher
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-[#617a72] line-clamp-2 leading-relaxed">
+                                {rec.description}
+                              </p>
+                            </div>
+                            <div className="mt-2.5 pt-2 border-t border-dashed border-[#e2ece5] flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-[#173a34] bg-[#edf4ee] px-2 py-0.5 rounded-md">
+                                R$ {rec.price || "80,00"}
+                              </span>
+                              <span className="text-[#647c74] font-medium flex items-center gap-1">
+                                <Clock className="h-3 w-3" /> {rec.durationMinutes || "60"} min
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 my-6">
+                  <div className="h-px flex-1 bg-[#e0eae3]" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-[#7a928a]">
+                    {service.name ? "Confirme ou personalize os dados abaixo" : "Ou digite seu serviço personalizado"}
+                  </span>
+                  <div className="h-px flex-1 bg-[#e0eae3]" />
+                </div>
+
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="sm:col-span-2">
                     <ServiceNameField
                       label="Nome do serviço"
                       value={service.name}
                       onChange={(value) => setService({ ...service, name: value })}
-                      onSelectCatalog={(name, description) =>
+                      onSelectCatalog={(name, description, price, duration) =>
                         setService({
                           ...service,
                           name,
                           description: description || service.description,
+                          price: price || service.price,
+                          durationMinutes: duration || service.durationMinutes,
                         })
                       }
                       professionName={profession.professionName}
-                      placeholder="Ex.: Instalação elétrica residencial"
+                      placeholder={servicePlaceholder}
                     />
                   </div>
                   <Field
@@ -2317,7 +2408,7 @@ function Clients() {
 }
 
 
-function CatalogPicker({ onSelect }: { onSelect: (name: string, description: string) => void }) {
+function CatalogPicker({ onSelect }: { onSelect: (name: string, description: string, price?: string, duration?: string) => void }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
@@ -2364,7 +2455,7 @@ function CatalogPicker({ onSelect }: { onSelect: (name: string, description: str
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs font-semibold text-[#6d8315] hover:bg-[#e4eed7]"
-                onClick={() => { onSelect(search.trim(), ""); close(); }}
+                onClick={() => { onSelect(search.trim(), "", "", ""); close(); }}
               >
                 <Plus className="mr-1 h-3.5 w-3.5" /> Criar "{search.trim()}"
               </Button>
@@ -2386,7 +2477,7 @@ function CatalogPicker({ onSelect }: { onSelect: (name: string, description: str
                 <div className="rounded-2xl border border-dashed border-[#dce5dc] p-6 text-center">
                   <p className="text-sm text-[#82948e]">Nenhuma profissão correspondente encontrada.</p>
                   <Button variant="outline" className="mt-3 h-9 rounded-xl border-[#8aa500] text-sm text-[#8aa500] hover:bg-[#f5f8f2]"
-                    onClick={() => { onSelect(search, ""); close(); }}>
+                    onClick={() => { onSelect(search, "", "", ""); close(); }}>
                     <Plus className="mr-1.5 h-4 w-4" /> Cadastrar "{search}" manualmente
                   </Button>
                 </div>
@@ -2397,7 +2488,7 @@ function CatalogPicker({ onSelect }: { onSelect: (name: string, description: str
                   variant="outline"
                   size="sm"
                   className="mt-2 h-8 rounded-xl border-[#8aa500] text-xs font-medium text-[#738d0d] hover:bg-[#f5f8f2]"
-                  onClick={() => { onSelect("", ""); close(); }}
+                  onClick={() => { onSelect("", "", "", ""); close(); }}
                 >
                   <Plus className="mr-1 h-3.5 w-3.5" /> Digitar serviço personalizado manualmente
                 </Button>
@@ -2412,17 +2503,25 @@ function CatalogPicker({ onSelect }: { onSelect: (name: string, description: str
               <div className="grid gap-2">
                 {subServices.map(s => (
                   <button key={s.name}
-                    onClick={() => { onSelect(s.name, s.description); close(); }}
-                    className="flex flex-col items-start rounded-xl border border-[#dce5dc] bg-white p-4 text-left transition hover:border-[#8aa500] hover:bg-[#f5f8f2]">
-                    <span className="font-semibold text-[#284b42]">{s.name}</span>
-                    <span className="mt-1 text-xs text-[#82948e]">{s.description}</span>
+                    onClick={() => { onSelect(s.name, s.description, s.price, s.durationMinutes); close(); }}
+                    className="flex items-center justify-between rounded-xl border border-[#dce5dc] bg-white p-3.5 text-left transition hover:border-[#8aa500] hover:bg-[#f5f8f2]">
+                    <div className="min-w-0 flex-1 pr-3">
+                      <span className="font-semibold text-sm text-[#284b42] block truncate">{s.name}</span>
+                      <span className="mt-0.5 block text-xs text-[#82948e] line-clamp-1">{s.description}</span>
+                    </div>
+                    {(s.price || s.durationMinutes) && (
+                      <div className="shrink-0 text-right text-xs">
+                        {s.price && <div className="font-bold text-[#173a34]">R$ {s.price}</div>}
+                        {s.durationMinutes && <div className="text-[11px] text-[#71867f] flex items-center justify-end gap-0.5"><Clock className="h-3 w-3" />{s.durationMinutes} min</div>}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
               <div className="rounded-xl border border-dashed border-[#dce5dc] p-4 text-center">
                 <p className="text-xs text-[#82948e]">Precisa de um serviço diferente para {profession?.label}?</p>
                 <Button variant="ghost" size="sm" className="mt-1 h-8 rounded-lg text-xs text-[#8aa500] hover:bg-[#f5f8f2]"
-                  onClick={() => { onSelect("", ""); close(); }}>
+                  onClick={() => { onSelect("", "", "", ""); close(); }}>
                   <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar serviço personalizado
                 </Button>
               </div>
@@ -2462,14 +2561,14 @@ function Services() {
     else create.mutate(payload);
   };
   const toggle = (service: any) => update.mutate({ id: service.id, name: service.name, description: service.description || undefined, durationMinutes: service.durationMinutes, priceCents: service.priceCents, modality: service.modality, active: !service.active });
-  return <Page title="Meus serviços" eyebrow="O que você oferece" description="Mantenha seu catálogo pronto para a agenda e para a página pública." help={<HelpButton title="Como funciona Serviços?"><p><strong>Serviços</strong> é o catálogo do que você oferece. Cada serviço tem nome, preço, duração e modalidade.</p><p><strong>Modalidades:</strong> Presencial (no seu local), no endereço do cliente, online ou híbrido.</p><p><strong>Ativar/Desativar:</strong> Serviços desativados não aparecem para novos clientes, mas ficam preservados no histórico.</p><p>Os serviços cadastrados alimentam a <strong>Agenda</strong>, os <strong>Orçamentos</strong> e sua <strong>página pública</strong>.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><CatalogPicker onSelect={(name, desc) => { setForm({ ...empty, name, description: desc }); setEditingId(null); setOpen(true); }} /><Button onClick={openAdd} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Novo serviço</Button></div>}>
+  return <Page title="Meus serviços" eyebrow="O que você oferece" description="Mantenha seu catálogo pronto para a agenda e para a página pública." help={<HelpButton title="Como funciona Serviços?"><p><strong>Serviços</strong> é o catálogo do que você oferece. Cada serviço tem nome, preço, duração e modalidade.</p><p><strong>Modalidades:</strong> Presencial (no seu local), no endereço do cliente, online ou híbrido.</p><p><strong>Ativar/Desativar:</strong> Serviços desativados não aparecem para novos clientes, mas ficam preservados no histórico.</p><p>Os serviços cadastrados alimentam a <strong>Agenda</strong>, os <strong>Orçamentos</strong> e sua <strong>página pública</strong>.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><CatalogPicker onSelect={(name, desc, price, duration) => { setForm({ ...empty, name, description: desc, price: price || "", durationMinutes: duration || "60" }); setEditingId(null); setOpen(true); }} /><Button onClick={openAdd} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Novo serviço</Button></div>}>
     <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) reset(); }}><ServiceDialog form={form} setForm={setForm} submit={submit} pending={create.isPending || update.isPending} editing={Boolean(editingId)} /></Dialog>
     <div className="mb-5 max-w-md"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa9a3]" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar por nome ou descrição..." className="h-11 rounded-xl border-[#dce5dc] bg-white pl-9" /></div></div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{services.data?.filter(service => `${service.name} ${service.description || ""}`.toLowerCase().includes(search.toLowerCase())).map(service => <Card key={service.id} className="rounded-[22px] border-0 shadow-[0_8px_26px_rgba(19,42,39,0.04)]"><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#e8f1f5] text-[#3f738e]"><BriefcaseBusiness className="h-5 w-5" /></div><StatusBadge status={service.active ? "aceito" : "cancelado"} /></div><h3 className="mt-5 font-bold text-[#284b42]">{service.name}</h3><p className="mt-2 min-h-10 text-sm leading-5 text-[#82948e]">{service.description || "Sem descrição adicionada."}</p><div className="mt-5 flex items-center justify-between border-t border-[#edf1eb] pt-4"><span className="text-sm text-[#71867f]"><Clock3 className="mr-1 inline h-4 w-4" />{service.durationMinutes} min</span><strong className="text-lg text-[#173a34]">{money(service.priceCents)}</strong></div><p className="mt-2 text-xs text-[#9aa9a3]">{modalityLabel[service.modality]}</p><div className="mt-4 flex gap-2"><Button variant="outline" onClick={() => openEdit(service)} className="h-9 flex-1 rounded-lg border-[#dce5dc] bg-white text-xs"><Pencil className="mr-1 h-3.5 w-3.5" /> Editar</Button><Button variant="ghost" onClick={() => toggle(service)} className="h-9 rounded-lg text-xs text-[#71867f]">{service.active ? "Desativar" : "Ativar"}</Button></div></CardContent></Card>)}</div>
-    {!services.isLoading && !services.data?.length && <EmptyState icon={BriefcaseBusiness} title="Adicione seu primeiro serviço" description="Seu catálogo alimenta a página pública, os pedidos e os orçamentos." action={<div className="flex flex-wrap justify-center gap-2"><CatalogPicker onSelect={(name, desc) => { setForm({ ...empty, name, description: desc }); setEditingId(null); setOpen(true); }} /><Button onClick={openAdd} className="rounded-xl bg-[#173a34] text-white"><Plus className="mr-2 h-4 w-4" /> Novo serviço</Button></div>} />}
+    {!services.isLoading && !services.data?.length && <EmptyState icon={BriefcaseBusiness} title="Adicione seu primeiro serviço" description="Seu catálogo alimenta a página pública, os pedidos e os orçamentos." action={<div className="flex flex-wrap justify-center gap-2"><CatalogPicker onSelect={(name, desc, price, duration) => { setForm({ ...empty, name, description: desc, price: price || "", durationMinutes: duration || "60" }); setEditingId(null); setOpen(true); }} /><Button onClick={openAdd} className="rounded-xl bg-[#173a34] text-white"><Plus className="mr-2 h-4 w-4" /> Novo serviço</Button></div>} />}
   </Page>;
 }
-function ServiceDialog({ form, setForm, submit, pending, editing }: { form: any; setForm: (form: any) => void; submit: () => void; pending: boolean; editing: boolean }) { return <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle><DialogDescription>As alterações refletem na agenda e na página pública.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><ServiceNameField label="Nome do serviço" value={form.name} onChange={value => setForm({ ...form, name: value })} onSelectCatalog={(name, description) => setForm({ ...form, name, description: description || form.description })} placeholder="Ex.: Troca de chuveiro, Instalação de tomadas..." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Preço" prefix="R$ " value={form.price} onChange={value => setForm({ ...form, price: value })} /><Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} /></div><FormSelect label="Modalidade" value={form.modality} onChange={value => setForm({ ...form, modality: value })} options={Object.entries(modalityLabel).map(([value,label]) => ({ value, label }))} /><div><Label className="mb-2 block">Descrição</Label><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div></div><DialogFooter><Button onClick={submit} disabled={pending} className="rounded-xl bg-[#173a34] text-white">{editing ? "Salvar alterações" : "Salvar serviço"}</Button></DialogFooter></DialogContent>; }
+function ServiceDialog({ form, setForm, submit, pending, editing }: { form: any; setForm: (form: any) => void; submit: () => void; pending: boolean; editing: boolean }) { return <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle><DialogDescription>As alterações refletem na agenda e na página pública.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><ServiceNameField label="Nome do serviço" value={form.name} onChange={value => setForm({ ...form, name: value })} onSelectCatalog={(name, description, price, duration) => setForm({ ...form, name, description: description || form.description, price: price || form.price, durationMinutes: duration || form.durationMinutes })} placeholder="Ex.: Troca de chuveiro, Instalação de tomadas..." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Preço" prefix="R$ " value={form.price} onChange={value => setForm({ ...form, price: value })} /><Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} /></div><FormSelect label="Modalidade" value={form.modality} onChange={value => setForm({ ...form, modality: value })} options={Object.entries(modalityLabel).map(([value,label]) => ({ value, label }))} /><div><Label className="mb-2 block">Descrição</Label><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div></div><DialogFooter><Button onClick={submit} disabled={pending} className="rounded-xl bg-[#173a34] text-white">{editing ? "Salvar alterações" : "Salvar serviço"}</Button></DialogFooter></DialogContent>; }
 
 function Requests() {
   const requests = trpc.request.list.useQuery(undefined, { refetchInterval: 5000, refetchOnWindowFocus: true });
