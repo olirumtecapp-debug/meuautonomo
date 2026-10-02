@@ -270,7 +270,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
         </Sidebar>
         <div className={`absolute right-0 top-0 z-50 h-full w-1 cursor-col-resize transition hover:bg-[#d9f56a]/40 ${isCollapsed ? "hidden" : ""}`} onMouseDown={() => setIsResizing(true)} />
       </div>
-      <SidebarInset className="bg-[#f5f8f2]">
+      <SidebarInset className="bg-[#f5f8f2] min-w-0 max-w-full overflow-x-hidden">
         <div className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#dce5dc] bg-[#f5f7f2]/90 px-4 backdrop-blur md:px-8">
           <div className="flex items-center gap-3"><SidebarTrigger className="h-9 w-9 rounded-xl bg-white md:hidden" /><span className="text-sm font-medium text-[#58716b]">{activeMenuItem?.label || "Visão geral"}</span></div>
           <div className="flex items-center gap-3">
@@ -399,7 +399,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
           )
         ) : null}
 
-        <main className="min-h-[calc(100vh-4rem)] flex-1 pb-24">{children}</main>
+        <main className="min-h-[calc(100vh-4rem)] flex-1 pb-24 w-full min-w-0 max-w-full overflow-x-hidden">{children}</main>
         {isMobile && <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-[72px] items-center justify-around border-t border-[#dce5dc] bg-white/95 px-2 shadow-[0_-6px_20px_rgba(19,42,39,0.06)] backdrop-blur">
           {menuItems.slice(0, 5).map(item => { const active = location === item.path; return <button key={item.path} onClick={() => setLocation(item.path)} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-semibold ${active ? "text-[#173a34]" : "text-[#8a9b95]"}`}><item.icon className={`h-5 w-5 ${active ? "text-[#8aa500]" : ""}`} /><span className="truncate">{item.label}</span></button>; })}
         </nav>}

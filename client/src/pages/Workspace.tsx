@@ -1566,7 +1566,7 @@ function HelpButton({ title, children }: { title: string; children: React.ReactN
   </>;
 }
 
-function Page({ title, eyebrow, description, action, help, children }: { title: string; eyebrow?: string; description?: string; action?: React.ReactNode; help?: React.ReactNode; children: React.ReactNode }) { return <div className="container py-6 md:py-10"><div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">{eyebrow || "MeuAutônomo"}</p><div className="flex items-center gap-2"><h1 className="text-3xl font-bold tracking-tight text-[#173a34] md:text-4xl">{title}</h1>{help}</div>{description && <p className="mt-2 max-w-2xl text-[#6d837c]">{description}</p>}</div>{action && <div className="flex flex-wrap items-center gap-2">{action}</div>}</div>{children}</div>; }
+function Page({ title, eyebrow, description, action, help, children }: { title: string; eyebrow?: string; description?: string; action?: React.ReactNode; help?: React.ReactNode; children: React.ReactNode }) { return <div className="container mx-auto px-3.5 sm:px-6 py-5 sm:py-6 md:py-10 max-w-7xl w-full min-w-0"><div className="mb-6 sm:mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div className="min-w-0"><p className="mb-1.5 sm:mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">{eyebrow || "MeuAutônomo"}</p><div className="flex items-center gap-2 flex-wrap"><h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-[#173a34] break-words">{title}</h1>{help}</div>{description && <p className="mt-1.5 sm:mt-2 max-w-2xl text-xs sm:text-sm text-[#6d837c]">{description}</p>}</div>{action && <div className="flex flex-wrap items-center gap-2">{action}</div>}</div>{children}</div>; }
 function EmptyState({ icon: Icon, title, description, action }: { icon: typeof CalendarDays; title: string; description: string; action?: React.ReactNode }) { return <div className="grid place-items-center rounded-[24px] border border-dashed border-[#cddbcf] bg-white/60 px-6 py-16 text-center"><div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[#eef5d2] text-[#829a14]"><Icon className="h-6 w-6" /></div><h3 className="text-lg font-bold text-[#173a34]">{title}</h3><p className="mt-2 max-w-sm text-sm text-[#78908a]">{description}</p>{action && <div className="mt-5">{action}</div>}</div>; }
 function StatusBadge({ status }: { status: string }) { return <Badge className={cn("border-0 font-semibold", statusClass[status] || "bg-[#edf2ec] text-[#5d746d]")}>{statusLabel[status] || status}</Badge>; }
 
@@ -4766,7 +4766,175 @@ export function TeamPage() {
 }
 
 
-function ProfessionalCard() { const profile = trpc.profile.get.useQuery(); if (!profile.data) return null; const shareUrl = `${window.location.origin}/p/${profile.data.slug}`; const copy = () => { navigator.clipboard?.writeText(shareUrl); toast.success("Link do cartão copiado."); }; return <Page title="Meu cartão" eyebrow="Sua presença profissional" description="Um link simples para compartilhar onde seus clientes já estão." help={<HelpButton title="Como funciona meu Cartão?"><p><strong>Meu Cartão</strong> é sua presença digital — um link público para compartilhar com clientes.</p><p><strong>Link público:</strong> Seu link único no formato <code>meuautonomo.creativeam.com.br/p/seu-slug</code>. Clientes acessam sem precisar criar conta.</p><p><strong>Como divulgar:</strong> Coloque o link na bio do Instagram, no status do WhatsApp e em suas propostas.</p><p>Clientes que acessam seu cartão podem preencher uma solicitação que cai direto em <strong>Solicitações</strong>.</p></HelpButton>}><div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]"><Card className="overflow-hidden rounded-[28px] border-0 bg-[#173a34] text-white shadow-[0_16px_45px_rgba(19,42,39,0.18)]"><CardContent className="relative p-7 sm:p-9"><div className="absolute -right-14 -top-14 h-44 w-44 rounded-full bg-[#d9f56a]/10" /><div className="relative"><div className="mb-10 flex items-center justify-between"><span className="flex items-center gap-2 text-sm font-bold"><Sparkles className="h-4 w-4 text-[#d9f56a]" /> MeuAutônomo</span><span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/65">Cartão digital</span></div><div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#d9f56a] text-2xl font-bold text-[#173a34]">{profile.data.avatarUrl ? <img src={profile.data.avatarUrl} alt={profile.data.displayName} className="h-full w-full rounded-2xl object-cover" /> : profile.data.displayName.charAt(0).toUpperCase()}</div><h2 className="mt-5 text-3xl font-bold tracking-tight">{profile.data.displayName}</h2><p className="mt-1 text-lg text-[#d9f56a]">{profile.data.professionName}</p><p className="mt-5 max-w-sm text-sm leading-6 text-white/65">{profile.data.bio || "Profissional autônomo pronto para ajudar."}</p><div className="mt-7 space-y-2 text-sm text-white/70">{profile.data.serviceRegion && <p><MapPin className="mr-2 inline h-4 w-4 text-[#d9f56a]" />{profile.data.serviceRegion}</p>}{profile.data.whatsapp && <p><Share2 className="mr-2 inline h-4 w-4 text-[#d9f56a]" />{formatPhone(profile.data.whatsapp)}</p>}</div></div></CardContent></Card><div className="space-y-5"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardContent className="p-6"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815]"><Link2 className="h-5 w-5" /></div><div><h3 className="font-bold text-[#284b42]">Seu link público</h3><p className="mt-1 text-sm text-[#82948e]">Compartilhe e receba novas solicitações.</p></div></div><div className="mt-5 flex items-center gap-2 rounded-xl bg-[#f5f8f2] p-3"><span className="min-w-0 flex-1 truncate text-sm text-[#526d64]">{shareUrl}</span><Button variant="outline" onClick={copy} className="h-9 shrink-0 rounded-lg border-[#dce5dc] bg-white"><Copy className="h-4 w-4" /></Button></div><div className="mt-4 flex flex-wrap gap-2"><Button onClick={copy} className="rounded-xl bg-[#173a34] text-white"><Share2 className="mr-2 h-4 w-4" /> Compartilhar cartão</Button><a href={`/p/${profile.data.slug}`} target="_blank" rel="noreferrer"><Button variant="outline" className="rounded-xl border-[#dce5dc] bg-white text-[#4c6960]"><ExternalLink className="mr-2 h-4 w-4" /> Abrir página</Button></a></div></CardContent></Card><Card className="rounded-[24px] border-0 bg-[#f1f7dd]"><CardContent className="p-6"><p className="text-sm font-semibold text-[#52674c]">Dica de hoje</p><p className="mt-2 text-lg font-bold text-[#304d2c]">Seu cartão é seu ponto de encontro.</p><p className="mt-2 text-sm leading-6 text-[#6d805f]">Coloque o link na bio do Instagram, no status do WhatsApp e nas suas propostas.</p></CardContent></Card></div></div></Page>; }
+function ProfessionalCard() {
+  const profile = trpc.profile.get.useQuery();
+  if (!profile.data) return null;
+  const shareUrl = `${window.location.origin}/p/${profile.data.slug}`;
+  const copy = () => {
+    navigator.clipboard?.writeText(shareUrl);
+    toast.success("Link do cartão copiado!");
+  };
+
+  const handleShareWhatsApp = () => {
+    const text = `Olá! Conheça meus serviços e reserve seu atendimento no meu cartão profissional:\n${shareUrl}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
+  const handleNativeShare = () => {
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      navigator.share({
+        title: `${profile.data?.displayName} - Cartão Profissional`,
+        text: `Conheça os serviços de ${profile.data?.displayName} (${profile.data?.professionName}):`,
+        url: shareUrl,
+      }).catch(() => copy());
+    } else {
+      copy();
+    }
+  };
+
+  return (
+    <Page
+      title="Meu cartão"
+      eyebrow="Sua presença profissional"
+      description="Um link simples para compartilhar onde seus clientes já estão."
+      help={
+        <HelpButton title="Como funciona meu Cartão?">
+          <p><strong>Meu Cartão</strong> é sua presença digital — um link público para compartilhar com clientes.</p>
+          <p><strong>Link público:</strong> Seu link único no formato <code>meuautonomo.creativeam.com.br/p/seu-slug</code>. Clientes acessam sem precisar criar conta.</p>
+          <p><strong>Como divulgar:</strong> Coloque o link na bio do Instagram, no status do WhatsApp e em suas propostas.</p>
+          <p>Clientes que acessam seu cartão podem preencher uma solicitação que cai direto em <strong>Solicitações</strong>.</p>
+        </HelpButton>
+      }
+    >
+      <div className="grid gap-5 sm:gap-6 lg:grid-cols-[0.85fr_1.15fr] w-full min-w-0 max-w-full">
+        {/* PRÉVIA DO CARTÃO DIGITAL DO PROFISSIONAL */}
+        <Card className="overflow-hidden rounded-[24px] sm:rounded-[28px] border-0 bg-[#173a34] text-white shadow-[0_16px_45px_rgba(19,42,39,0.18)] w-full min-w-0">
+          <CardContent className="relative p-5 sm:p-7 md:p-9 min-w-0">
+            <div className="absolute -right-10 -top-10 h-36 w-36 sm:h-44 sm:w-44 rounded-full bg-[#d9f56a]/10 pointer-events-none" />
+            <div className="relative min-w-0">
+              <div className="mb-6 sm:mb-8 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-white">
+                  <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#d9f56a]" /> MeuAutônomo
+                </span>
+                <span className="rounded-full bg-white/10 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.12em] text-white/75 shrink-0">
+                  Cartão digital
+                </span>
+              </div>
+
+              <div className="grid h-14 w-14 sm:h-16 sm:w-16 place-items-center rounded-2xl bg-[#d9f56a] text-xl sm:text-2xl font-extrabold text-[#173a34] shadow-sm">
+                {profile.data.avatarUrl ? (
+                  <img src={profile.data.avatarUrl} alt={profile.data.displayName} className="h-full w-full rounded-2xl object-cover" />
+                ) : (
+                  profile.data.displayName.charAt(0).toUpperCase()
+                )}
+              </div>
+
+              <h2 className="mt-4 text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight break-words text-white">
+                {profile.data.displayName}
+              </h2>
+              <p className="mt-1 text-sm sm:text-base md:text-lg font-medium text-[#d9f56a] break-words">
+                {profile.data.professionName}
+              </p>
+              <p className="mt-3 sm:mt-4 text-xs sm:text-sm leading-relaxed text-white/70 break-words">
+                {profile.data.bio || "Profissional autônomo pronto para ajudar você com agilidade e qualidade."}
+              </p>
+
+              <div className="mt-5 sm:mt-6 space-y-2 border-t border-white/10 pt-4 text-xs sm:text-sm text-white/75">
+                {profile.data.serviceRegion && (
+                  <p className="flex items-start gap-2 break-words">
+                    <MapPin className="h-4 w-4 text-[#d9f56a] shrink-0 mt-0.5" />
+                    <span className="min-w-0 break-words">Atende em {profile.data.serviceRegion}</span>
+                  </p>
+                )}
+                {profile.data.whatsapp && (
+                  <p className="flex items-center gap-2 break-words">
+                    <Share2 className="h-4 w-4 text-[#d9f56a] shrink-0" />
+                    <span className="min-w-0 break-words">{formatPhone(profile.data.whatsapp)}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* CONTROLES DE COMPARTILHAMENTO E DICAS */}
+        <div className="space-y-4 sm:space-y-5 w-full min-w-0">
+          <Card className="rounded-[22px] sm:rounded-[24px] border-0 bg-white shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
+            <CardContent className="p-4 sm:p-6 min-w-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="grid h-10 w-10 sm:h-11 sm:w-11 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815] shrink-0">
+                  <Link2 className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-[#284b42] text-sm sm:text-base truncate">Seu link público</h3>
+                  <p className="text-xs text-[#82948e] truncate">Compartilhe e receba novas solicitações</p>
+                </div>
+              </div>
+
+              {/* CAIXA COM LINK DO CARTÃO COM ZERO ESTOURO */}
+              <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#f5f8f2] p-2.5 sm:p-3 border border-[#dce5dc] w-full min-w-0 overflow-hidden">
+                <span className="min-w-0 flex-1 truncate text-xs sm:text-sm text-[#406157] font-medium select-all">
+                  {shareUrl}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={copy}
+                  className="h-8 px-2.5 shrink-0 rounded-lg border-[#dce5dc] bg-white text-xs font-bold text-[#173a34] hover:bg-[#ebf3ea]"
+                  title="Copiar link"
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
+                </Button>
+              </div>
+
+              {/* BOTÕES DE AÇÃO TOTALMENTE RESPONSIVOS PARA MOBILE */}
+              <div className="mt-4 flex flex-col sm:flex-row gap-2.5 w-full">
+                <Button
+                  onClick={handleNativeShare}
+                  className="h-11 w-full sm:flex-1 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] text-xs sm:text-sm font-semibold shadow-xs cursor-pointer"
+                >
+                  <Share2 className="mr-2 h-4 w-4 text-[#d9f56a]" /> Compartilhar cartão
+                </Button>
+                <a
+                  href={`/p/${profile.data.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full sm:flex-1 block"
+                >
+                  <Button
+                    variant="outline"
+                    className="h-11 w-full rounded-xl border-[#dce5dc] bg-white text-[#4c6960] hover:bg-[#f4f7f2] text-xs sm:text-sm font-semibold cursor-pointer"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" /> Abrir página
+                  </Button>
+                </a>
+              </div>
+
+              {/* BOTÃO DIRETO DO WHATSAPP */}
+              <Button
+                variant="outline"
+                onClick={handleShareWhatsApp}
+                className="mt-2.5 h-10 sm:h-11 w-full rounded-xl border-[#cbe4d1] bg-[#eef7f0] text-[#173a34] hover:bg-[#e0f1e4] text-xs sm:text-sm font-semibold cursor-pointer"
+              >
+                <Share2 className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#2d7d54]" /> Enviar no WhatsApp de um Cliente
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[22px] sm:rounded-[24px] border-0 bg-[#f1f7dd] w-full min-w-0">
+            <CardContent className="p-4 sm:p-6 min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wider text-[#52674c]">Dica de divulgação</p>
+              <p className="mt-1.5 text-base sm:text-lg font-bold text-[#304d2c] leading-snug">Seu cartão é seu ponto de encontro.</p>
+              <p className="mt-2 text-xs sm:text-sm leading-relaxed text-[#6d805f]">
+                Coloque o link na bio do Instagram, no status do WhatsApp e envie para clientes após cada orçamento ou atendimento.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </Page>
+  );
+}
 
 function SettingsPage() {
   const profile = trpc.profile.get.useQuery();
