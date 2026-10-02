@@ -398,6 +398,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
 
 function NotificationsBell() {
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
   const notifications = trpc.notification.list.useQuery(undefined, {
     refetchInterval: 5000,
     refetchOnWindowFocus: true,
@@ -412,11 +413,18 @@ function NotificationsBell() {
       unread.refetch();
     },
   });
+  const markAllRead = trpc.notification.markAllRead.useMutation({
+    onSuccess: () => {
+      notifications.refetch();
+      unread.refetch();
+    },
+  });
+
+  const unreadCount = typeof unread.data === "number" ? unread.data : 0;
 
   const prevCountRef = useRef<number | null>(null);
   useEffect(() => {
-    const currentCount = unread.data?.count ?? 0;
-    if (prevCountRef.current !== null && currentCount > prevCountRef.current) {
+    if (prevCountRef.current !== null && unreadCount > prevCountRef.current) {
       const latest = notifications.data?.[0];
       if (latest && !latest.read) {
         toast.info(latest.title || "Nova notificação", {
@@ -429,8 +437,15 @@ function NotificationsBell() {
         });
       }
     }
-    prevCountRef.current = currentCount;
-  }, [unread.data?.count, notifications.data]);
+    prevCountRef.current = unreadCount;
+  }, [unreadCount, notifications.data]);
+
+  const handleOpenChange = (open: boolean) => {
+    if (open && unreadCount > 0) {
+      utils.notification.unreadCount.setData(undefined, 0);
+      markAllRead.mutate();
+    }
+  };
 
   const handleNotificationClick = (item: {
     id: number;
@@ -483,20 +498,34 @@ function NotificationsBell() {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
         <button
           aria-label="Notificações"
           className="relative grid h-9 w-9 place-items-center rounded-xl text-[#58716b] transition hover:bg-white cursor-pointer"
         >
           <Bell className="h-4 w-4" />
-          {(unread.data || 0) > 0 && (
+          {unreadCount > 0 && (
             <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#9c4d43]" />
           )}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-80">
-        <p className="px-2 py-2 text-sm font-bold text-[#173a34]">Notificações</p>
+        <div className="flex items-center justify-between border-b border-[#edf1eb] px-3 py-2">
+          <p className="text-sm font-bold text-[#173a34]">Notificações</p>
+          {unreadCount > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                utils.notification.unreadCount.setData(undefined, 0);
+                markAllRead.mutate();
+              }}
+              className="text-[11px] font-semibold text-[#8aa500] hover:underline"
+            >
+              Marcar como lidas
+            </button>
+          )}
+        </div>
         {notifications.data?.length ? (
           notifications.data.map((item) => (
             <DropdownMenuItem

@@ -3292,6 +3292,13 @@ var appRouter = router({
       await db.update(notifications).set({ read: true }).where(and2(eq4(notifications.id, input.id), eq4(notifications.profileId, profile.id)));
       return { success: true };
     }),
+    markAllRead: protectedProcedure.mutation(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(notifications).set({ read: true }).where(and2(eq4(notifications.profileId, profile.id), eq4(notifications.read, false)));
+      return { success: true };
+    }),
     unreadCount: protectedProcedure.query(async ({ ctx }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
