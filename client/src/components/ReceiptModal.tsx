@@ -84,7 +84,8 @@ export function ReceiptModal({
   };
 
   const handlePrint = () => {
-    window.print();
+    const code = data.authCode || data.receiptNumber;
+    window.open(`/validar-recibo?codigo=${encodeURIComponent(code)}&print=true`, "_blank");
   };
 
   return (

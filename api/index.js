@@ -1950,10 +1950,9 @@ import crypto3 from "node:crypto";
 
 // server/receiptAuth.ts
 import crypto2 from "crypto";
-function generateReceiptAuthCode(type, id, createdAt, amountCents) {
+function generateReceiptAuthCode(type, id, profileId, amountCents) {
   const secretSalt = process.env.SESSION_SECRET || "meuautonomo-receipt-salt-2026";
-  const ts = new Date(createdAt).getTime();
-  const hash = crypto2.createHmac("sha256", secretSalt).update(`${type}:${id}:${ts}:${amountCents}`).digest("hex").slice(0, 6).toUpperCase();
+  const hash = crypto2.createHmac("sha256", secretSalt).update(`${type}:${id}:${profileId}:${amountCents}`).digest("hex").slice(0, 6).toUpperCase();
   return `MA-REC-${type}${id}-${hash}`;
 }
 
@@ -2538,7 +2537,7 @@ var appRouter = router({
       const rows = await db.select().from(appointments).where(and2(...conditions)).orderBy(appointments.startsAt);
       return rows.map((r) => ({
         ...r,
-        receiptCode: generateReceiptAuthCode("A", r.id, r.createdAt, r.amountCents)
+        receiptCode: generateReceiptAuthCode("A", r.id, r.profileId, r.amountCents)
       }));
     }),
     create: protectedProcedure.input(z2.object({
@@ -2801,7 +2800,7 @@ var appRouter = router({
           );
           return {
             ...q,
-            receiptCode: generateReceiptAuthCode("Q", q.id, q.createdAt, q.totalCents),
+            receiptCode: generateReceiptAuthCode("Q", q.id, q.profileId, q.totalCents),
             clientName: clientName || null,
             clientEmail: clientEmail || null,
             clientPhone: clientPhone || null,
@@ -3809,25 +3808,51 @@ var appRouter = router({
   }),
   receipt: router({
     validate: publicProcedure.input(z2.object({ code: z2.string() })).query(async ({ input }) => {
-      const rawCode = input.code.trim().toUpperCase();
-      const match = rawCode.match(/^MA-REC-([AQ])(\d+)-([A-Z0-9]+)$/);
-      if (!match) {
-        return { valid: false, error: "Formato de c\xF3digo inv\xE1lido. O formato oficial deve ser MA-REC-A12-XXXXXX ou MA-REC-Q12-XXXXXX." };
+      const rawCode = input.code.trim().toUpperCase().replace(/\s+/g, "");
+      if (!rawCode) {
+        return { valid: false, error: "Informe o c\xF3digo do recibo para validar." };
       }
-      const [, type, idStr] = match;
-      const id = parseInt(idStr, 10);
-      if (isNaN(id) || id <= 0) {
+      let type = "A";
+      let id = null;
+      let providedHash = null;
+      const fullMatch = rawCode.match(/^MA-REC-([AQ])(\d+)(?:-([A-Z0-9]+))?$/);
+      if (fullMatch) {
+        type = fullMatch[1];
+        id = parseInt(fullMatch[2], 10);
+        providedHash = fullMatch[3] || null;
+      } else {
+        const friendlyMatch = rawCode.match(/^(?:REC-)?(?:([AQ])[-_]?)?(\d+)$/);
+        if (friendlyMatch) {
+          type = friendlyMatch[1] || "A";
+          id = parseInt(friendlyMatch[2], 10);
+        } else {
+          return {
+            valid: false,
+            error: `Formato de c\xF3digo n\xE3o reconhecido: "${rawCode}". Exemplos v\xE1lidos: MA-REC-A12-XXXXXX ou REC-12.`
+          };
+        }
+      }
+      if (!id || isNaN(id) || id <= 0) {
         return { valid: false, error: "Identificador de recibo inv\xE1lido." };
       }
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      if (type === "A") {
-        const appointment = (await db.select().from(appointments).where(eq4(appointments.id, id)).limit(1))[0];
-        if (!appointment) {
-          return { valid: false, error: "Atendimento ou recibo n\xE3o localizado no sistema." };
+      let appointment = type === "A" ? (await db.select().from(appointments).where(eq4(appointments.id, id)).limit(1))[0] : null;
+      let quote = type === "Q" ? (await db.select().from(quotes).where(eq4(quotes.id, id)).limit(1))[0] : null;
+      if (!appointment && !quote && !fullMatch) {
+        appointment = (await db.select().from(appointments).where(eq4(appointments.id, id)).limit(1))[0];
+        if (appointment) {
+          type = "A";
+        } else {
+          quote = (await db.select().from(quotes).where(eq4(quotes.id, id)).limit(1))[0];
+          if (quote) {
+            type = "Q";
+          }
         }
-        const expectedCode = generateReceiptAuthCode("A", appointment.id, appointment.createdAt, appointment.amountCents);
-        if (expectedCode.toUpperCase() !== rawCode) {
+      }
+      if (type === "A" && appointment) {
+        const officialCode = generateReceiptAuthCode("A", appointment.id, appointment.profileId, appointment.amountCents);
+        if (providedHash && officialCode.toUpperCase() !== rawCode) {
           return { valid: false, error: "C\xF3digo de autenticidade adulterado ou divergente do registro original." };
         }
         const profile = (await db.select().from(professionalProfiles).where(eq4(professionalProfiles.id, appointment.profileId)).limit(1))[0];
@@ -3835,7 +3860,7 @@ var appRouter = router({
         const service = appointment.serviceId ? (await db.select().from(services).where(eq4(services.id, appointment.serviceId)).limit(1))[0] : null;
         return {
           valid: true,
-          code: rawCode,
+          code: officialCode,
           receiptNumber: `REC-${String(appointment.id).padStart(4, "0")}`,
           type: "Comprovante de Atendimento Conclu\xEDdo",
           professionalName: profile?.displayName || "Profissional",
@@ -3851,20 +3876,16 @@ var appRouter = router({
           paymentStatus: appointment.status === "concluido" ? "Quitado / Recebido" : "Confirmado",
           legalBasis: "Em conformidade com a Lei Federal n\xBA 14.063/2020 (Assinatura Eletr\xF4nica Simples) e Art. 320 do C\xF3digo Civil Brasileiro"
         };
-      } else {
-        const quote = (await db.select().from(quotes).where(eq4(quotes.id, id)).limit(1))[0];
-        if (!quote) {
-          return { valid: false, error: "Or\xE7amento ou recibo n\xE3o localizado no sistema." };
-        }
-        const expectedCode = generateReceiptAuthCode("Q", quote.id, quote.createdAt, quote.totalCents);
-        if (expectedCode.toUpperCase() !== rawCode) {
+      } else if (type === "Q" && quote) {
+        const officialCode = generateReceiptAuthCode("Q", quote.id, quote.profileId, quote.totalCents);
+        if (providedHash && officialCode.toUpperCase() !== rawCode) {
           return { valid: false, error: "C\xF3digo de autenticidade adulterado ou divergente do registro original." };
         }
         const profile = (await db.select().from(professionalProfiles).where(eq4(professionalProfiles.id, quote.profileId)).limit(1))[0];
         const client = quote.clientId ? (await db.select().from(clients).where(eq4(clients.id, quote.clientId)).limit(1))[0] : null;
         return {
           valid: true,
-          code: rawCode,
+          code: officialCode,
           receiptNumber: `REC-${String(quote.id).padStart(4, "0")}`,
           type: "Comprovante de Proposta / Or\xE7amento Aprovado",
           professionalName: profile?.displayName || "Profissional",
@@ -3881,6 +3902,7 @@ var appRouter = router({
           legalBasis: "Em conformidade com a Lei Federal n\xBA 14.063/2020 (Assinatura Eletr\xF4nica Simples) e Art. 320 do C\xF3digo Civil Brasileiro"
         };
       }
+      return { valid: false, error: "Recibo ou atendimento n\xE3o localizado no sistema." };
     })
   })
 });

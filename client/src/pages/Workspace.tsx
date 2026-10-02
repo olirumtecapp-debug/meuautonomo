@@ -1347,7 +1347,7 @@ function Agenda() {
       serviceDescription: serviceName,
       amountCents: item.amountCents,
       paymentMethod: item.paymentMethod || "Acerto direto com o prestador",
-      authCode: item.receiptCode,
+      authCode: item.receiptCode || `MA-REC-A${item.id}`,
     });
   };
 
@@ -3255,7 +3255,7 @@ function Quotes() {
                                 serviceDescription: quote.description || "Prestação de serviços orçados",
                                 amountCents: quote.totalCents,
                                 paymentMethod: quote.paymentTerms || "Acerto direto com o prestador",
-                                authCode: (quote as any).receiptCode,
+                                authCode: (quote as any).receiptCode || `MA-REC-Q${quote.id}`,
                               });
                             }}
                             className="rounded-xl border-[#b3d7bf] bg-[#f0f7f2] text-xs font-semibold text-[#173a34] hover:bg-[#e1f0e5]"
