@@ -49,7 +49,7 @@ import {
   Ticket,
   Crown,
 } from "lucide-react";
-import { CSSProperties, useEffect, useRef, useState } from "react";
+import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
@@ -115,6 +115,11 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [voucherModalOpen, setVoucherModalOpen] = useState(false);
   const [referralModalOpen, setReferralModalOpen] = useState(false);
+  const profileQuery = trpc.profile.get.useQuery();
+  const accountType = profileQuery.data?.accountType || "individual";
+  const visibleMenuItems = useMemo(() => {
+    return menuItems.filter(item => item.path !== "/equipe" || accountType === "equipe");
+  }, [accountType]);
   const voucherStatusQuery = trpc.voucher.getStatus.useQuery();
   const voucherStatus = voucherStatusQuery.data;
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -184,7 +189,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
           <SidebarContent className="gap-0 px-2 py-4">
             <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/45 group-data-[collapsible=icon]:hidden">Seu espaço</p>
             <SidebarMenu className="gap-1">
-              {menuItems.map(item => {
+              {visibleMenuItems.map(item => {
                 const active = location === item.path;
                 const handleItemClick = () => {
                   if (item.path === "/indique") {

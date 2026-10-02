@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "wouter";
 import {
   Check,
@@ -19,6 +19,7 @@ import {
   Ticket,
   Gift,
   Crown,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,18 @@ export default function PlansPage() {
   const [simulatingPayment, setSimulatingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
+  const profileQuery = trpc.profile.get.useQuery();
+  const utils = trpc.useUtils();
+
+  const userAccountType = (profileQuery.data as any)?.accountType || "individual";
+  const [viewMode, setViewMode] = useState<"individual" | "equipe">("individual");
+
+  useEffect(() => {
+    if (profileQuery.data?.accountType) {
+      setViewMode(profileQuery.data.accountType);
+    }
+  }, [profileQuery.data?.accountType]);
+
   // Estado do PIX real do Asaas
   const [pixLoading, setPixLoading] = useState(false);
   const [pixError, setPixError] = useState<string | null>(null);
@@ -53,12 +66,9 @@ export default function PlansPage() {
   } | null>(null);
   const [pollingInterval, setPollingInterval] = useState<ReturnType<typeof setInterval> | null>(null);
 
-  const profileQuery = trpc.profile.get.useQuery();
-  const utils = trpc.useUtils();
-
   // Preços
-  const PRICE_SOLO = "R$ 49,90";
-  const PRICE_TEAM = "R$ 89,90";
+  const PRICE_SOLO = "R$ 59,90";
+  const PRICE_TEAM = "R$ 99,90";
 
   const stopPolling = () => {
     if (pollingInterval) {
@@ -146,11 +156,11 @@ export default function PlansPage() {
           payment: {
             id: "pay_sim_" + Date.now(),
             customer: "cus_sim_" + Date.now(),
-            value: selectedPlan === "solo" ? 49.9 : 89.9,
-            netValue: selectedPlan === "solo" ? 49.9 : 89.9,
+            value: selectedPlan === "solo" ? 59.9 : 99.9,
+            netValue: selectedPlan === "solo" ? 59.9 : 99.9,
             billingType: "PIX",
             status: "RECEIVED",
-            description: selectedPlan === "solo" ? "Plano PRO Solo Vitalício" : "Plano PRO Estúdio Equipe Vitalício",
+            description: selectedPlan === "solo" ? "MeuAutônomo PRO Individual – Vitalício" : "MeuAutônomo PRO Equipe & Estúdio – Vitalício",
             externalReference: profileQuery.data?.userId ? String(profileQuery.data.userId) : "1",
           },
         }),
@@ -219,237 +229,411 @@ export default function PlansPage() {
             </Button>
           </div>
 
-          {/* CARDS COMPARATIVOS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-
-            {/* PLANO 1: GRÁTIS */}
-            <Card className="rounded-[28px] border-2 border-[#dce5dc] bg-white p-6 shadow-sm flex flex-col justify-between relative">
+          {/* SELETOR DE MODO: INDIVIDUAL vs EQUIPE */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 sm:p-4 rounded-2xl border border-[#dce5dc] shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#173a34] text-[#d9f56a] font-bold">
+                {viewMode === "individual" ? <User className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+              </div>
               <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-                    Degustação Real
+                <span className="text-xs font-bold text-[#173a34] block">
+                  Visualizando planos para: <strong className="text-emerald-800">{viewMode === "individual" ? "👤 Autônomo Individual" : "👥 Equipe & Estúdio"}</strong>
+                </span>
+                <span className="text-[11px] text-[#71867f]">
+                  {viewMode === "individual"
+                    ? "Para quem trabalha sozinho e quer o sistema enxuto sem telas de equipe"
+                    : "Para salões, estúdios, oficinas e negócios com ajudantes ou parceiras"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 p-1 bg-[#f5f7f2] rounded-xl w-full sm:w-auto border border-[#e2e9df]">
+              <button
+                type="button"
+                onClick={() => setViewMode("individual")}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                  viewMode === "individual"
+                    ? "bg-[#173a34] text-white shadow-xs"
+                    : "text-[#58716b] hover:text-[#173a34] hover:bg-white/50"
+                }`}
+              >
+                <span>👤 Individual</span>
+                {userAccountType === "individual" && (
+                  <span className="text-[10px] bg-[#d9f56a] text-[#173a34] px-1.5 py-0.5 rounded-full font-black">
+                    Sua Conta
                   </span>
-                  {currentPlan === "free" && (
-                    <Badge variant="outline" className="border-emerald-600 text-emerald-700 bg-emerald-50 text-[11px] font-bold">
-                      Seu Plano Atual
-                    </Badge>
-                  )}
-                </div>
-
-                <h3 className="text-xl font-bold text-[#173a34] mt-4">Plano Grátis</h3>
-                <p className="text-xs text-[#71867f] mt-1 min-h-[32px]">
-                  Ideal para quem está começando e quer testar na rotina sem gastar nada.
-                </p>
-
-                <div className="mt-6 mb-6 pb-6 border-b border-[#edf1eb]">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-[#173a34]">R$ 0</span>
-                    <span className="text-xs text-[#71867f] font-semibold">/ sempre</span>
-                  </div>
-                  <span className="text-[11px] text-emerald-700 font-bold block mt-1">
-                    ✓ Sem cartão de crédito
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("equipe")}
+                className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                  viewMode === "equipe"
+                    ? "bg-purple-900 text-white shadow-xs"
+                    : "text-[#58716b] hover:text-purple-900 hover:bg-white/50"
+                }`}
+              >
+                <span>👥 Equipe & Estúdio</span>
+                {userAccountType === "equipe" && (
+                  <span className="text-[10px] bg-purple-200 text-purple-950 px-1.5 py-0.5 rounded-full font-black">
+                    Sua Conta
                   </span>
-                </div>
-
-                {/* ITENS INCLUSOS */}
-                <ul className="space-y-3 text-xs text-[#38584f]">
-                  <li className="flex items-start gap-2.5 font-bold text-[#173a34]">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>10 orçamentos grátis</strong> todo mês</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Até 20 clientes cadastrados</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Link do cartão digital para WhatsApp</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Chave PIX manual nas propostas</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 text-slate-400">
-                    <X className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
-                    <span>QR Code PIX automático na tela</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 text-slate-400">
-                    <X className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
-                    <span>Modo Equipe / Salão com parceiras</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 text-slate-400">
-                    <X className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
-                    <span>Relatórios financeiros detalhados</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="mt-8">
-                <Button
-                  disabled={currentPlan === "free"}
-                  variant="outline"
-                  className="w-full min-h-[48px] py-2.5 px-3 rounded-xl border-[#dce5dc] font-bold text-xs text-[#38584f]"
-                >
-                  {currentPlan === "free" ? "Plano em Uso" : "Voltar ao Grátis"}
-                </Button>
-              </div>
-            </Card>
-
-            {/* PLANO 2: PRO SOLO (DESTAQUE) */}
-            <Card className="rounded-[28px] border-2 border-[#173a34] bg-white p-5 sm:p-6 shadow-xl flex flex-col justify-between relative transform md:-translate-y-2">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#d9f56a] text-[#173a34] font-black text-[10px] sm:text-[11px] px-4 py-1.5 rounded-full uppercase tracking-wider shadow-md whitespace-nowrap z-20 border border-[#b8dc2e]">
-                🔥 Mais Escolhido por Autônomos
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mt-5">
-                  <span className="text-xs font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
-                    Acesso Vitalício
-                  </span>
-                  {currentPlan === "pro" && (
-                    <Badge className="bg-emerald-600 text-white text-[11px] font-bold">
-                      Ativo na sua Conta
-                    </Badge>
-                  )}
-                </div>
-
-                <h3 className="text-xl font-bold text-[#173a34] mt-4">PRO Solo</h3>
-                <p className="text-xs text-[#71867f] mt-1 min-h-[32px]">
-                  Para o autônomo individual que quer fechar propostas sem limites e passar imagem de empresa grande.
-                </p>
-
-                <div className="mt-6 mb-6 pb-6 border-b border-[#edf1eb]">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl sm:text-4xl font-black text-[#173a34]">{PRICE_SOLO}</span>
-                    <span className="text-xs text-[#71867f] font-semibold">taxa única</span>
-                  </div>
-                  <span className="text-[11px] text-emerald-700 font-bold block mt-1">
-                    ✓ Paga uma vez, usa para sempre (Sem mensalidades!)
-                  </span>
-                </div>
-
-                {/* ITENS INCLUSOS */}
-                <ul className="space-y-3 text-xs text-[#38584f]">
-                  <li className="flex items-start gap-2.5 font-bold text-[#173a34]">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Orçamentos ILIMITADOS</strong> no WhatsApp</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 font-bold text-[#173a34]">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Clientes e agenda ILIMITADOS</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 font-bold text-[#173a34]">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>QR Code PIX Automático</strong> na tela de aprovação</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Zero taxas de intermediação (100% seu no PIX)</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Painel financeiro com gráficos e relatórios</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Sua Marca & Foto em Destaque</strong> nas propostas e no WhatsApp</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 font-bold text-emerald-800">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Garantia de 7 dias com devolução total no PIX</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="mt-8">
-                <Button
-                  onClick={() => handleOpenCheckout("solo")}
-                  className="w-full min-h-[48px] py-2.5 px-3 rounded-xl bg-[#173a34] hover:bg-[#28564d] font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span>Garantir Acesso Vitalício ({PRICE_SOLO})</span>
-                  <ArrowRight className="w-4 h-4 shrink-0" />
-                </Button>
-              </div>
-            </Card>
-
-            {/* PLANO 3: PRO ESTÚDIO / EQUIPE */}
-            <Card className="rounded-[28px] border-2 border-purple-200 bg-white p-5 sm:p-6 shadow-sm flex flex-col justify-between relative">
-              <div className="absolute -top-3.5 right-6 bg-purple-600 text-white font-bold text-[10px] px-3 py-1 rounded-full uppercase tracking-wider shadow">
-                Salões & Oficinas
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mt-5">
-                  <span className="text-xs font-black uppercase tracking-wider text-purple-800 bg-purple-100 px-3 py-1 rounded-full">
-                    Estúdio & Equipe
-                  </span>
-                  {currentPlan === "team" && (
-                    <Badge className="bg-purple-600 text-white text-[11px] font-bold">
-                      Ativo na sua Conta
-                    </Badge>
-                  )}
-                </div>
-
-                <h3 className="text-xl font-bold text-[#173a34] mt-4">PRO Equipe</h3>
-                <p className="text-xs text-[#71867f] mt-1 min-h-[32px]">
-                  Para quem tem salão de beleza, barbearia, estética ou oficina com colaboradoras e parceiras.
-                </p>
-
-                <div className="mt-6 mb-6 pb-6 border-b border-[#edf1eb]">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-3xl sm:text-4xl font-black text-[#173a34]">{PRICE_TEAM}</span>
-                    <span className="text-xs text-[#71867f] font-semibold">taxa única</span>
-                  </div>
-                  <span className="text-[11px] text-purple-700 font-bold block mt-1">
-                    ✓ Valor único para todo o seu time
-                  </span>
-                </div>
-
-                {/* ITENS INCLUSOS */}
-                <ul className="space-y-3 text-xs text-[#38584f]">
-                  <li className="flex items-start gap-2.5 font-bold text-purple-950">
-                    <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                    <span><strong>Tudo do Plano PRO Solo</strong> incluso</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 font-bold text-purple-950">
-                    <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                    <span><strong>Colaboradoras e parceiras ilimitadas</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2.5 font-bold text-purple-950">
-                    <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                    <span><strong>Portal Seguro no celular de cada funcionária</strong></span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                    <span>Privacidade total (elas não veem seu lucro geral)</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                    <span>Cálculo automático de comissões e repasses</span>
-                  </li>
-                  <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-                    <span>Extrato pronto para WhatsApp da parceira</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 font-bold text-emerald-800">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                    <span>Garantia legal de 7 dias (Art. 49 CDC)</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="mt-8">
-                <Button
-                  onClick={() => handleOpenCheckout("team")}
-                  className="w-full min-h-[48px] py-2.5 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <span>Desbloquear Modo Equipe ({PRICE_TEAM})</span>
-                  <ArrowRight className="w-4 h-4 shrink-0" />
-                </Button>
-              </div>
-            </Card>
-
+                )}
+              </button>
+            </div>
           </div>
+
+          {/* VIEW MODE: INDIVIDUAL */}
+          {viewMode === "individual" && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto items-stretch">
+
+                {/* PLANO INDIVIDUAL 1: GRÁTIS */}
+                <Card className="rounded-[28px] border-2 border-[#dce5dc] bg-white p-6 shadow-sm flex flex-col justify-between relative">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                        Degustação Solo
+                      </span>
+                      {currentPlan === "free" && userAccountType === "individual" && (
+                        <Badge variant="outline" className="border-emerald-600 text-emerald-700 bg-emerald-50 text-[11px] font-bold">
+                          Seu Plano Atual
+                        </Badge>
+                      )}
+                    </div>
+
+                    <h3 className="text-xl font-bold text-[#173a34] mt-4">Grátis Individual</h3>
+                    <p className="text-xs text-[#71867f] mt-1 min-h-[32px]">
+                      Perfeito para quem trabalha sozinho e quer testar orçamentos e agendamentos no dia a dia.
+                    </p>
+
+                    <div className="mt-6 mb-6 pb-6 border-b border-[#edf1eb]">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-black text-[#173a34]">R$ 0</span>
+                        <span className="text-xs text-[#71867f] font-semibold">/ sempre</span>
+                      </div>
+                      <span className="text-[11px] text-emerald-700 font-bold block mt-1">
+                        ✓ Sem cartão de crédito
+                      </span>
+                    </div>
+
+                    {/* ITENS INCLUSOS */}
+                    <ul className="space-y-3 text-xs text-[#38584f]">
+                      <li className="flex items-start gap-2.5 font-bold text-[#173a34]">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span><strong>10 orçamentos grátis</strong> todo mês</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>Até 20 clientes cadastrados</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>Link do cartão digital para WhatsApp</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>Chave PIX manual nas propostas</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-slate-400">
+                        <X className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
+                        <span>QR Code PIX automático na tela</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-slate-400">
+                        <X className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
+                        <span>Relatórios financeiros avançados</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-8">
+                    <Button
+                      disabled={currentPlan === "free" && userAccountType === "individual"}
+                      variant="outline"
+                      className="w-full min-h-[48px] py-2.5 px-3 rounded-xl border-[#dce5dc] font-bold text-xs text-[#38584f]"
+                    >
+                      {currentPlan === "free" && userAccountType === "individual" ? "Plano em Uso" : "Permanecer Grátis"}
+                    </Button>
+                  </div>
+                </Card>
+
+                {/* PLANO INDIVIDUAL 2: PRO INDIVIDUAL VITALÍCIO (DESTAQUE) */}
+                <Card className="rounded-[28px] border-2 border-[#173a34] bg-white p-5 sm:p-6 shadow-xl flex flex-col justify-between relative transform md:-translate-y-2">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#d9f56a] text-[#173a34] font-black text-[10px] sm:text-[11px] px-4 py-1.5 rounded-full uppercase tracking-wider shadow-md whitespace-nowrap z-20 border border-[#b8dc2e]">
+                    🔥 Mais Escolhido por Autônomos
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mt-5">
+                      <span className="text-xs font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
+                        Acesso Vitalício Solo
+                      </span>
+                      {currentPlan === "pro" && (
+                        <Badge className="bg-emerald-600 text-white text-[11px] font-bold">
+                          Ativo na sua Conta
+                        </Badge>
+                      )}
+                    </div>
+
+                    <h3 className="text-xl font-bold text-[#173a34] mt-4">PRO Individual</h3>
+                    <p className="text-xs text-[#71867f] mt-1 min-h-[32px]">
+                      Feito sob medida para o autônomo solo fechar serviços sem limites com visual profissional de ponta.
+                    </p>
+
+                    <div className="mt-6 mb-6 pb-6 border-b border-[#edf1eb]">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-3xl sm:text-4xl font-black text-[#173a34]">{PRICE_SOLO}</span>
+                        <span className="text-xs text-[#71867f] font-semibold">taxa única</span>
+                      </div>
+                      <span className="text-[11px] text-emerald-700 font-bold block mt-1">
+                        ✓ Paga uma vez, usa para sempre (Sem mensalidades!)
+                      </span>
+                    </div>
+
+                    {/* ITENS INCLUSOS */}
+                    <ul className="space-y-3 text-xs text-[#38584f]">
+                      <li className="flex items-start gap-2.5 font-bold text-[#173a34]">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span><strong>Orçamentos ILIMITADOS</strong> no WhatsApp</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 font-bold text-[#173a34]">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>Clientes e agenda ILIMITADOS</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 font-bold text-[#173a34]">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span><strong>QR Code PIX Automático</strong> na tela de aprovação</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>Zero taxas de intermediação (100% seu no PIX)</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>Painel financeiro com gráficos e extrato</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span><strong>Sua Marca & Foto em Destaque</strong> nas propostas</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 font-bold text-emerald-800">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>Garantia de 7 dias com devolução total no PIX</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-8">
+                    <Button
+                      onClick={() => handleOpenCheckout("solo")}
+                      className="w-full min-h-[48px] py-2.5 px-3 rounded-xl bg-[#173a34] hover:bg-[#28564d] font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Garantir Acesso Vitalício ({PRICE_SOLO})</span>
+                      <ArrowRight className="w-4 h-4 shrink-0" />
+                    </Button>
+                  </div>
+                </Card>
+
+              </div>
+
+              {/* BANNER DE MIGRAÇÃO / EQUIPE */}
+              <div className="max-w-4xl mx-auto rounded-2xl border border-purple-200 bg-purple-50/70 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-purple-950">Precisa gerenciar sócios, ajudantes ou salão?</h5>
+                    <p className="text-xs text-purple-800">
+                      Para ter portal individual por colaboradora e cálculo automático de comissões, conheça o <strong>Plano Equipe & Estúdio ({PRICE_TEAM} vitalício)</strong>.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setViewMode("equipe")}
+                  className="border-purple-300 text-purple-900 bg-white hover:bg-purple-100 font-bold text-xs shrink-0 cursor-pointer shadow-xs"
+                >
+                  Ver Plano Equipe & Estúdio →
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* VIEW MODE: EQUIPE */}
+          {viewMode === "equipe" && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto items-stretch">
+
+                {/* PLANO EQUIPE 1: GRÁTIS */}
+                <Card className="rounded-[28px] border-2 border-[#dce5dc] bg-white p-6 shadow-sm flex flex-col justify-between relative">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-purple-800 bg-purple-100 px-3 py-1 rounded-full">
+                        Degustação Equipe
+                      </span>
+                      {currentPlan === "free" && userAccountType === "equipe" && (
+                        <Badge variant="outline" className="border-purple-600 text-purple-700 bg-purple-50 text-[11px] font-bold">
+                          Seu Plano Atual
+                        </Badge>
+                      )}
+                    </div>
+
+                    <h3 className="text-xl font-bold text-[#173a34] mt-4">Grátis Equipe</h3>
+                    <p className="text-xs text-[#71867f] mt-1 min-h-[32px]">
+                      Teste a gestão de sua equipe com até 2 membros para ver como funciona no seu espaço.
+                    </p>
+
+                    <div className="mt-6 mb-6 pb-6 border-b border-[#edf1eb]">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-black text-[#173a34]">R$ 0</span>
+                        <span className="text-xs text-[#71867f] font-semibold">/ sempre</span>
+                      </div>
+                      <span className="text-[11px] text-purple-700 font-bold block mt-1">
+                        ✓ Sem compromisso
+                      </span>
+                    </div>
+
+                    {/* ITENS INCLUSOS */}
+                    <ul className="space-y-3 text-xs text-[#38584f]">
+                      <li className="flex items-start gap-2.5 font-bold text-purple-950">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span><strong>10 orçamentos grátis</strong> todo mês</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span>Até 2 membros na equipe</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span>Agenda simultânea básica</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-slate-400">
+                        <X className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
+                        <span>Equipe ilimitada</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 text-slate-400">
+                        <X className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
+                        <span>Portal seguro exclusivo no celular delas</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-8">
+                    <Button
+                      disabled={currentPlan === "free" && userAccountType === "equipe"}
+                      variant="outline"
+                      className="w-full min-h-[48px] py-2.5 px-3 rounded-xl border-[#dce5dc] font-bold text-xs text-[#38584f]"
+                    >
+                      {currentPlan === "free" && userAccountType === "equipe" ? "Plano em Uso" : "Permanecer Grátis"}
+                    </Button>
+                  </div>
+                </Card>
+
+                {/* PLANO EQUIPE 2: PRO EQUIPE & ESTÚDIO VITALÍCIO (DESTAQUE) */}
+                <Card className="rounded-[28px] border-2 border-purple-500 bg-white p-5 sm:p-6 shadow-xl flex flex-col justify-between relative transform md:-translate-y-2">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-purple-700 text-white font-black text-[10px] sm:text-[11px] px-4 py-1.5 rounded-full uppercase tracking-wider shadow-md whitespace-nowrap z-20">
+                    👑 Para Salões, Estúdios & Oficinas
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mt-5">
+                      <span className="text-xs font-black uppercase tracking-wider text-purple-800 bg-purple-100 px-3 py-1 rounded-full">
+                        Acesso Vitalício Equipe
+                      </span>
+                      {currentPlan === "team" && (
+                        <Badge className="bg-purple-600 text-white text-[11px] font-bold">
+                          Ativo na sua Conta
+                        </Badge>
+                      )}
+                    </div>
+
+                    <h3 className="text-xl font-bold text-[#173a34] mt-4">PRO Equipe & Estúdio</h3>
+                    <p className="text-xs text-[#71867f] mt-1 min-h-[32px]">
+                      Para quem tem salão de beleza, barbearia, estética ou oficina com colaboradoras e parceiras.
+                    </p>
+
+                    <div className="mt-6 mb-6 pb-6 border-b border-[#edf1eb]">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-3xl sm:text-4xl font-black text-[#173a34]">{PRICE_TEAM}</span>
+                        <span className="text-xs text-[#71867f] font-semibold">taxa única</span>
+                      </div>
+                      <span className="text-[11px] text-purple-700 font-bold block mt-1">
+                        ✓ Valor único para todo o seu time (Sem mensalidades!)
+                      </span>
+                    </div>
+
+                    {/* ITENS INCLUSOS */}
+                    <ul className="space-y-3 text-xs text-[#38584f]">
+                      <li className="flex items-start gap-2.5 font-bold text-purple-950">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span><strong>Tudo do Plano Individual</strong> incluso</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 font-bold text-purple-950">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span><strong>Colaboradoras e parceiras ILIMITADAS</strong></span>
+                      </li>
+                      <li className="flex items-start gap-2.5 font-bold text-purple-950">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span><strong>Portal Seguro no celular de cada funcionária</strong></span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span>Privacidade total (elas não veem seu lucro geral)</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span>Cálculo automático de comissões e repasses</span>
+                      </li>
+                      <li className="flex items-start gap-2.5">
+                        <Check className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                        <span>Extrato pronto para WhatsApp da parceira</span>
+                      </li>
+                      <li className="flex items-start gap-2.5 font-bold text-emerald-800">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>Garantia de 7 dias com devolução total no PIX</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-8">
+                    <Button
+                      onClick={() => handleOpenCheckout("team")}
+                      className="w-full min-h-[48px] py-2.5 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Desbloquear Modo Equipe ({PRICE_TEAM})</span>
+                      <ArrowRight className="w-4 h-4 shrink-0" />
+                    </Button>
+                  </div>
+                </Card>
+
+              </div>
+
+              {/* BANNER DE VOLTAR PARA INDIVIDUAL */}
+              <div className="max-w-4xl mx-auto rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#173a34] text-[#d9f56a] flex items-center justify-center shrink-0 shadow-xs">
+                    <User className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-[#173a34]">Trabalha 100% sozinho sem sócios nem ajudantes?</h5>
+                    <p className="text-xs text-[#58716b]">
+                      Você pode economizar e assinar o <strong>Plano PRO Individual por apenas {PRICE_SOLO} vitalício</strong> sem excesso de telas de equipe.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setViewMode("individual")}
+                  className="border-emerald-300 text-emerald-900 bg-white hover:bg-emerald-100 font-bold text-xs shrink-0 cursor-pointer shadow-xs"
+                >
+                  Ver Plano Individual →
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* BANNER DE GARANTIA INCONDICIONAL DE 7 DIAS (CDC) */}
           <div className="rounded-[28px] border border-[#d2e4c4] bg-gradient-to-r from-[#f6fbf2] via-white to-[#f0f8ed] p-6 sm:p-8 flex flex-col sm:flex-row items-center gap-6 shadow-sm">

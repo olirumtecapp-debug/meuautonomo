@@ -38,6 +38,7 @@ export const professionalProfiles = mysqlTable("professionalProfiles", {
   pixKeyType: varchar("pixKeyType", { length: 30 }),
   showPrices: boolean("showPrices").default(true).notNull(),
   bookingEnabled: boolean("bookingEnabled").default(false).notNull(),
+  accountType: mysqlEnum("accountType", ["individual", "equipe"]).default("individual").notNull(),
   plan: mysqlEnum("plan", ["free", "pro", "team"]).default("free").notNull(),
   isPro: boolean("isPro").default(false).notNull(),
   isVip: boolean("isVip").default(false).notNull(),

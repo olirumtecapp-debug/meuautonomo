@@ -12,8 +12,8 @@ const ASAAS_API_KEY = process.env.ASAAS_API_KEY || "";
 export const ASAAS_PLANS = {
   solo: {
     plan: "solo" as const,
-    title: "MeuAutônomo PRO Solo – Vitalício",
-    value: 49.9,
+    title: "MeuAutônomo PRO Individual – Vitalício",
+    value: 59.9,
     paymentId: "pay_zhlfko0mdc480t69",
     invoiceUrl: "https://www.asaas.com/i/zhlfko0mdc480t69",
     payload: "00020101021226800014br.gov.bcb.pix2558pix.asaas.com/qr/cobv/b2cb693e-dfa7-47f6-a94a-641d9e4462ee5204000053039865802BR5924Murilo Ferreira da Silva6015Sao Bernardo do61080976105062070503***63041D9D",
@@ -21,8 +21,8 @@ export const ASAAS_PLANS = {
   },
   team: {
     plan: "team" as const,
-    title: "MeuAutônomo PRO Equipe – Vitalício",
-    value: 89.9,
+    title: "MeuAutônomo PRO Equipe & Estúdio – Vitalício",
+    value: 99.9,
     paymentId: "pay_44zhds3co79fyqe4",
     invoiceUrl: "https://www.asaas.com/i/44zhds3co79fyqe4",
     payload: "00020101021226800014br.gov.bcb.pix2558pix.asaas.com/qr/cobv/05bf6317-f01e-4d1e-a578-0f7e98c8c9095204000053039865802BR5924Murilo Ferreira da Silva6015Sao Bernardo do61080976105062070503***63041762",

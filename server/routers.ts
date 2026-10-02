@@ -338,6 +338,7 @@ export const appRouter = router({
         pixKeyType: z.string().max(30).optional(),
         showPrices: z.boolean().default(true),
         bookingEnabled: z.boolean().default(false),
+        accountType: z.enum(["individual", "equipe"]).default("individual").optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const db = await getDb();
@@ -358,6 +359,15 @@ export const appRouter = router({
           throw new TRPCError({ code: "CONFLICT", message: "Esse endereço público já está em uso." });
         }
         return getProfileByUserId(ctx.user.id);
+      }),
+    setAccountType: protectedProcedure
+      .input(z.object({ accountType: z.enum(["individual", "equipe"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const profile = await requireProfile(ctx.user.id);
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        await db.update(professionalProfiles).set({ accountType: input.accountType }).where(eq(professionalProfiles.id, profile.id));
+        return { success: true, accountType: input.accountType };
       }),
     saveAvailability: protectedProcedure
       .input(z.object({ schedule: z.string().min(2), unavailableDays: z.string().optional() }))

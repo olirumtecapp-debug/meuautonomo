@@ -70,6 +70,7 @@ var init_schema = __esm({
       pixKeyType: varchar("pixKeyType", { length: 30 }),
       showPrices: boolean("showPrices").default(true).notNull(),
       bookingEnabled: boolean("bookingEnabled").default(false).notNull(),
+      accountType: mysqlEnum("accountType", ["individual", "equipe"]).default("individual").notNull(),
       plan: mysqlEnum("plan", ["free", "pro", "team"]).default("free").notNull(),
       isPro: boolean("isPro").default(false).notNull(),
       isVip: boolean("isVip").default(false).notNull(),
@@ -325,6 +326,7 @@ function createCleanStore() {
         pixKeyType: null,
         showPrices: true,
         bookingEnabled: true,
+        accountType: "individual",
         createdAt: now,
         updatedAt: now
       },
@@ -345,6 +347,7 @@ function createCleanStore() {
         pixKeyType: null,
         showPrices: true,
         bookingEnabled: true,
+        accountType: "equipe",
         createdAt: now,
         updatedAt: now
       }
@@ -1420,8 +1423,8 @@ var ASAAS_API_KEY = process.env.ASAAS_API_KEY || "";
 var ASAAS_PLANS = {
   solo: {
     plan: "solo",
-    title: "MeuAut\xF4nomo PRO Solo \u2013 Vital\xEDcio",
-    value: 49.9,
+    title: "MeuAut\xF4nomo PRO Individual \u2013 Vital\xEDcio",
+    value: 59.9,
     paymentId: "pay_zhlfko0mdc480t69",
     invoiceUrl: "https://www.asaas.com/i/zhlfko0mdc480t69",
     payload: "00020101021226800014br.gov.bcb.pix2558pix.asaas.com/qr/cobv/b2cb693e-dfa7-47f6-a94a-641d9e4462ee5204000053039865802BR5924Murilo Ferreira da Silva6015Sao Bernardo do61080976105062070503***63041D9D",
@@ -1429,8 +1432,8 @@ var ASAAS_PLANS = {
   },
   team: {
     plan: "team",
-    title: "MeuAut\xF4nomo PRO Equipe \u2013 Vital\xEDcio",
-    value: 89.9,
+    title: "MeuAut\xF4nomo PRO Equipe & Est\xFAdio \u2013 Vital\xEDcio",
+    value: 99.9,
     paymentId: "pay_44zhds3co79fyqe4",
     invoiceUrl: "https://www.asaas.com/i/44zhds3co79fyqe4",
     payload: "00020101021226800014br.gov.bcb.pix2558pix.asaas.com/qr/cobv/05bf6317-f01e-4d1e-a578-0f7e98c8c9095204000053039865802BR5924Murilo Ferreira da Silva6015Sao Bernardo do61080976105062070503***63041762",
@@ -2398,7 +2401,8 @@ var appRouter = router({
       pixKey: z2.string().max(140).optional(),
       pixKeyType: z2.string().max(30).optional(),
       showPrices: z2.boolean().default(true),
-      bookingEnabled: z2.boolean().default(false)
+      bookingEnabled: z2.boolean().default(false),
+      accountType: z2.enum(["individual", "equipe"]).default("individual").optional()
     })).mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel." });
@@ -2416,6 +2420,13 @@ var appRouter = router({
         throw new TRPCError3({ code: "CONFLICT", message: "Esse endere\xE7o p\xFAblico j\xE1 est\xE1 em uso." });
       }
       return getProfileByUserId(ctx.user.id);
+    }),
+    setAccountType: protectedProcedure.input(z2.object({ accountType: z2.enum(["individual", "equipe"]) })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(professionalProfiles).set({ accountType: input.accountType }).where(eq4(professionalProfiles.id, profile.id));
+      return { success: true, accountType: input.accountType };
     }),
     saveAvailability: protectedProcedure.input(z2.object({ schedule: z2.string().min(2), unavailableDays: z2.string().optional() })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);

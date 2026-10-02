@@ -647,7 +647,8 @@ function ServiceNameField({
 
 function Onboarding() {
   const { user } = useAuth();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
+  const [accountType, setAccountType] = useState<"individual" | "equipe">("individual");
 
   // Nunca pré-preencher com nomes de sistema/admin genéricos
   const isSystemAdminName = Boolean(
@@ -701,6 +702,7 @@ function Onboarding() {
       const finalBio = spellBio?.hasCorrection ? spellBio.correctedText : profession.bio;
       await profileMutation.mutateAsync({
         ...profession,
+        accountType,
         professionCategory: profession.professionCategory || "Serviços Gerais",
         city: profession.city || undefined,
         serviceRegion: profession.serviceRegion || undefined,
@@ -751,19 +753,210 @@ function Onboarding() {
   return (
     <div className="min-h-screen bg-[#f5f7f2] px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-3xl">
-        <div className="mb-10 flex items-center">
+        <div className="mb-10 flex items-center justify-center sm:justify-start">
           <img src="/logo.png" alt="MeuAutônomo" className="h-12 w-auto object-contain" />
         </div>
-        <div className="mb-8 grid grid-cols-3 gap-2">
-          <Step n={1} active={step >= 1} label="Você" />
-          <Step n={2} active={step >= 2} label="Serviço" />
-          <Step n={3} active={step >= 3} label="Agenda" />
-        </div>
+
+        {step > 0 && (
+          <div className="mb-8 grid grid-cols-3 gap-2">
+            <Step n={1} active={step >= 1} label="Você" />
+            <Step n={2} active={step >= 2} label="Serviço" />
+            <Step n={3} active={step >= 3} label="Agenda" />
+          </div>
+        )}
+
         <Card className="overflow-hidden rounded-[28px] border-0 bg-white shadow-[0_18px_60px_rgba(19,42,39,0.08)]">
           <div className="h-2 bg-[#d9f56a]" />
           <CardContent className="p-6 sm:p-10">
+            {step === 0 && (
+              <>
+                <div className="text-center mb-8">
+                  <span className="inline-block rounded-full bg-[#173a34] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-[#d9f56a]">
+                    ✨ Boas-vindas ao MeuAutônomo
+                  </span>
+                  <h1 className="mt-4 text-2xl sm:text-3xl font-extrabold text-[#173a34] tracking-tight">
+                    Como você vai trabalhar?
+                  </h1>
+                  <p className="mt-2 text-sm text-[#6b817a] max-w-xl mx-auto">
+                    Escolha o modo de uso ideal para a sua rotina. O sistema ajustará os menus, agenda e orçamentos para ficar 100% sob medida para você.
+                  </p>
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* CARD 1: INDIVIDUAL */}
+                  <div
+                    onClick={() => {
+                      setAccountType("individual");
+                      setStep(1);
+                    }}
+                    className={cn(
+                      "group relative flex flex-col justify-between rounded-2xl border-2 p-6 transition-all cursor-pointer hover:shadow-lg",
+                      accountType === "individual"
+                        ? "border-[#173a34] bg-[#f9fbf8] shadow-md"
+                        : "border-[#dce5dc] bg-white hover:border-[#173a34]/60"
+                    )}
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#eef5d2] text-[#819815] group-hover:scale-105 transition-transform">
+                          <UserRound className="h-6 w-6" />
+                        </div>
+                        <span className="rounded-full bg-[#173a34] px-3 py-1 text-[11px] font-bold text-[#d9f56a]">
+                          Solo / Individual
+                        </span>
+                      </div>
+
+                      <div>
+                        <h2 className="text-xl font-bold text-[#173a34]">MeuAutônomo Individual</h2>
+                        <p className="text-xs font-semibold text-[#8aa500] mt-0.5">
+                          Trabalho por conta própria
+                        </p>
+                        <p className="mt-2 text-xs text-[#526d64] leading-relaxed">
+                          Você atua sozinho(a), prestando seus próprios serviços diretamente para seus clientes, sem sócios, funcionários ou divisão de comissões.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 rounded-xl bg-white p-3.5 border border-[#edf1eb] text-xs">
+                        <p className="font-bold text-[#173a34] text-[11px] uppercase tracking-wider">
+                          O que inclui no seu dia a dia:
+                        </p>
+                        <div className="space-y-1.5 text-[#3e564e]">
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-[#8aa500] shrink-0" />
+                            <span><strong>Cartão Digital com PIX</strong> para por na bio</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-[#8aa500] shrink-0" />
+                            <span><strong>Catálogo de Serviços</strong> e preços</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-[#8aa500] shrink-0" />
+                            <span><strong>Orçamentos no WhatsApp</strong> profissionais</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-[#8aa500] shrink-0" />
+                            <span><strong>Agenda Pessoal</strong> limpa e sem conflitos</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-[#8aa500] shrink-0" />
+                            <span><strong>Recibos em PDF</strong> com 1 clique</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-[#6b817a] bg-[#f4f7f2] p-2.5 rounded-lg leading-relaxed">
+                        <strong>Ideal para:</strong> Eletricista, encanador, pintor, marido de aluguel, manicure solo, diarista, técnico, consultor, etc.
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-[#edf1eb]">
+                      <Button
+                        type="button"
+                        className="w-full h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] font-bold text-xs"
+                      >
+                        Começar no Modo Individual <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* CARD 2: EQUIPE & ESTÚDIO */}
+                  <div
+                    onClick={() => {
+                      setAccountType("equipe");
+                      setStep(1);
+                    }}
+                    className={cn(
+                      "group relative flex flex-col justify-between rounded-2xl border-2 p-6 transition-all cursor-pointer hover:shadow-lg",
+                      accountType === "equipe"
+                        ? "border-[#173a34] bg-[#f9fbf8] shadow-md"
+                        : "border-[#dce5dc] bg-white hover:border-[#173a34]/60"
+                    )}
+                  >
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#f3e8ff] text-purple-700 group-hover:scale-105 transition-transform">
+                          <Users className="h-6 w-6" />
+                        </div>
+                        <span className="rounded-full bg-purple-700 px-3 py-1 text-[11px] font-bold text-white">
+                          Equipe & Estúdio
+                        </span>
+                      </div>
+
+                      <div>
+                        <h2 className="text-xl font-bold text-[#173a34]">MeuAutônomo Equipe & Estúdio</h2>
+                        <p className="text-xs font-semibold text-purple-700 mt-0.5">
+                          Tenho equipe, parceiros ou ajudantes
+                        </p>
+                        <p className="mt-2 text-xs text-[#526d64] leading-relaxed">
+                          Você gerencia um espaço compartilhado ou coordena outros profissionais e precisa controlar quem atendeu e ratear comissões.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 rounded-xl bg-white p-3.5 border border-[#edf1eb] text-xs">
+                        <p className="font-bold text-[#173a34] text-[11px] uppercase tracking-wider">
+                          Tudo do Individual + Módulo Equipe:
+                        </p>
+                        <div className="space-y-1.5 text-[#3e564e]">
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-purple-600 shrink-0" />
+                            <span><strong>Cadastro de Membros</strong> e parceiros</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-purple-600 shrink-0" />
+                            <span><strong>Taxas & Comissões (%)</strong> automáticas</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-purple-600 shrink-0" />
+                            <span><strong>Agenda Simultânea</strong> com filtro por membro</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-purple-600 shrink-0" />
+                            <span><strong>Relatório de Repasses PIX</strong> da equipe</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="h-4 w-4 text-purple-600 shrink-0" />
+                            <span><strong>Lei do Salão-Parceiro</strong> (segurança jurídica)</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-[11px] text-[#6b817a] bg-[#f4f7f2] p-2.5 rounded-lg leading-relaxed">
+                        <strong>Ideal para:</strong> Salões de beleza, barbearias, estúdios de estética, oficinas, empreiteiras de reformas e prestadores com ajudantes.
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-[#edf1eb]">
+                      <Button
+                        type="button"
+                        className="w-full h-11 rounded-xl bg-purple-700 text-white hover:bg-purple-800 font-bold text-xs"
+                      >
+                        Começar no Modo Equipe <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="mt-6 text-center text-xs text-[#71867f]">
+                  💡 <strong>Fique tranquilo(a):</strong> Você pode alternar livremente entre os modos a qualquer momento nas <strong>Configurações</strong> sem perder nenhum dado.
+                </p>
+              </>
+            )}
+
             {step === 1 && (
               <>
+                <div className="mb-6 flex items-center justify-between rounded-xl bg-[#f4f7f2] px-4 py-2.5 text-xs text-[#526d64]">
+                  <span>
+                    Modo selecionado: <strong>{accountType === "individual" ? "👤 Individual (Trabalho por conta própria)" : "👥 Equipe & Estúdio (Com parceiros)"}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setStep(0)}
+                    className="font-bold text-[#173a34] underline hover:text-[#8aa500] cursor-pointer"
+                  >
+                    Alterar modo
+                  </button>
+                </div>
+
                 <p className="mb-2 text-sm font-semibold uppercase tracking-[0.18em] text-[#8aa500]">
                   Passo 1 de 3
                 </p>
@@ -1118,9 +1311,94 @@ function Field({
   );
 }
 
+function IndividualTeamPromo() {
+  const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
+  const setTypeMutation = trpc.profile.setAccountType.useMutation({
+    onSuccess: () => {
+      toast.success("Modo Equipe & Estúdio ativado com sucesso!");
+      utils.profile.get.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao mudar de modo.");
+    }
+  });
+
+  return (
+    <Page
+      title="Módulo Equipe & Parceiros"
+      eyebrow="Gerenciamento Avançado"
+      description="Gerencie estúdios, oficinas, salões de beleza e colaboradores parceiros."
+    >
+      <div className="mx-auto max-w-2xl text-center py-10">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-purple-100 text-purple-700 mb-5 shadow-xs">
+          <Users className="h-8 w-8" />
+        </div>
+        <span className="rounded-full bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 uppercase tracking-wider">
+          Modo Equipe & Estúdio
+        </span>
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-[#173a34] mt-3">
+          Você está no modo MeuAutônomo Individual
+        </h2>
+        <p className="mt-3 text-sm text-[#5f756d] leading-relaxed max-w-xl mx-auto">
+          No modo <strong>Individual</strong>, seu sistema foi configurado para ser ágil e focado exclusivamente nos seus atendimentos diretos, sem menus de equipe ou divisão de comissões.
+        </p>
+
+        <div className="mt-8 rounded-2xl border border-purple-200 bg-purple-50/50 p-6 text-left space-y-3 shadow-xs">
+          <h4 className="font-bold text-sm text-purple-950 flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-purple-700" />
+            Precisa gerenciar parceiros, salão ou ajudantes?
+          </h4>
+          <p className="text-xs text-purple-900/80 leading-relaxed">
+            Ao ativar o <strong>Modo Equipe & Estúdio</strong>, você desbloqueia:
+          </p>
+          <ul className="text-xs text-purple-950 space-y-2 pl-1">
+            <li className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-purple-600 shrink-0" />
+              <span>Cadastro de colaboradores e parceiros com fotos e especialidades</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-purple-600 shrink-0" />
+              <span>Divisão automática de comissões e repasses (Lei do Salão-Parceiro)</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-purple-600 shrink-0" />
+              <span>Agenda simultânea para múltiplos profissionais sem conflito de horário</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Check className="h-4 w-4 text-purple-600 shrink-0" />
+              <span>Extrato de acerto no WhatsApp com chave PIX do parceiro</span>
+            </li>
+          </ul>
+        </div>
+
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <Button
+            onClick={() => setTypeMutation.mutate({ accountType: "equipe" })}
+            disabled={setTypeMutation.isPending}
+            className="w-full sm:w-auto h-12 rounded-xl bg-purple-700 text-white hover:bg-purple-800 font-bold px-6 text-sm cursor-pointer shadow-sm"
+          >
+            <Users className="mr-2 h-4 w-4" /> Ativar Modo Equipe & Estúdio Agora
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/app")}
+            className="w-full sm:w-auto h-12 rounded-xl border-[#dce5dc] bg-white text-[#173a34] font-semibold px-6 text-sm cursor-pointer"
+          >
+            Voltar ao Meu Início
+          </Button>
+        </div>
+      </div>
+    </Page>
+  );
+}
+
 function Workspace() {
   const [location, setLocation] = useLocation();
   const route = location === "/" ? "/app" : location;
+  const profileQuery = trpc.profile.get.useQuery();
+  const isIndividual = profileQuery.data?.accountType === "individual";
+
   if (route === "/app") return <Dashboard />;
   if (route === "/meu-dia") return <MeuDia />;
   if (route === "/relatorios") return <Reports />;
@@ -1130,7 +1408,10 @@ function Workspace() {
   if (route === "/solicitacoes") return <Requests />;
   if (route === "/orcamentos") return <Quotes />;
   if (route === "/financeiro") return <Finance />;
-  if (route === "/equipe") return <TeamPage />;
+  if (route === "/equipe") {
+    if (isIndividual) return <IndividualTeamPromo />;
+    return <TeamPage />;
+  }
   if (route === "/cartao") return <ProfessionalCard />;
   if (route === "/tutorial" || route === "/guia") return <TutorialPage />;
   if (route === "/configuracoes") return <SettingsPage />;
@@ -1513,12 +1794,14 @@ function Agenda() {
   const [form, setForm] = useState({ clientId: "", serviceId: "", teamMemberId: "", startsAt: getNextAppointmentSlot(), durationMinutes: "60", amount: "", location: "", notes: "", status: "confirmado" });
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>("all");
 
+  const isTeamMode = profileQuery.data?.accountType === "equipe";
   const filteredAppointments = useMemo(() => {
     const list = appointments.data || [];
+    if (!isTeamMode) return list.filter(a => !a.teamMemberId);
     if (!teamMembers.data?.length || selectedMemberFilter === "all") return list;
     if (selectedMemberFilter === "owner") return list.filter(a => !a.teamMemberId);
     return list.filter(a => a.teamMemberId === Number(selectedMemberFilter));
-  }, [appointments.data, teamMembers.data, selectedMemberFilter]);
+  }, [appointments.data, teamMembers.data, selectedMemberFilter, isTeamMode]);
 
   const [quoteScheduleOpen, setQuoteScheduleOpen] = useState(false);
   const [selectedQuoteToSchedule, setSelectedQuoteToSchedule] = useState<any | null>(null);
@@ -1659,7 +1942,7 @@ function Agenda() {
                     options={(services.data || []).filter(s => s.active).map(s => ({ value: String(s.id), label: s.name }))}
                   />
                 </div>
-                {Boolean(teamMembers.data?.length) && (
+                {isTeamMode && Boolean(teamMembers.data?.length) && (
                   <FormSelect
                     label="Profissional / Parceiro(a)"
                     value={form.teamMemberId}
@@ -1787,7 +2070,7 @@ function Agenda() {
       <UnresolvedPastAlert onGenerateReceipt={handleGenerateReceipt} />
 
       {/* Seletor rápido de membros da equipe (Modo Estúdio / Equipe) */}
-      {Boolean(teamMembers.data?.length) && (
+      {isTeamMode && Boolean(teamMembers.data?.length) && (
         <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[#edf1eb] bg-white p-2.5 shadow-xs">
           <span className="px-2 text-xs font-semibold text-[#5f756d]">Visualizar agenda:</span>
           <Button
@@ -3562,6 +3845,8 @@ function RangeFilter({ from, to, setFrom, setTo }: { from: string; to: string; s
 function Finance() {
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
   const range = useMemo(() => ({ from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined, to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined }), [from, to]);
+  const profile = trpc.profile.get.useQuery();
+  const isTeamMode = profile.data?.accountType === "equipe";
   const payments = trpc.payment.list.useQuery(range); const expenses = trpc.expense.list.useQuery(range); const summary = trpc.dashboard.summary.useQuery(range); const clients = trpc.customer.list.useQuery(); const services = trpc.service.list.useQuery(); const teamMembers = trpc.team.list.useQuery(); const utils = trpc.useUtils();
   const createPayment = trpc.payment.create.useMutation({ onSuccess: () => { toast.success("Pagamento registrado."); utils.payment.list.invalidate(); setPaymentOpen(false); } });
   const createExpense = trpc.expense.create.useMutation({ onSuccess: () => { toast.success("Despesa registrada."); utils.expense.list.invalidate(); setExpenseOpen(false); } });
@@ -3572,14 +3857,14 @@ function Finance() {
   const submitExpense = () => { const cents = parseBrlToCents(expense.amount); if (!expense.description || cents <= 0) return toast.error("Informe descrição e valor."); createExpense.mutate({ description: expense.description, category: expense.category || undefined, amountCents: cents, note: expense.note || undefined }); };
   const received = (payments.data || []).filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0); const pending = (payments.data || []).filter(p => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0); const spent = (expenses.data || []).reduce((sum, item) => sum + item.amountCents, 0);
   return <Page title="Financeiro" eyebrow="Dinheiro sem complicação" description="Registre receitas e despesas. Sem números inventados: tudo vem dos seus lançamentos." help={<HelpButton title="Como funciona Financeiro?"><p><strong>Financeiro</strong> registra todas as movimentações do seu negócio — receitas e despesas.</p><p><strong>Receitas (entradas):</strong></p><ul className="list-disc pl-5 space-y-1"><li><strong>Pago</strong> — dinheiro já recebido, conta no saldo.</li><li><strong>Pendente</strong> — combinado mas ainda não pago.</li><li><strong>Parcial</strong> — parte foi paga, o resto está pendente.</li></ul><p><strong>Despesas (saídas):</strong> Custos do seu trabalho — materiais, deslocamento, ferramentas etc.</p><p><strong>Saldo:</strong> Receitas pagas menos despesas registradas no período.</p><p><strong>Filtro de período:</strong> Selecione um intervalo de datas para ver só o que aconteceu naquele período.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><RangeFilter from={from} to={to} setFrom={setFrom} setTo={setTo} /><Button onClick={() => setExpenseOpen(true)} variant="outline" className="h-11 rounded-xl border-[#dce5dc] bg-white text-[#4c6960]"><Plus className="mr-2 h-4 w-4" /> Nova despesa</Button><Button onClick={() => setPaymentOpen(true)} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Registrar receita</Button></div>}>
-    <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Registrar receita</DialogTitle><DialogDescription>Pagamento recebido ou a receber.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><FormSelect label="Cliente" value={payment.clientId} onChange={value => setPayment({ ...payment, clientId: value })} placeholder="Selecionar cliente" options={(clients.data || []).map(c => ({ value: String(c.id), label: c.name }))} /><FormSelect label="Serviço" value={payment.serviceId} onChange={value => { const svc = services.data?.find(s => String(s.id) === value); setPayment({ ...payment, serviceId: value, amount: svc && (!payment.amount || payment.amount === "0" || payment.amount === "0,00") ? formatBrlInput(svc.priceCents) : payment.amount }); }} placeholder="Selecionar serviço" options={(services.data || []).filter(service => service.active).map(service => ({ value: String(service.id), label: service.name }))} />{Boolean(teamMembers.data?.length) && <FormSelect label="Profissional / Parceiro(a)" value={payment.teamMemberId} onChange={value => setPayment({ ...payment, teamMemberId: value })} placeholder="Receita própria (sem comissão)" options={[{ value: "", label: "Receita própria (sem comissão)" }, ...(teamMembers.data || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role || "Parceiro"} - ${m.commissionPercent}% comissão)` }))]} />}<Field label="Valor" prefix="R$ " value={payment.amount} onChange={value => setPayment({ ...payment, amount: value })} /><div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Forma" value={payment.method} onChange={value => setPayment({ ...payment, method: value as typeof payment.method })} options={[["pix","Pix"],["dinheiro","Dinheiro"],["cartao","Cartão"],["transferencia","Transferência"],["outro","Outro"]].map(([value,label]) => ({ value, label }))} /><FormSelect label="Situação" value={payment.status} onChange={value => setPayment({ ...payment, status: value as typeof payment.status })} options={[["pago","Pago"],["pendente","Pendente"],["parcial","Parcial"]].map(([value,label]) => ({ value, label }))} /></div><Field label="Observação" value={payment.note} onChange={value => setPayment({ ...payment, note: value })} /></div><DialogFooter><Button onClick={submitPayment} className="rounded-xl bg-[#173a34] text-white">Salvar receita</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Registrar receita</DialogTitle><DialogDescription>Pagamento recebido ou a receber.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><FormSelect label="Cliente" value={payment.clientId} onChange={value => setPayment({ ...payment, clientId: value })} placeholder="Selecionar cliente" options={(clients.data || []).map(c => ({ value: String(c.id), label: c.name }))} /><FormSelect label="Serviço" value={payment.serviceId} onChange={value => { const svc = services.data?.find(s => String(s.id) === value); setPayment({ ...payment, serviceId: value, amount: svc && (!payment.amount || payment.amount === "0" || payment.amount === "0,00") ? formatBrlInput(svc.priceCents) : payment.amount }); }} placeholder="Selecionar serviço" options={(services.data || []).filter(service => service.active).map(service => ({ value: String(service.id), label: service.name }))} />{isTeamMode && Boolean(teamMembers.data?.length) && <FormSelect label="Profissional / Parceiro(a)" value={payment.teamMemberId} onChange={value => setPayment({ ...payment, teamMemberId: value })} placeholder="Receita própria (sem comissão)" options={[{ value: "", label: "Receita própria (sem comissão)" }, ...(teamMembers.data || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role || "Parceiro"} - ${m.commissionPercent}% comissão)` }))]} />}<Field label="Valor" prefix="R$ " value={payment.amount} onChange={value => setPayment({ ...payment, amount: value })} /><div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Forma" value={payment.method} onChange={value => setPayment({ ...payment, method: value as typeof payment.method })} options={[["pix","Pix"],["dinheiro","Dinheiro"],["cartao","Cartão"],["transferencia","Transferência"],["outro","Outro"]].map(([value,label]) => ({ value, label }))} /><FormSelect label="Situação" value={payment.status} onChange={value => setPayment({ ...payment, status: value as typeof payment.status })} options={[["pago","Pago"],["pendente","Pendente"],["parcial","Parcial"]].map(([value,label]) => ({ value, label }))} /></div><Field label="Observação" value={payment.note} onChange={value => setPayment({ ...payment, note: value })} /></div><DialogFooter><Button onClick={submitPayment} className="rounded-xl bg-[#173a34] text-white">Salvar receita</Button></DialogFooter></DialogContent></Dialog>
     <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Nova despesa</DialogTitle><DialogDescription>Registre um custo real do seu trabalho.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><Field label="Descrição" value={expense.description} onChange={value => setExpense({ ...expense, description: value })} placeholder="Ex.: Material elétrico" /><div className="grid gap-4 sm:grid-cols-2"><Field label="Categoria" value={expense.category} onChange={value => setExpense({ ...expense, category: value })} placeholder="Ex.: Materiais" /><Field label="Valor" prefix="R$ " value={expense.amount} onChange={value => setExpense({ ...expense, amount: value })} /></div><Field label="Observação" value={expense.note} onChange={value => setExpense({ ...expense, note: value })} /></div><DialogFooter><Button onClick={submitExpense} className="rounded-xl bg-[#173a34] text-white">Salvar despesa</Button></DialogFooter></DialogContent></Dialog>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric title="Recebido" value={money(received)} hint="receitas pagas" icon={CircleDollarSign} accent="green" /><Metric title="Pendente" value={money(pending)} hint="a receber" icon={ClipboardList} accent="orange" /><Metric title="Despesas" value={money(spent)} hint="custos registrados" icon={WalletCards} accent="blue" /><Metric title="Saldo" value={money(received - spent)} hint="recebido menos despesas" icon={CircleDollarSign} accent="lime" /></div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
       <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-lg text-[#173a34]">Resumo do período</CardTitle><p className="mt-1 text-sm text-[#82948e]">Receitas pagas, valores pendentes e despesas por dia.</p></div><BarChart3 className="h-5 w-5 text-[#8aa500]" /></div></CardHeader><CardContent className="pt-0">{summary.isLoading ? <div className="grid h-[250px] place-items-center text-sm text-[#82948e]">Carregando gráfico…</div> : summary.data?.monthlySeries.length ? <div className="h-[280px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={summary.data.monthlySeries} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} /><XAxis dataKey="date" tickFormatter={value => String(value).slice(8, 10)} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} /><YAxis tickFormatter={value => `R$ ${Math.round(Number(value) / 100)}`} tickLine={false} axisLine={false} width={58} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} /><Tooltip formatter={(value, name) => [money(Number(value)), name === "receitas" ? "Receitas" : name === "pendentes" ? "Pendentes" : "Despesas"]} labelFormatter={value => `Dia ${String(value).slice(8, 10)}`} contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)" }} /><Legend formatter={value => value === "receitas" ? "Receitas" : value === "pendentes" ? "Pendentes" : "Despesas"} iconType="circle" /><Line type="monotone" dataKey="receitas" stroke="var(--chart-1)" strokeWidth={3} dot={false} /><Line type="monotone" dataKey="pendentes" stroke="var(--chart-3)" strokeWidth={2} strokeDasharray="5 5" dot={false} /><Line type="monotone" dataKey="despesas" stroke="var(--destructive)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div> : <div className="grid h-[250px] place-items-center rounded-2xl bg-[#f5f8f2] text-center"><div><BarChart3 className="mx-auto h-7 w-7 text-[#9bad9a]" /><p className="mt-3 text-sm font-semibold text-[#526d64]">Nenhuma movimentação no período</p><p className="mt-1 text-xs text-[#82948e]">O gráfico aparecerá quando você registrar receitas ou despesas.</p></div></div>}</CardContent></Card>
       <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Saldo acumulado</CardTitle><p className="text-sm text-[#82948e]">Evolução do saldo recebido menos despesas.</p></CardHeader><CardContent className="pt-0">{summary.data?.monthlySeries.length ? <div className="h-[280px] w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={summary.data.monthlySeries} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} /><XAxis dataKey="date" tickFormatter={value => String(value).slice(8, 10)} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} /><YAxis tickFormatter={value => `R$ ${Math.round(Number(value) / 100)}`} tickLine={false} axisLine={false} width={58} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} /><Tooltip formatter={value => [money(Number(value)), "Saldo"]} labelFormatter={value => `Dia ${String(value).slice(8, 10)}`} contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)" }} /><Bar dataKey="saldo" fill="var(--chart-2)" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer></div> : <div className="grid h-[250px] place-items-center text-sm text-[#82948e]">Sem dados para calcular o saldo.</div>}</CardContent></Card>
     </div>
-    <Card className="mt-6 rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Movimentações</CardTitle></CardHeader><CardContent className="p-0">{payments.data?.length || expenses.data?.length ? <div className="divide-y divide-[#edf1eb]">{payments.data?.map(item => { const member = teamMembers.data?.find(m => m.id === item.teamMemberId); const client = clients.data?.find(c => c.id === item.clientId); const service = services.data?.find(s => s.id === item.serviceId); const clientName = client?.name || (item as any).clientName || (item.clientId ? `Cliente #${item.clientId}` : "Receita"); const serviceName = service?.name || (item as any).serviceName; return <div key={`p-${item.id}`} className="flex items-center gap-3 p-5"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e3f3e8] text-[#3e885c]"><WalletCards className="h-4 w-4" /></div><div className="flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-[#284b42]">{clientName}</p>{serviceName && <span className="inline-flex items-center gap-1 rounded-md bg-[#eef5d2] px-2 py-0.5 text-xs font-semibold text-[#667700]"><BriefcaseBusiness className="h-3 w-3" />{serviceName}</span>}{member && <span className="inline-flex items-center gap-1 rounded-md bg-[#e8f1f5] px-2 py-0.5 text-xs font-semibold text-[#2f5e77]"><UserCheck className="h-3 w-3" />{member.name} ({item.commissionPercent || member.commissionPercent}%)</span>}</div><p className="mt-1 text-xs text-[#82948e]">{item.method.toUpperCase()} · {dateLabel(item.createdAt)}{item.commissionAmountCents ? ` · Repasse parceiro: ${money(item.commissionAmountCents)}` : ""}</p></div><div className="text-right"><p className="font-bold text-[#173a34]">+ {money(item.amountCents)}</p><StatusBadge status={item.status} /></div></div>; })}{expenses.data?.map(item => <div key={`e-${item.id}`} className="flex items-center gap-3 p-5"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#f9e5e3] text-[#9c4d43]"><WalletCards className="h-4 w-4" /></div><div className="flex-1"><p className="font-semibold text-[#284b42]">{item.description}</p><p className="mt-1 text-xs text-[#82948e]">{item.category || "Despesa"} · {dateLabel(item.occurredAt)}</p></div><p className="font-bold text-[#9c4d43]">- {money(item.amountCents)}</p></div>)}</div> : <div className="p-8"><EmptyState icon={CircleDollarSign} title="Nenhuma movimentação registrada" description="Quando você registrar uma receita ou despesa, ela aparecerá aqui." /></div>}</CardContent></Card>
+    <Card className="mt-6 rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Movimentações</CardTitle></CardHeader><CardContent className="p-0">{payments.data?.length || expenses.data?.length ? <div className="divide-y divide-[#edf1eb]">{payments.data?.map(item => { const member = teamMembers.data?.find(m => m.id === item.teamMemberId); const client = clients.data?.find(c => c.id === item.clientId); const service = services.data?.find(s => s.id === item.serviceId); const clientName = client?.name || (item as any).clientName || (item.clientId ? `Cliente #${item.clientId}` : "Receita"); const serviceName = service?.name || (item as any).serviceName; return <div key={`p-${item.id}`} className="flex items-center gap-3 p-5"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e3f3e8] text-[#3e885c]"><WalletCards className="h-4 w-4" /></div><div className="flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-[#284b42]">{clientName}</p>{serviceName && <span className="inline-flex items-center gap-1 rounded-md bg-[#eef5d2] px-2 py-0.5 text-xs font-semibold text-[#667700]"><BriefcaseBusiness className="h-3 w-3" />{serviceName}</span>}{isTeamMode && member && <span className="inline-flex items-center gap-1 rounded-md bg-[#e8f1f5] px-2 py-0.5 text-xs font-semibold text-[#2f5e77]"><UserCheck className="h-3 w-3" />{member.name} ({item.commissionPercent || member.commissionPercent}%)</span>}</div><p className="mt-1 text-xs text-[#82948e]">{item.method.toUpperCase()} · {dateLabel(item.createdAt)}{isTeamMode && item.commissionAmountCents ? ` · Repasse parceiro: ${money(item.commissionAmountCents)}` : ""}</p></div><div className="text-right"><p className="font-bold text-[#173a34]">+ {money(item.amountCents)}</p><StatusBadge status={item.status} /></div></div>; })}{expenses.data?.map(item => <div key={`e-${item.id}`} className="flex items-center gap-3 p-5"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#f9e5e3] text-[#9c4d43]"><WalletCards className="h-4 w-4" /></div><div className="flex-1"><p className="font-semibold text-[#284b42]">{item.description}</p><p className="mt-1 text-xs text-[#82948e]">{item.category || "Despesa"} · {dateLabel(item.occurredAt)}</p></div><p className="font-bold text-[#9c4d43]">- {money(item.amountCents)}</p></div>)}</div> : <div className="p-8"><EmptyState icon={CircleDollarSign} title="Nenhuma movimentação registrada" description="Quando você registrar uma receita ou despesa, ela aparecerá aqui." /></div>}</CardContent></Card>
   </Page>;
 }
 
@@ -4150,6 +4435,15 @@ function SettingsPage() {
   const saveAvailability = trpc.profile.saveAvailability.useMutation({
     onSuccess: () => toast.success("Horários salvos.")
   });
+  const setAccountTypeMutation = trpc.profile.setAccountType.useMutation({
+    onSuccess: (res) => {
+      toast.success(res.accountType === "equipe" ? "Modo Equipe & Estúdio ativado!" : "Modo Individual ativado!");
+      profile.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao alterar modo.");
+    }
+  });
   const resetDb = trpc.database.reset.useMutation({
     onSuccess: () => {
       toast.success("Banco zerado com sucesso!");
@@ -4212,6 +4506,107 @@ function SettingsPage() {
       }
     >
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* CARD MODO DE OPERAÇÃO (INDIVIDUAL VS EQUIPE) */}
+        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] lg:col-span-2">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg text-[#173a34] flex items-center gap-2">
+                  <Users className="h-5 w-5 text-[#8aa500]" />
+                  Modo de Operação do MeuAutônomo
+                </CardTitle>
+                <p className="mt-1 text-sm text-[#71867f]">
+                  Alterne entre o modo individual (você sozinho) e o modo equipe & estúdio (com parceiros ou ajudantes).
+                </p>
+              </div>
+              <Badge
+                className={cn(
+                  "px-3 py-1 text-xs font-bold w-fit",
+                  profile.data.accountType === "equipe"
+                    ? "bg-purple-100 text-purple-800"
+                    : "bg-[#eef5d2] text-[#6d8300]"
+                )}
+              >
+                {profile.data.accountType === "equipe"
+                  ? "👥 Modo Atual: Equipe & Estúdio"
+                  : "👤 Modo Atual: Individual"}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div
+                className={cn(
+                  "rounded-2xl border-2 p-4 transition-all flex flex-col justify-between",
+                  profile.data.accountType === "individual"
+                    ? "border-[#173a34] bg-[#f9fbf8]"
+                    : "border-[#edf1eb] bg-white opacity-85"
+                )}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm">
+                      <UserRound className="h-4 w-4 text-[#8aa500]" />
+                      <span>MeuAutônomo Individual</span>
+                    </div>
+                    {profile.data.accountType === "individual" && (
+                      <span className="text-[10px] font-bold text-[#8aa500] uppercase tracking-wider">Ativo</span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-[#526d64] leading-relaxed">
+                    Ideal para quem trabalha por conta própria (marido de aluguel, eletricista, manicure solo). Menus simplificados, orçamentos rápidos e agenda pessoal sem divisão de comissões.
+                  </p>
+                </div>
+                {profile.data.accountType !== "individual" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAccountTypeMutation.mutate({ accountType: "individual" })}
+                    disabled={setAccountTypeMutation.isPending}
+                    className="mt-4 rounded-xl border-[#dce5dc] text-xs font-bold text-[#173a34] hover:bg-[#f4f7f2]"
+                  >
+                    Mudar para Modo Individual
+                  </Button>
+                )}
+              </div>
+
+              <div
+                className={cn(
+                  "rounded-2xl border-2 p-4 transition-all flex flex-col justify-between",
+                  profile.data.accountType === "equipe"
+                    ? "border-purple-600 bg-[#faf5ff]"
+                    : "border-[#edf1eb] bg-white opacity-85"
+                )}
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm">
+                      <Users className="h-4 w-4 text-purple-700" />
+                      <span>MeuAutônomo Equipe & Estúdio</span>
+                    </div>
+                    {profile.data.accountType === "equipe" && (
+                      <span className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">Ativo</span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-[#526d64] leading-relaxed">
+                    Ideal para salões, barbearias, oficinas e equipes. Libera a aba <strong>Equipe / Parceiros</strong>, divisão automática de comissões (Lei do Salão-Parceiro) e agenda simultânea.
+                  </p>
+                </div>
+                {profile.data.accountType !== "equipe" && (
+                  <Button
+                    size="sm"
+                    onClick={() => setAccountTypeMutation.mutate({ accountType: "equipe" })}
+                    disabled={setAccountTypeMutation.isPending}
+                    className="mt-4 rounded-xl bg-purple-700 hover:bg-purple-800 text-xs font-bold text-white shadow-xs"
+                  >
+                    Ativar Modo Equipe & Estúdio
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]">
           <CardHeader>
             <CardTitle className="text-lg text-[#173a34]">Perfil profissional</CardTitle>
@@ -4400,12 +4795,15 @@ export function TutorialPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<"passos" | "estudio" | "dicas">("passos");
 
+  const profileQuery = trpc.profile.get.useQuery();
+  const isTeamMode = profileQuery.data?.accountType === "equipe";
+
   const openTour = (tab: "passos" | "estudio" | "dicas" = "passos") => {
     setModalTab(tab);
     setModalOpen(true);
   };
 
-  const steps = [
+  const soloSteps = [
     {
       num: 1,
       icon: UserRound,
@@ -4423,24 +4821,13 @@ export function TutorialPage() {
       color: "bg-[#e8f1f5] text-[#3f738e]",
       title: "Catálogo de Serviços com Preços Prontos",
       badge: "Catálogo Rápido",
-      desc: "Cadastre seus serviços com duração, valor e modalidade. Use nossas sugestões prontas para estética, beleza, unhas, sobrancelhas ou adicione qualquer especialidade autônoma.",
+      desc: "Cadastre seus serviços com duração, valor e modalidade. Use nossas sugestões prontas para sua profissão ou adicione qualquer especialidade autônoma.",
       path: "/servicos",
       buttonText: "Configurar Serviços",
       tip: "Os serviços cadastrados preenchem automaticamente a agenda e os orçamentos.",
     },
     {
       num: 3,
-      icon: UserCheck,
-      color: "bg-[#f1f7dd] text-[#28564d]",
-      title: "Módulo Equipe & Estúdio (Salão-Parceiro)",
-      badge: "Para Quem Tem Equipe",
-      desc: "Tem mais pessoas trabalhando no mesmo local? Baseado na Lei do Salão-Parceiro (Lei 13.352), cadastre parceiros autônomos com comissões individuais (ex: 50%, 60%) e gerencie tudo sem conflitos.",
-      path: "/equipe",
-      buttonText: "Módulo Equipe",
-      tip: "Gera extratos individuais prontos para enviar no WhatsApp do parceiro com a chave PIX!",
-    },
-    {
-      num: 4,
       icon: FileText,
       color: "bg-[#fff1d9] text-[#a27320]",
       title: "Orçamentos Formais no WhatsApp",
@@ -4451,18 +4838,18 @@ export function TutorialPage() {
       tip: "Orçamentos aprovados viram atendimentos na agenda com apenas um toque.",
     },
     {
-      num: 5,
+      num: 4,
       icon: CalendarDays,
       color: "bg-[#e8f1f5] text-[#3f738e]",
-      title: "Agenda Inteligente & Sem Conflitos",
+      title: "Agenda Inteligente Pessoal",
       badge: "Organização Total",
-      desc: "Controle seus compromissos nos modos Dia, Semana ou Mês. Selecione o profissional responsável caso tenha parceiros no estúdio e acompanhe status em tempo real.",
+      desc: "Controle seus compromissos nos modos Dia, Semana ou Mês. Sem conflitos, com rotas rápidas e alertas caso esqueça de atualizar o status.",
       path: "/agenda",
       buttonText: "Minha Agenda",
       tip: "Clique em 'Abrir rota' para traçar o caminho até o endereço do cliente no Google Maps.",
     },
     {
-      num: 6,
+      num: 5,
       icon: CircleDollarSign,
       color: "bg-[#e3f3e8] text-[#3e885c]",
       title: "Financeiro & Recibos em PDF",
@@ -4473,7 +4860,7 @@ export function TutorialPage() {
       tip: "Recibos em PDF podem ser compartilhados direto no WhatsApp ou impressos.",
     },
     {
-      num: 7,
+      num: 6,
       icon: SunMedium,
       color: "bg-[#fdf3d8] text-[#966b15]",
       title: "Meu Dia & Rotina Sem Estresse",
@@ -4484,6 +4871,88 @@ export function TutorialPage() {
       tip: "A rotina ideal: confira o 'Meu Dia' antes de começar os atendimentos.",
     },
   ];
+
+  const teamSteps = [
+    {
+      num: 1,
+      icon: Building2,
+      color: "bg-[#f3e8ff] text-purple-700",
+      title: "Configuração do Estúdio & Negócio",
+      badge: "Identidade",
+      desc: "Configure o nome do seu salão, estúdio ou oficina, logotipo, cidade de atendimento e sua chave PIX principal nas Configurações.",
+      path: "/configuracoes",
+      buttonText: "Configurações",
+      tip: "Seus clientes verão a marca do seu espaço nos orçamentos e agendamentos.",
+    },
+    {
+      num: 2,
+      icon: UserCheck,
+      color: "bg-[#eef5d2] text-[#819815]",
+      title: "Módulo Equipe & Parceiros (Salão-Parceiro)",
+      badge: "Lei 13.352",
+      desc: "Cadastre parceiros autônomos com comissões individuais (ex: 50%, 60%) e gerencie tudo sem conflitos com segurança jurídica pela Lei do Salão-Parceiro.",
+      path: "/equipe",
+      buttonText: "Módulo Equipe",
+      tip: "Gera extratos individuais prontos para enviar no WhatsApp do parceiro com a chave PIX!",
+    },
+    {
+      num: 3,
+      icon: BriefcaseBusiness,
+      color: "bg-[#e8f1f5] text-[#3f738e]",
+      title: "Catálogo de Serviços da Equipe",
+      badge: "Catálogo Rápido",
+      desc: "Cadastre seus procedimentos e serviços com duração, valor e modalidade para toda a sua equipe atender.",
+      path: "/servicos",
+      buttonText: "Configurar Serviços",
+      tip: "Os serviços cadastrados preenchem automaticamente a agenda e os orçamentos.",
+    },
+    {
+      num: 4,
+      icon: CalendarDays,
+      color: "bg-[#e8f1f5] text-[#3f738e]",
+      title: "Agenda Simultânea por Profissional",
+      badge: "Sem Conflitos",
+      desc: "Múltiplos parceiros podem atender clientes no mesmo horário sem bloquear o sistema. Alterne a visão entre toda a equipe ou um parceiro específico.",
+      path: "/agenda",
+      buttonText: "Minha Agenda",
+      tip: "Filtre a agenda por profissional para ver os horários de cada um.",
+    },
+    {
+      num: 5,
+      icon: FileText,
+      color: "bg-[#fff1d9] text-[#a27320]",
+      title: "Orçamentos Formais da Equipe",
+      badge: "Feche Mais Vendas",
+      desc: "Crie propostas claras em menos de 1 minuto. O cliente recebe o link no WhatsApp, confere os detalhes e aprova em 1 clique.",
+      path: "/orcamentos",
+      buttonText: "Criar Orçamento",
+      tip: "Orçamentos aprovados viram atendimentos na agenda com apenas um toque.",
+    },
+    {
+      num: 6,
+      icon: CircleDollarSign,
+      color: "bg-[#e3f3e8] text-[#3e885c]",
+      title: "Financeiro, Comissões e Repasses PIX",
+      badge: "Zero Calculadora",
+      desc: "Ao registrar pagamentos, o sistema calcula na hora: quanto é repasse da parceira e quanto é o lucro líquido do estúdio.",
+      path: "/financeiro",
+      buttonText: "Abrir Financeiro",
+      tip: "Envie extrato de repasse formatado no WhatsApp com a chave PIX em 1 toque.",
+    },
+    {
+      num: 7,
+      icon: SunMedium,
+      color: "bg-[#fdf3d8] text-[#966b15]",
+      title: "Meu Dia do Gestor",
+      badge: "Visão Geral",
+      desc: "Abra pela manhã e veja a lista de todos os atendimentos do estúdio para hoje, faturamento previsto e pendências.",
+      path: "/meu-dia",
+      buttonText: "Ver Meu Dia",
+      tip: "Acompanhe o movimento geral do seu time antes de iniciar o expediente.",
+    },
+  ];
+
+  const steps = isTeamMode ? teamSteps : soloSteps;
 
   return (
     <Page
@@ -4577,7 +5046,7 @@ export function TutorialPage() {
               value="estudio"
               className="rounded-xl py-3 text-xs sm:text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-[#173a34] data-[state=active]:shadow-xs"
             >
-              🏢 Estúdio & Equipe
+              {isTeamMode ? "🏢 Estúdio & Equipe" : "🌱 Mudar para Equipe?"}
             </TabsTrigger>
             <TabsTrigger
               value="dicas"
@@ -4592,7 +5061,7 @@ export function TutorialPage() {
             <SimulatorTour />
           </TabsContent>
 
-          {/* ABA 1: OS 7 PASSOS */}
+          {/* ABA 1: OS PASSOS */}
           <TabsContent value="passos" className="space-y-4">
             <div className="grid gap-4">
               {steps.map((step) => {
@@ -4629,7 +5098,7 @@ export function TutorialPage() {
                         <div className="shrink-0 sm:self-center">
                           <Button
                             onClick={() => setLocation(step.path)}
-                            className="w-full sm:w-auto rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] text-xs font-bold h-10 px-4"
+                            className="w-full sm:w-auto rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] text-xs font-bold h-10 px-4 cursor-pointer"
                           >
                             {step.buttonText} <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                           </Button>
@@ -4642,90 +5111,176 @@ export function TutorialPage() {
             </div>
           </TabsContent>
 
-          {/* ABA 2: ESTÚDIO & EQUIPE */}
-          <TabsContent value="estudio" className="space-y-6">
-            <Card className="rounded-[24px] border-0 bg-[#173a34] text-white shadow-[0_12px_40px_rgba(19,42,39,0.12)]">
-              <CardContent className="p-6 sm:p-8">
-                <div className="flex flex-wrap items-center gap-2 text-[#d9f56a]">
-                  <Building2 className="h-5 w-5" />
-                  <span className="text-xs font-bold uppercase tracking-wider">
-                    Gestão Completa de Salão & Estúdio
-                  </span>
-                </div>
-                <h3 className="mt-3 text-2xl font-bold">
-                  Como funciona o Módulo de Equipe (Lei do Salão-Parceiro)?
-                </h3>
-                <p className="mt-2 text-sm sm:text-base leading-relaxed text-white/70 max-w-3xl">
-                  Se você possui um estúdio de estética, salão de beleza, barbearia ou espaço compartilhado onde outras manicures, lash designers ou profissionais autônomas atendem, o MeuAutônomo resolve 100% da sua gestão contábil e de repasses.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <Button
-                    onClick={() => setLocation("/equipe")}
-                    className="rounded-xl bg-[#d9f56a] text-[#173a34] hover:bg-[#e8ff8e] font-bold text-xs h-10 px-5"
-                  >
-                    Acessar Módulo Equipe <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => openTour("estudio")}
-                    className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 text-xs font-medium h-10"
-                  >
-                    Ver Tour do Módulo
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#eef5d2] text-[#819815] font-bold">1</div>
-                    <CardTitle className="text-base text-[#173a34]">Cadastro com Comissão Flexível</CardTitle>
+          {/* ABA 2: ESTÚDIO & EQUIPE OU GUIA DE TRANSIÇÃO */}
+          {!isTeamMode ? (
+            <TabsContent value="estudio" className="space-y-6">
+              <Card className="rounded-[24px] border-0 bg-[#173a34] text-white shadow-[0_12px_40px_rgba(19,42,39,0.12)]">
+                <CardContent className="p-6 sm:p-8">
+                  <div className="flex flex-wrap items-center gap-2 text-[#d9f56a]">
+                    <Sparkles className="h-5 w-5" />
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      Crescimento Sem Complicação
+                    </span>
                   </div>
-                </CardHeader>
-                <CardContent className="text-sm text-[#5d756d] leading-relaxed">
-                  Cadastre cada profissional parceiro(a) com nome, cargo (ex: Manicure, Lash Designer), chave PIX e porcentagem de comissão (ex: 50% ou 60%). Cada profissional tem sua comissão calculada de forma individual e automática.
+                  <h3 className="mt-3 text-2xl font-bold">
+                    Quando migrar para o Modo Equipe & Estúdio?
+                  </h3>
+                  <p className="mt-2 text-sm sm:text-base leading-relaxed text-white/70 max-w-3xl">
+                    Você começou sozinho(a) no modo <strong>Individual</strong>. Mas se a sua agenda lotar e você trouxer um ajudante, manicure parceira ou assistente, o MeuAutônomo cresce com você sem você perder nenhum cliente, serviço ou histórico.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Button
+                      onClick={() => setLocation("/configuracoes")}
+                      className="rounded-xl bg-[#d9f56a] text-[#173a34] hover:bg-[#e8ff8e] font-bold text-xs h-10 px-5 cursor-pointer"
+                    >
+                      Ver Configurações de Modo <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => openTour("estudio")}
+                      className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 text-xs font-medium h-10 cursor-pointer"
+                    >
+                      Ver Como Funciona a Equipe
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e8f1f5] text-[#3f738e] font-bold">2</div>
-                    <CardTitle className="text-base text-[#173a34]">Agenda Simultânea sem Conflitos</CardTitle>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#eef5d2] text-[#819815] font-bold">1</div>
+                      <CardTitle className="text-base text-[#173a34]">Ativação Instantânea</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-[#5d756d] leading-relaxed">
+                    Em <strong>Configurações</strong>, basta clicar em <em>'Ativar Modo Equipe & Estúdio'</em>. A aba <strong>Equipe / Parceiros</strong> aparece imediatamente no seu menu.
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e8f1f5] text-[#3f738e] font-bold">2</div>
+                      <CardTitle className="text-base text-[#173a34]">Divisão Automática de Comissões</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-[#5d756d] leading-relaxed">
+                    Defina a porcentagem de comissão combinada (ex: 50% ou 60%). Ao registrar os atendimentos, o sistema calcula o rateio na hora, sem contas manuais.
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e3f3e8] text-[#3e885c] font-bold">3</div>
+                      <CardTitle className="text-base text-[#173a34]">Agenda Simultânea Livre</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-[#5d756d] leading-relaxed">
+                    Você e seus parceiros podem atender no mesmo horário sem conflito. A agenda ganha filtro rápido por profissional para visualização individual.
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#fff1d9] text-[#a27320] font-bold">4</div>
+                      <CardTitle className="text-base text-[#173a34]">Extrato PIX no WhatsApp</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-[#5d756d] leading-relaxed">
+                    No fechamento da semana ou mês, envie o extrato direto no WhatsApp do parceiro com todos os atendimentos discriminados e a chave PIX dele pronta.
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          ) : (
+            <TabsContent value="estudio" className="space-y-6">
+              <Card className="rounded-[24px] border-0 bg-[#173a34] text-white shadow-[0_12px_40px_rgba(19,42,39,0.12)]">
+                <CardContent className="p-6 sm:p-8">
+                  <div className="flex flex-wrap items-center gap-2 text-[#d9f56a]">
+                    <Building2 className="h-5 w-5" />
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      Gestão Completa de Salão & Estúdio
+                    </span>
                   </div>
-                </CardHeader>
-                <CardContent className="text-sm text-[#5d756d] leading-relaxed">
-                  Ao criar um agendamento, selecione qual parceiro atenderá. O sistema permite atendimentos no mesmo horário para profissionais diferentes, perfeito para estúdios com várias mesas ou macas.
+                  <h3 className="mt-3 text-2xl font-bold">
+                    Como funciona o Módulo de Equipe (Lei do Salão-Parceiro)?
+                  </h3>
+                  <p className="mt-2 text-sm sm:text-base leading-relaxed text-white/70 max-w-3xl">
+                    Se você possui um estúdio de estética, salão de beleza, barbearia ou espaço compartilhado onde outras manicures, lash designers ou profissionais autônomas atendem, o MeuAutônomo resolve 100% da sua gestão contábil e de repasses.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Button
+                      onClick={() => setLocation("/equipe")}
+                      className="rounded-xl bg-[#d9f56a] text-[#173a34] hover:bg-[#e8ff8e] font-bold text-xs h-10 px-5 cursor-pointer"
+                    >
+                      Acessar Módulo Equipe <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => openTour("estudio")}
+                      className="rounded-xl border-white/20 bg-transparent text-white hover:bg-white/10 text-xs font-medium h-10 cursor-pointer"
+                    >
+                      Ver Tour do Módulo
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
-              <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e3f3e8] text-[#3e885c] font-bold">3</div>
-                    <CardTitle className="text-base text-[#173a34]">Divisão Automática de Receita</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="text-sm text-[#5d756d] leading-relaxed">
-                  Você não precisa fazer contas de calculadora no fim do mês! A aba 'Extrato & Repasses' mostra exatamente o faturamento bruto gerado por cada parceiro, o valor da comissão a pagar e o quanto ficou de retenção para o estúdio.
-                </CardContent>
-              </Card>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#eef5d2] text-[#819815] font-bold">1</div>
+                      <CardTitle className="text-base text-[#173a34]">Cadastro com Comissão Flexível</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-[#5d756d] leading-relaxed">
+                    Cadastre cada profissional parceiro(a) com nome, cargo (ex: Manicure, Lash Designer), chave PIX e porcentagem de comissão (ex: 50% ou 60%). Cada profissional tem sua comissão calculada de forma individual e automática.
+                  </CardContent>
+                </Card>
 
-              <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#fff1d9] text-[#a27320] font-bold">4</div>
-                    <CardTitle className="text-base text-[#173a34]">Extrato no WhatsApp em 1 Clique</CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="text-sm text-[#5d756d] leading-relaxed">
-                  Basta tocar no botão verde 'Enviar Extrato WhatsApp'. O sistema monta uma mensagem completa com os atendimentos realizados, a soma devida e a chave PIX do parceiro para você realizar a transferência com total transparência.
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+                <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e8f1f5] text-[#3f738e] font-bold">2</div>
+                      <CardTitle className="text-base text-[#173a34]">Agenda Simultânea sem Conflitos</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-[#5d756d] leading-relaxed">
+                    Ao criar um agendamento, selecione qual parceiro atenderá. O sistema permite atendimentos no mesmo horário para profissionais diferentes, perfeito para estúdios com várias mesas ou macas.
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e3f3e8] text-[#3e885c] font-bold">3</div>
+                      <CardTitle className="text-base text-[#173a34]">Divisão Automática de Receita</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-[#5d756d] leading-relaxed">
+                    Você não precisa fazer contas de calculadora no fim do mês! A aba 'Extrato & Repasses' mostra exatamente o faturamento bruto gerado por cada parceiro, o valor da comissão a pagar e o quanto ficou de retenção para o estúdio.
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_25px_rgba(19,42,39,0.04)]">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#fff1d9] text-[#a27320] font-bold">4</div>
+                      <CardTitle className="text-base text-[#173a34]">Extrato no WhatsApp em 1 Clique</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="text-sm text-[#5d756d] leading-relaxed">
+                    Basta tocar no botão verde 'Enviar Extrato WhatsApp'. O sistema monta uma mensagem completa com os atendimentos realizados, a soma devida e a chave PIX do parceiro para você realizar a transferência com total transparência.
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
 
           {/* ABA 3: DICAS & PERGUNTAS */}
           <TabsContent value="dicas" className="space-y-4">

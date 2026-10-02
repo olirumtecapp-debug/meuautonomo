@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { useLocation } from "wouter";
 
+import { trpc } from "@/lib/trpc";
+
 interface GuidedTutorialModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,7 +43,10 @@ export function GuidedTutorialModal({
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
 
-  const steps = [
+  const profile = trpc.profile.get.useQuery();
+  const isTeamMode = profile.data?.accountType === "equipe";
+
+  const soloSteps = [
     {
       id: "perfil",
       number: "1",
@@ -71,34 +76,16 @@ export function GuidedTutorialModal({
       description:
         "Cadastre os serviços que você oferece com tempo de duração, valor e modalidade (no seu local, a domicílio ou online). Para facilitar, criamos um Catálogo Inteligente com serviços pré-cadastrados!",
       details: [
-        "Se você faz unhas: selecione Alongamento Fibra de Vidro, Esmaltação em Gel, Banho de Gel ou Spa dos Pés em 1 clique.",
-        "Se faz sobrancelhas: Design com Henna, Mapeamento, Micropigmentação e Lash Lifting já vêm sugeridos.",
+        "Selecione serviços sugeridos de acordo com a sua profissão ou cadastre novos rapidamente.",
+        "Defina preços justos, tempo médio de execução e instruções para o cliente.",
         "Seus serviços cadastrados alimentam automaticamente a Agenda, os Orçamentos e seu Cartão Público.",
       ],
       actionLabel: "Configurar Meus Serviços",
       actionPath: "/servicos",
     },
     {
-      id: "equipe",
-      number: "3",
-      title: "Módulo Equipe & Estúdio (Salão-Parceiro)",
-      badge: "Para Quem Tem Equipe",
-      icon: UserCheck,
-      color: "bg-[#f1f7dd] text-[#28564d]",
-      headline: "Gerencie outros profissionais na mesma empresa",
-      description:
-        "Tem uma loja, salão, estúdio ou clínica com mais profissionais autônomos trabalhando juntos? Com base na Lei do Salão-Parceiro (Lei 13.352), você cadastra cada parceiro(a) e o sistema faz toda a gestão financeira.",
-      details: [
-        "Divisão Automática: Defina a comissão de cada um (ex: 50% para Manicure, 60% para Sobrancelha). Atendimentos na agenda e receitas dividem o repasse na hora.",
-        "Agenda Simultânea: Várias profissionais podem atender clientes no mesmo horário sem conflito, com seleção do profissional responsável tanto na criação quanto na edição.",
-        "1-Clique no WhatsApp: Envie o extrato de repasse formatado com faturamento, comissão calculada e a chave PIX do parceiro.",
-      ],
-      actionLabel: "Conhecer Módulo Equipe",
-      actionPath: "/equipe",
-    },
-    {
       id: "orcamentos",
-      number: "4",
+      number: "3",
       title: "Orçamentos Formais com Envio no WhatsApp",
       badge: "Feche Mais Vendas",
       icon: FileText,
@@ -116,8 +103,8 @@ export function GuidedTutorialModal({
     },
     {
       id: "agenda",
-      number: "5",
-      title: "Agenda de Atendimentos Inteligente",
+      number: "4",
+      title: "Agenda de Atendimentos Pessoal",
       badge: "Organização Total",
       icon: CalendarDays,
       color: "bg-[#e8f1f5] text-[#3f738e]",
@@ -127,14 +114,14 @@ export function GuidedTutorialModal({
       details: [
         "Acompanhe o status: Agendado, Confirmado, Em Andamento, Concluído ou Cancelado.",
         "Sincronização com Relatórios: Atendimentos confirmados e concluídos alimentam automaticamente seu faturamento e gráficos.",
-        "Associação de Parceiros: Defina qual parceiro(a) realizou o atendimento tanto na criação quanto na edição para apuração da comissão.",
+        "Alertas Inteligentes: O sistema avisa se houver atendimentos passados que você esqueceu de dar baixa.",
       ],
       actionLabel: "Acessar Minha Agenda",
       actionPath: "/agenda",
     },
     {
       id: "financeiro",
-      number: "6",
+      number: "5",
       title: "Financeiro Descomplicado & Recibos em PDF",
       badge: "Dinheiro Sob Controle",
       icon: CircleDollarSign,
@@ -152,7 +139,7 @@ export function GuidedTutorialModal({
     },
     {
       id: "meu-dia",
-      number: "7",
+      number: "6",
       title: "Rotina Diária com 'Meu Dia'",
       badge: "Produtividade Máxima",
       icon: Sparkles,
@@ -170,12 +157,133 @@ export function GuidedTutorialModal({
     },
   ];
 
-  const handleGoTo = (path: string) => {
-    onOpenChange(false);
-    setLocation(path);
-  };
+  const teamSteps = [
+    {
+      id: "config",
+      number: "1",
+      title: "Configuração do Estúdio & Negócio",
+      badge: "Identidade da Equipe",
+      icon: Building2,
+      color: "bg-[#f3e8ff] text-purple-700",
+      headline: "Apresente sua equipe de forma profissional",
+      description:
+        "Configure o nome do seu estúdio, salão ou oficina, logotipo, cidade de atendimento e sua chave PIX principal nas Configurações.",
+      details: [
+        "Seus clientes verão a marca do seu espaço e a lista de serviços oferecidos.",
+        "O link público exclusivo do estúdio pode ser divulgado nas redes sociais para agendamentos diretos.",
+        "Defina horário de funcionamento para evitar agendamentos fora do expediente.",
+      ],
+      actionLabel: "Configurar Espaço",
+      actionPath: "/configuracoes",
+    },
+    {
+      id: "equipe",
+      number: "2",
+      title: "Gestão de Parceiros & Comissões (%)",
+      badge: "Lei do Salão-Parceiro",
+      icon: UserCheck,
+      color: "bg-[#eef5d2] text-[#819815]",
+      headline: "Cadastre sua equipe com divisão financeira automática",
+      description:
+        "Na aba Equipe / Parceiros, cadastre cada profissional informando nome, especialidade, chave PIX e a porcentagem de comissão combinada (ex: 50% ou 60%).",
+      details: [
+        "Segurança Jurídica: Baseado na Lei do Salão-Parceiro (Lei 13.352).",
+        "Divisão Automática: O sistema separa na hora a comissão do profissional e a retenção do espaço.",
+        "Extrato WhatsApp: Envie relatórios de fechamento para cada profissional com 1 clique.",
+      ],
+      actionLabel: "Gerenciar Equipe",
+      actionPath: "/equipe",
+    },
+    {
+      id: "servicos",
+      number: "3",
+      title: "Catálogo de Serviços da Equipe",
+      badge: "Catálogo & Preços",
+      icon: BriefcaseBusiness,
+      color: "bg-[#e8f1f5] text-[#3f738e]",
+      headline: "Organize tudo o que seu time oferece",
+      description:
+        "Cadastre os procedimentos e serviços do seu espaço com valor e duração. Seus clientes e membros podem escolher os serviços com agilidade.",
+      details: [
+        "Defina preços claros e duração estimada para cada atendimento.",
+        "Os serviços alimentam automaticamente a agenda de todos os membros e as propostas enviadas aos clientes.",
+      ],
+      actionLabel: "Ver Serviços",
+      actionPath: "/servicos",
+    },
+    {
+      id: "agenda",
+      number: "4",
+      title: "Agenda Simultânea sem Conflitos",
+      badge: "Múltiplas Agendas",
+      icon: CalendarDays,
+      color: "bg-[#e8f1f5] text-[#3f738e]",
+      headline: "Vários profissionais atendendo no mesmo horário",
+      description:
+        "Múltiplos parceiros podem ter clientes agendados no mesmo horário sem choque. Filtre a visão da agenda por membro da equipe ou veja todo o time junto.",
+      details: [
+        "Filtros Rápidos: Alterne entre 'Toda a equipe', 'Titular' ou parceiros específicos em 1 clique.",
+        "Selecione o profissional responsável ao cadastrar ou editar qualquer atendimento.",
+      ],
+      actionLabel: "Abrir Agenda",
+      actionPath: "/agenda",
+    },
+    {
+      id: "orcamentos",
+      number: "5",
+      title: "Orçamentos Formais da Equipe",
+      badge: "Feche Mais Vendas",
+      icon: FileText,
+      color: "bg-[#fff1d9] text-[#a27320]",
+      headline: "Propostas com autoridade para o seu estúdio",
+      description:
+        "Envie orçamentos profissionais pelo WhatsApp com fotos, descrição detalhada dos serviços e botão de aprovação rápida.",
+      details: [
+        "Assim que aprovado, o orçamento pode ser agendado diretamente no calendário do profissional.",
+        "Gera comprovante e recibo para o cliente com a identificação do espaço.",
+      ],
+      actionLabel: "Ver Orçamentos",
+      actionPath: "/orcamentos",
+    },
+    {
+      id: "financeiro",
+      number: "6",
+      title: "Financeiro, Comissões e Repasses PIX",
+      badge: "Divisão Automática",
+      icon: CircleDollarSign,
+      color: "bg-[#e3f3e8] text-[#3e885c]",
+      headline: "Controle do faturamento total e divisão de lucros",
+      description:
+        "Ao registrar pagamentos, o sistema calcula na hora a parte de cada membro da equipe e o faturamento líquido da empresa.",
+      details: [
+        "Acompanhe receitas do titular vs. receitas geradas por parceiros.",
+        "Sem necessidade de planilhas complexas ou contas manuais no final do mês.",
+      ],
+      actionLabel: "Abrir Financeiro",
+      actionPath: "/financeiro",
+    },
+    {
+      id: "meu-dia",
+      number: "7",
+      title: "Visão Diária do Negócio no 'Meu Dia'",
+      badge: "Rotina de Gestão",
+      icon: Sparkles,
+      color: "bg-[#f4f8ed] text-[#718600]",
+      headline: "Abra pela manhã e veja o movimento do seu espaço",
+      description:
+        "Acompanhe todos os atendimentos agendados para hoje, preveja o faturamento do dia e fique por dentro das novas mensagens.",
+      details: [
+        "Veja os horários em sequência e certifique-se de que nada seja esquecido.",
+        "Instale como app no celular para acompanhar de onde estiver.",
+      ],
+      actionLabel: "Acessar Meu Dia",
+      actionPath: "/meu-dia",
+    },
+  ];
 
-  const step = steps[currentStep];
+  const steps = isTeamMode ? teamSteps : soloSteps;
+  const safeStep = currentStep >= steps.length ? 0 : currentStep;
+  const step = steps[safeStep];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -209,7 +317,7 @@ export function GuidedTutorialModal({
                 🚀 Tour Passo a Passo
               </TabsTrigger>
               <TabsTrigger value="estudio" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[#173a34] font-semibold">
-                🏢 Estúdio & Equipe
+                {isTeamMode ? "🏢 Estúdio & Equipe" : "🌱 Mudar para Equipe?"}
               </TabsTrigger>
               <TabsTrigger value="dicas" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[#173a34] font-semibold">
                 💡 Dúvidas & Dicas
@@ -310,67 +418,131 @@ export function GuidedTutorialModal({
               </div>
             </TabsContent>
 
-            {/* TAB 2: GUIA SALÃO & ESTÚDIO PARCEIRO */}
-            <TabsContent value="estudio" className="mt-5 space-y-4">
-              <div className="rounded-2xl border border-[#cbe4d1] bg-[#f0f8f2] p-4 text-xs text-[#284b42] leading-relaxed">
-                <div className="flex items-center gap-2 font-bold text-sm text-[#1b4333] mb-1">
-                  <Building2 className="h-4 w-4 text-[#2d7d54]" />
-                  <span>Para Donas de Estúdio de Estética, Esmalterias e Salões</span>
-                </div>
-                Se você trabalha com outras manicures, lash designers, esteticistas ou cabeleireiros no mesmo espaço físico, o MeuAutônomo resolve a divisão financeira com segurança jurídica pela <strong>Lei nº 13.352 (Lei do Salão-Parceiro)</strong>.
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
-                  <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
-                    <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">1</div>
-                    <span>Cadastre as Parceiras</span>
+            {/* TAB 2: GUIA SALÃO & ESTÚDIO PARCEIRO OU GUIA DE TRANSIÇÃO */}
+            {!isTeamMode ? (
+              <TabsContent value="estudio" className="mt-5 space-y-4">
+                <div className="rounded-2xl border border-[#cbe4d1] bg-[#f0f8f2] p-4 text-xs text-[#284b42] leading-relaxed">
+                  <div className="flex items-center gap-2 font-bold text-sm text-[#1b4333] mb-1">
+                    <Sparkles className="h-4 w-4 text-[#2d7d54]" />
+                    <span>Sua demanda cresceu e você precisa de ajuda?</span>
                   </div>
-                  <p className="text-xs text-[#6d837c] leading-5">
-                    Na aba <strong>Equipe / Parceiros</strong>, cadastre cada profissional informando nome, especialidade, chave PIX e a porcentagem de comissão combinada (ex: 50% ou 60%).
-                  </p>
+                  Você começou sozinho(a) no modo <strong>Individual</strong>, mas se a agenda lotar e você trouxer um ajudante, parceiro ou abrir seu próprio espaço, o MeuAutônomo cresce com você sem você perder nenhum cliente ou histórico.
                 </div>
 
-                <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
-                  <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
-                    <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">2</div>
-                    <span>Agendamentos Livres</span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">1</div>
+                      <span>Ativação em 1 Clique</span>
+                    </div>
+                    <p className="text-xs text-[#6d837c] leading-5">
+                      Vá em <strong>Configurações</strong> e clique em <em>'Ativar Modo Equipe & Estúdio'</em>. Imediatamente a aba <strong>Equipe / Parceiros</strong> é liberada no seu menu lateral.
+                    </p>
                   </div>
-                  <p className="text-xs text-[#6d837c] leading-5">
-                    Várias profissionais podem ter atendimentos marcados <strong>no mesmo horário</strong>. O sistema não bloqueia a agenda se forem parceiras diferentes.
-                  </p>
-                </div>
 
-                <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
-                  <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
-                    <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">3</div>
-                    <span>Cálculo Automático</span>
+                  <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">2</div>
+                      <span>Divisão de Comissões</span>
+                    </div>
+                    <p className="text-xs text-[#6d837c] leading-5">
+                      Cadastre ajudantes ou parceiros com a porcentagem combinada (ex: 50%, 60% ou diária fixa). O sistema divide os valores recebidos automaticamente.
+                    </p>
                   </div>
-                  <p className="text-xs text-[#6d837c] leading-5">
-                    Ao registrar cada pagamento, o sistema calcula na hora: quanto é repasse da parceira e quanto é o lucro líquido do estúdio. Sem calculadora nem planilha manual.
-                  </p>
-                </div>
 
-                <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
-                  <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
-                    <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">4</div>
-                    <span>Extrato WhatsApp em 1 Clique</span>
+                  <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">3</div>
+                      <span>Agenda Simultânea</span>
+                    </div>
+                    <p className="text-xs text-[#6d837c] leading-5">
+                      Você e seus ajudantes ou parceiros podem atender clientes diferentes no mesmo horário sem choque de horários na agenda.
+                    </p>
                   </div>
-                  <p className="text-xs text-[#6d837c] leading-5">
-                    No fim do dia, semana ou mês, clique em <strong>'Enviar Extrato no WhatsApp'</strong>. A mensagem vai com total faturado, comissão a pagar e a chave PIX pronta para conferência.
-                  </p>
-                </div>
-              </div>
 
-              <div className="mt-4 flex justify-end">
-                <Button
-                  onClick={() => handleGoTo("/equipe")}
-                  className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] text-xs font-semibold cursor-pointer"
-                >
-                  <UserCheck className="mr-2 h-4 w-4" /> Acessar Módulo Equipe Agora
-                </Button>
-              </div>
-            </TabsContent>
+                  <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">4</div>
+                      <span>Repasses PIX no WhatsApp</span>
+                    </div>
+                    <p className="text-xs text-[#6d837c] leading-5">
+                      No fim da semana, gere o extrato de repasse formatado pronto com a chave PIX do parceiro e envie no WhatsApp com 1 clique.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    onClick={() => handleGoTo("/configuracoes")}
+                    className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] text-xs font-semibold cursor-pointer"
+                  >
+                    <span>Ir para Configurações de Modo</span>
+                    <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </TabsContent>
+            ) : (
+              <TabsContent value="estudio" className="mt-5 space-y-4">
+                <div className="rounded-2xl border border-[#cbe4d1] bg-[#f0f8f2] p-4 text-xs text-[#284b42] leading-relaxed">
+                  <div className="flex items-center gap-2 font-bold text-sm text-[#1b4333] mb-1">
+                    <Building2 className="h-4 w-4 text-[#2d7d54]" />
+                    <span>Para Donas de Estúdio de Estética, Esmalterias e Salões</span>
+                  </div>
+                  Se você trabalha com outras manicures, lash designers, esteticistas ou cabeleireiros no mesmo espaço físico, o MeuAutônomo resolve a divisão financeira com segurança jurídica pela <strong>Lei nº 13.352 (Lei do Salão-Parceiro)</strong>.
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">1</div>
+                      <span>Cadastre as Parceiras</span>
+                    </div>
+                    <p className="text-xs text-[#6d837c] leading-5">
+                      Na aba <strong>Equipe / Parceiros</strong>, cadastre cada profissional informando nome, especialidade, chave PIX e a porcentagem de comissão combinada (ex: 50% ou 60%).
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">2</div>
+                      <span>Agendamentos Livres</span>
+                    </div>
+                    <p className="text-xs text-[#6d837c] leading-5">
+                      Várias profissionais podem ter atendimentos marcados <strong>no mesmo horário</strong>. O sistema não bloqueia a agenda se forem parceiras diferentes.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">3</div>
+                      <span>Cálculo Automático</span>
+                    </div>
+                    <p className="text-xs text-[#6d837c] leading-5">
+                      Ao registrar cada pagamento, o sistema calcula na hora: quanto é repasse da parceira e quanto é o lucro líquido do estúdio. Sem calculadora nem planilha manual.
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#dce5dc] bg-white p-4">
+                    <div className="flex items-center gap-2 font-bold text-[#173a34] text-sm mb-1.5">
+                      <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#eef5d2] text-[#819815] font-bold text-xs">4</div>
+                      <span>Extrato WhatsApp em 1 Clique</span>
+                    </div>
+                    <p className="text-xs text-[#6d837c] leading-5">
+                      No fim do dia, semana ou mês, clique em <strong>'Enviar Extrato no WhatsApp'</strong>. A mensagem vai com total faturado, comissão a pagar e a chave PIX pronta para conferência.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    onClick={() => handleGoTo("/equipe")}
+                    className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] text-xs font-semibold cursor-pointer"
+                  >
+                    <UserCheck className="mr-2 h-4 w-4" /> Acessar Módulo Equipe Agora
+                  </Button>
+                </div>
+              </TabsContent>
+            )}
 
             {/* TAB 3: DICAS DE OURO E PERGUNTAS FREQUENTES */}
             <TabsContent value="dicas" className="mt-5 space-y-3">
