@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Eye,
+  EyeOff,
   KeyRound,
   Loader2,
   LogIn,
@@ -62,10 +64,12 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
 
   // Formulário de Login
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -279,17 +283,27 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
               <div className="relative">
                 <KeyRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#92a39d]" />
                 <Input
-                  type="password"
+                  type={showRegPassword ? "text" : "password"}
                   value={regPassword}
                   onChange={(e) => {
                     setRegPassword(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
                   placeholder="Mínimo 6 caracteres"
-                  className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] pl-10 text-sm focus:border-[#173a34]"
+                  className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] pl-10 pr-11 text-sm focus:border-[#173a34]"
                   disabled={isSubmitting}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowRegPassword(!showRegPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#92a39d] hover:text-[#173a34] transition cursor-pointer p-1"
+                  tabIndex={-1}
+                  aria-label={showRegPassword ? "Ocultar senha" : "Ver senha"}
+                  title={showRegPassword ? "Ocultar senha" : "Ver senha"}
+                >
+                  {showRegPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4 text-[#71867f]" />}
+                </button>
               </div>
             </div>
 
@@ -344,17 +358,27 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
               <div className="relative">
                 <KeyRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#92a39d]" />
                 <Input
-                  type="password"
+                  type={showLoginPassword ? "text" : "password"}
                   value={loginPassword}
                   onChange={(e) => {
                     setLoginPassword(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
                   placeholder="Sua senha de acesso"
-                  className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] pl-10 text-sm focus:border-[#173a34]"
+                  className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] pl-10 pr-11 text-sm focus:border-[#173a34]"
                   disabled={isSubmitting}
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#92a39d] hover:text-[#173a34] transition cursor-pointer p-1"
+                  tabIndex={-1}
+                  aria-label={showLoginPassword ? "Ocultar senha" : "Ver senha"}
+                  title={showLoginPassword ? "Ocultar senha" : "Ver senha"}
+                >
+                  {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4 text-[#71867f]" />}
+                </button>
               </div>
             </div>
 
