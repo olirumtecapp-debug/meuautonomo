@@ -6,15 +6,49 @@ export interface ProfessionCategory {
 
 export const POPULAR_PROFESSIONS: ProfessionCategory[] = [
   {
+    category: "Multisserviços e Polivalentes",
+    icon: "🌟",
+    professions: [
+      "Profissional Multisserviços",
+      "Espaço Multiatendimento / Multisserviços",
+      "Prestador(a) de Serviços Integrados",
+      "Pequenos Reparos, Reformas e Manutenção",
+      "Ateliê / Espaço Multidisciplinar",
+      "Serviços Gerais e Utilidades",
+    ],
+  },
+  {
+    category: "Beleza e Estética",
+    icon: "💅",
+    professions: [
+      "Estúdio de Beleza Multisserviços (Cabelo, Unhas e Cílios)",
+      "Espaço de Beleza Integrada",
+      "Beauty Studio Completo",
+      "Cabeleireiro(a)",
+      "Manicure e Pedicure",
+      "Barbeiro",
+      "Designer de Sobrancelhas",
+      "Lash Designer (Extensão de Cílios)",
+      "Maquiador(a)",
+      "Esteticista",
+      "Depilador(a)",
+      "Massoterapeuta",
+      "Podólogo(a)",
+      "Tatuador(a) / Piercer",
+    ],
+  },
+  {
     category: "Casa e Manutenção",
     icon: "🛠️",
     professions: [
+      "Profissional Multisserviços (Reparos e Manutenção)",
+      "Marido de Aluguel",
+      "Manutenção Geral & Instalações",
       "Eletricista",
       "Encanador",
       "Pintor",
       "Marceneiro",
       "Pedreiro",
-      "Marido de Aluguel",
       "Chaveiro",
       "Montador de Móveis",
       "Gesseiro",
@@ -28,26 +62,10 @@ export const POPULAR_PROFESSIONS: ProfessionCategory[] = [
     ],
   },
   {
-    category: "Beleza e Estética",
-    icon: "💅",
-    professions: [
-      "Manicure e Pedicure",
-      "Barbeiro",
-      "Cabeleireiro(a)",
-      "Designer de Sobrancelhas",
-      "Lash Designer (Extensão de Cílios)",
-      "Maquiador(a)",
-      "Esteticista",
-      "Depilador(a)",
-      "Massoterapeuta",
-      "Podólogo(a)",
-      "Tatuador(a) / Piercer",
-    ],
-  },
-  {
     category: "Saúde e Bem-Estar",
     icon: "🩺",
     professions: [
+      "Espaço Integrado de Saúde & Terapias",
       "Personal Trainer",
       "Fisioterapeuta",
       "Nutricionista",
@@ -63,6 +81,7 @@ export const POPULAR_PROFESSIONS: ProfessionCategory[] = [
     category: "Serviços Domésticos e Família",
     icon: "🧹",
     professions: [
+      "Serviços Domésticos Integrados",
       "Diarista / Faxineira",
       "Passadeira",
       "Cozinheiro(a) Particular",
@@ -76,6 +95,7 @@ export const POPULAR_PROFESSIONS: ProfessionCategory[] = [
     category: "Automotivo",
     icon: "🚗",
     professions: [
+      "Centro Automotivo Multisserviços",
       "Mecânico(a)",
       "Eletricista Automotivo",
       "Funileiro / Pintor Automotivo",
@@ -89,6 +109,7 @@ export const POPULAR_PROFESSIONS: ProfessionCategory[] = [
     category: "Tecnologia, Mídia e Criação",
     icon: "💻",
     professions: [
+      "Comunicação & Mídia Multisserviços (Design, Foto e Vídeo)",
       "Fotógrafo(a)",
       "Videomaker / Filmaker",
       "Designer Gráfico",
@@ -115,6 +136,7 @@ export const POPULAR_PROFESSIONS: ProfessionCategory[] = [
     category: "Eventos e Gastronomia",
     icon: "🎉",
     professions: [
+      "Produção de Eventos & Buffet Multisserviços",
       "Confeiteiro(a) / Doceiro(a)",
       "Salgadeiro(a)",
       "Churrasqueiro(a)",
