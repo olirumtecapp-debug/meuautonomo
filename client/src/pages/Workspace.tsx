@@ -71,7 +71,7 @@ import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { SERVICE_CATALOG, getRecommendedServicesForProfession, getServicePlaceholderForProfession } from "../data/servicesCatalog";
+import { SERVICE_CATALOG, getRecommendedServicesForProfession, getServicePlaceholderForProfession, getTeamRoleSuggestionsForProfession } from "../data/servicesCatalog";
 import { ALL_PROFESSIONS_FLAT, POPULAR_PROFESSIONS, findCategoryForProfession, getProfessionsByCategory } from "../data/professions";
 import { checkServiceSpelling } from "../utils/serviceSpellcheck";
 import { StateCitySelect } from "@/components/StateCitySelect";
@@ -418,7 +418,7 @@ function ServiceNameField({
   onChange,
   onSelectCatalog,
   professionName,
-  placeholder = "Ex.: Instalação de chuveiro elétrico",
+  placeholder,
   label = "Nome do serviço",
 }: {
   value: string;
@@ -430,6 +430,10 @@ function ServiceNameField({
 }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [autoFixed, setAutoFixed] = useState<{ from: string; to: string } | null>(null);
+
+  const dynamicPlaceholder = useMemo(() => {
+    return placeholder || getServicePlaceholderForProfession(professionName || "");
+  }, [placeholder, professionName]);
 
   const spellcheck = useMemo(() => {
     return checkServiceSpelling(value);
@@ -494,7 +498,7 @@ function ServiceNameField({
               setDismissed(spellcheck.correctedText);
             }
           }}
-          placeholder={placeholder}
+          placeholder={dynamicPlaceholder}
           spellCheck={true}
           lang="pt-BR"
           autoCorrect="on"
@@ -2535,6 +2539,7 @@ function CatalogPicker({ onSelect }: { onSelect: (name: string, description: str
 
 function Services() {
   const services = trpc.service.list.useQuery();
+  const profile = trpc.profile.get.useQuery();
   const utils = trpc.useUtils();
   const create = trpc.service.create.useMutation({ onSuccess: () => { toast.success("Serviço salvo."); utils.service.list.invalidate(); setOpen(false); reset(); } });
   const update = trpc.service.update.useMutation({ onSuccess: () => { toast.success("Serviço atualizado."); utils.service.list.invalidate(); setOpen(false); reset(); } });
@@ -2562,13 +2567,133 @@ function Services() {
   };
   const toggle = (service: any) => update.mutate({ id: service.id, name: service.name, description: service.description || undefined, durationMinutes: service.durationMinutes, priceCents: service.priceCents, modality: service.modality, active: !service.active });
   return <Page title="Meus serviços" eyebrow="O que você oferece" description="Mantenha seu catálogo pronto para a agenda e para a página pública." help={<HelpButton title="Como funciona Serviços?"><p><strong>Serviços</strong> é o catálogo do que você oferece. Cada serviço tem nome, preço, duração e modalidade.</p><p><strong>Modalidades:</strong> Presencial (no seu local), no endereço do cliente, online ou híbrido.</p><p><strong>Ativar/Desativar:</strong> Serviços desativados não aparecem para novos clientes, mas ficam preservados no histórico.</p><p>Os serviços cadastrados alimentam a <strong>Agenda</strong>, os <strong>Orçamentos</strong> e sua <strong>página pública</strong>.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><CatalogPicker onSelect={(name, desc, price, duration) => { setForm({ ...empty, name, description: desc, price: price || "", durationMinutes: duration || "60" }); setEditingId(null); setOpen(true); }} /><Button onClick={openAdd} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Novo serviço</Button></div>}>
-    <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) reset(); }}><ServiceDialog form={form} setForm={setForm} submit={submit} pending={create.isPending || update.isPending} editing={Boolean(editingId)} /></Dialog>
+    <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) reset(); }}>
+      <ServiceDialog
+        form={form}
+        setForm={setForm}
+        submit={submit}
+        pending={create.isPending || update.isPending}
+        editing={Boolean(editingId)}
+        professionName={profile.data?.professionName}
+      />
+    </Dialog>
     <div className="mb-5 max-w-md"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa9a3]" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar por nome ou descrição..." className="h-11 rounded-xl border-[#dce5dc] bg-white pl-9" /></div></div>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{services.data?.filter(service => `${service.name} ${service.description || ""}`.toLowerCase().includes(search.toLowerCase())).map(service => <Card key={service.id} className="rounded-[22px] border-0 shadow-[0_8px_26px_rgba(19,42,39,0.04)]"><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#e8f1f5] text-[#3f738e]"><BriefcaseBusiness className="h-5 w-5" /></div><StatusBadge status={service.active ? "aceito" : "cancelado"} /></div><h3 className="mt-5 font-bold text-[#284b42]">{service.name}</h3><p className="mt-2 min-h-10 text-sm leading-5 text-[#82948e]">{service.description || "Sem descrição adicionada."}</p><div className="mt-5 flex items-center justify-between border-t border-[#edf1eb] pt-4"><span className="text-sm text-[#71867f]"><Clock3 className="mr-1 inline h-4 w-4" />{service.durationMinutes} min</span><strong className="text-lg text-[#173a34]">{money(service.priceCents)}</strong></div><p className="mt-2 text-xs text-[#9aa9a3]">{modalityLabel[service.modality]}</p><div className="mt-4 flex gap-2"><Button variant="outline" onClick={() => openEdit(service)} className="h-9 flex-1 rounded-lg border-[#dce5dc] bg-white text-xs"><Pencil className="mr-1 h-3.5 w-3.5" /> Editar</Button><Button variant="ghost" onClick={() => toggle(service)} className="h-9 rounded-lg text-xs text-[#71867f]">{service.active ? "Desativar" : "Ativar"}</Button></div></CardContent></Card>)}</div>
     {!services.isLoading && !services.data?.length && <EmptyState icon={BriefcaseBusiness} title="Adicione seu primeiro serviço" description="Seu catálogo alimenta a página pública, os pedidos e os orçamentos." action={<div className="flex flex-wrap justify-center gap-2"><CatalogPicker onSelect={(name, desc, price, duration) => { setForm({ ...empty, name, description: desc, price: price || "", durationMinutes: duration || "60" }); setEditingId(null); setOpen(true); }} /><Button onClick={openAdd} className="rounded-xl bg-[#173a34] text-white"><Plus className="mr-2 h-4 w-4" /> Novo serviço</Button></div>} />}
   </Page>;
 }
-function ServiceDialog({ form, setForm, submit, pending, editing }: { form: any; setForm: (form: any) => void; submit: () => void; pending: boolean; editing: boolean }) { return <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle><DialogDescription>As alterações refletem na agenda e na página pública.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><ServiceNameField label="Nome do serviço" value={form.name} onChange={value => setForm({ ...form, name: value })} onSelectCatalog={(name, description, price, duration) => setForm({ ...form, name, description: description || form.description, price: price || form.price, durationMinutes: duration || form.durationMinutes })} placeholder="Ex.: Troca de chuveiro, Instalação de tomadas..." /><div className="grid gap-4 sm:grid-cols-2"><Field label="Preço" prefix="R$ " value={form.price} onChange={value => setForm({ ...form, price: value })} /><Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} /></div><FormSelect label="Modalidade" value={form.modality} onChange={value => setForm({ ...form, modality: value })} options={Object.entries(modalityLabel).map(([value,label]) => ({ value, label }))} /><div><Label className="mb-2 block">Descrição</Label><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></div></div><DialogFooter><Button onClick={submit} disabled={pending} className="rounded-xl bg-[#173a34] text-white">{editing ? "Salvar alterações" : "Salvar serviço"}</Button></DialogFooter></DialogContent>; }
+function ServiceDialog({
+  form,
+  setForm,
+  submit,
+  pending,
+  editing,
+  professionName,
+}: {
+  form: any;
+  setForm: (form: any) => void;
+  submit: () => void;
+  pending: boolean;
+  editing: boolean;
+  professionName?: string;
+}) {
+  const dynamicPlaceholder = useMemo(() => getServicePlaceholderForProfession(professionName || ""), [professionName]);
+  const suggestions = useMemo(() => (!professionName ? [] : getRecommendedServicesForProfession(professionName)), [professionName]);
+
+  return (
+    <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
+      <DialogHeader>
+        <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
+        <DialogDescription>
+          {professionName ? `Cadastrando para ${professionName}. As alterações refletem na agenda e na página pública.` : "As alterações refletem na agenda e na página pública."}
+        </DialogDescription>
+      </DialogHeader>
+
+      {!editing && suggestions.length > 0 && (
+        <div className="rounded-2xl border border-[#dce5dc] bg-[#fbfcf9] p-3.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#173a34] flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-[#708818]" />
+              Sugestões para {professionName}
+            </span>
+            <span className="text-[11px] text-[#71867f]">Preenche tudo em 1 toque</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+            {suggestions.map((sug) => {
+              const isSelected = form.name.trim().toLowerCase() === sug.name.trim().toLowerCase();
+              return (
+                <button
+                  key={sug.name}
+                  type="button"
+                  onClick={() => {
+                    setForm({
+                      ...form,
+                      name: sug.name,
+                      description: sug.description || form.description,
+                      price: sug.price || form.price,
+                      durationMinutes: sug.durationMinutes || form.durationMinutes,
+                    });
+                  }}
+                  className={cn(
+                    "rounded-lg border px-2.5 py-1 text-xs font-medium transition text-left cursor-pointer",
+                    isSelected
+                      ? "border-[#173a34] bg-[#173a34] text-[#d9f56a] shadow-xs"
+                      : "border-[#dce5dc] bg-white text-[#284b42] hover:border-[#173a34] hover:bg-[#f4f7f2]"
+                  )}
+                  title={sug.description}
+                >
+                  + {sug.name} {sug.price ? `(R$ ${sug.price})` : ""}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 py-3">
+        <ServiceNameField
+          label="Nome do serviço"
+          value={form.name}
+          onChange={value => setForm({ ...form, name: value })}
+          onSelectCatalog={(name, description, price, duration) =>
+            setForm({
+              ...form,
+              name,
+              description: description || form.description,
+              price: price || form.price,
+              durationMinutes: duration || form.durationMinutes,
+            })
+          }
+          professionName={professionName}
+          placeholder={dynamicPlaceholder}
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Preço" prefix="R$ " value={form.price} onChange={value => setForm({ ...form, price: value })} />
+          <Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} />
+        </div>
+        <FormSelect
+          label="Modalidade"
+          value={form.modality}
+          onChange={value => setForm({ ...form, modality: value })}
+          options={Object.entries(modalityLabel).map(([value, label]) => ({ value, label }))}
+        />
+        <div>
+          <Label className="mb-2 block">Descrição</Label>
+          <Textarea
+            value={form.description}
+            onChange={e => setForm({ ...form, description: e.target.value })}
+            placeholder="Detalhes ou observações sobre o serviço..."
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button onClick={submit} disabled={pending} className="rounded-xl bg-[#173a34] text-white">
+          {editing ? "Salvar alterações" : "Salvar serviço"}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+}
 
 function Requests() {
   const requests = trpc.request.list.useQuery(undefined, { refetchInterval: 5000, refetchOnWindowFocus: true });
@@ -3514,6 +3639,43 @@ function Quotes() {
                   <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar item
                 </Button>
               </div>
+
+              {/* Chips rápidos dos serviços do catálogo para inserir com 1 clique no orçamento */}
+              {services.data && services.data.filter(s => s.active).length > 0 && (
+                <div className="mb-3 rounded-xl border border-[#dce5dc] bg-white p-2.5">
+                  <p className="text-[11px] font-semibold text-[#526d64] mb-1.5 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-[#708818]" />
+                    Inserir serviço do seu catálogo neste orçamento:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                    {services.data.filter(s => s.active).map(srv => (
+                      <button
+                        key={srv.id}
+                        type="button"
+                        onClick={() => {
+                          const existingEmptyIndex = form.items.findIndex(it => !it.description.trim() && !it.unitPrice.trim());
+                          const newItem = {
+                            description: srv.name,
+                            quantity: "1",
+                            unitPrice: formatBrlInput(srv.priceCents)
+                          };
+                          if (existingEmptyIndex !== -1) {
+                            const newItems = [...form.items];
+                            newItems[existingEmptyIndex] = newItem;
+                            setForm({ ...form, items: newItems });
+                          } else {
+                            setForm({ ...form, items: [...form.items, newItem] });
+                          }
+                          toast.success(`"${srv.name}" adicionado aos itens do orçamento.`);
+                        }}
+                        className="rounded-lg border border-[#dce5dc] bg-[#fbfcf9] px-2 py-1 text-xs text-[#284b42] hover:border-[#173a34] hover:bg-[#f4f7f2] transition cursor-pointer"
+                      >
+                        + {srv.name} <span className="font-semibold text-[#173a34]">({money(srv.priceCents)})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {form.items.map((item, index) => (
                 <div key={index} className="mb-3 grid gap-3 rounded-xl border border-[#e3ebe0] bg-white p-3 sm:grid-cols-[1fr_90px_120px_auto]">
                   <Field label={index === 0 ? "Descrição" : ""} value={item.description} onChange={value => updateItem(index, { description: value })} />
@@ -4048,6 +4210,7 @@ export function TeamPage() {
   const report = trpc.team.report.useQuery(range);
   const teamList = trpc.team.list.useQuery();
   const profile = trpc.profile.get.useQuery();
+  const services = trpc.service.list.useQuery();
   const utils = trpc.useUtils();
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -4172,17 +4335,9 @@ export function TeamPage() {
     }
   };
 
-  const roleSuggestions = [
-    "Manicure & Nail Designer",
-    "Alongamento em Fibra / Gel",
-    "Designer de Sobrancelhas",
-    "Micropigmentadora",
-    "Lash Designer (Cílios)",
-    "Esteticista Facial & Corporal",
-    "Cabeleireira(o) / Colorista",
-    "Maquiadora Profissional",
-    "Massoterapeuta / Depiladora"
-  ];
+  const roleData = useMemo(() => {
+    return getTeamRoleSuggestionsForProfession(profile.data?.professionName, profile.data?.professionCategory);
+  }, [profile.data?.professionName, profile.data?.professionCategory]);
 
   const activeMembersCount = (teamList.data || []).filter(m => m.active).length;
 
@@ -4282,7 +4437,7 @@ export function TeamPage() {
           <EmptyState
             icon={UserCheck}
             title="Nenhum parceiro cadastrado ainda"
-            description="Cadastre manicures, designers de sobrancelha, cabeleireiros ou outros profissionais que trabalham com você."
+            description={profile.data?.professionName ? `Cadastre profissionais parceiros para atender clientes em ${profile.data.professionName}.` : "Cadastre profissionais parceiros que trabalham com você para dividir comissões e multiplicar atendimentos."}
             action={
               <Button onClick={openNew} className="rounded-xl bg-[#173a34] text-white">
                 <Plus className="mr-2 h-4 w-4" /> Cadastrar primeiro(a) parceiro(a)
@@ -4425,21 +4580,74 @@ export function TeamPage() {
                 label="Especialidade / Função"
                 value={form.role}
                 onChange={val => setForm({ ...form, role: val })}
-                placeholder="Ex.: Manicure & Nail Designer"
+                placeholder={roleData.placeholder}
               />
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {roleSuggestions.map(s => (
+                {roleData.suggestions.map(s => (
                   <button
                     key={s}
                     type="button"
                     onClick={() => setForm({ ...form, role: s })}
-                    className="rounded-lg bg-[#f0f4ea] px-2 py-1 text-[11px] text-[#4d6b46] hover:bg-[#e4eed9] transition"
+                    className={cn(
+                      "rounded-lg px-2.5 py-1 text-[11px] font-medium transition cursor-pointer",
+                      form.role === s
+                        ? "bg-[#173a34] text-[#d9f56a]"
+                        : "bg-[#f0f4ea] text-[#4d6b46] hover:bg-[#e4eed9]"
+                    )}
                   >
                     + {s}
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* SELEÇÃO RÁPIDA DOS SERVIÇOS DO CATÁLOGO QUE ESTE PARCEIRO REALIZA */}
+            {services.data && services.data.filter(s => s.active).length > 0 && (
+              <div className="rounded-2xl border border-[#dce5dc] bg-[#fbfcf9] p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#173a34] flex items-center gap-1.5">
+                    <BriefcaseBusiness className="h-3.5 w-3.5 text-[#28564d]" />
+                    Serviços do seu catálogo que este(a) parceiro(a) realiza:
+                  </span>
+                  <span className="text-[10px] text-[#71867f]">Vincula às anotações</span>
+                </div>
+                <p className="text-[11px] text-[#526d64]">
+                  Clique nos serviços que este profissional atende no seu espaço:
+                </p>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                  {services.data.filter(s => s.active).map(srv => {
+                    const isIncluded = form.notes.includes(srv.name);
+                    return (
+                      <button
+                        key={srv.id}
+                        type="button"
+                        onClick={() => {
+                          if (isIncluded) {
+                            const updated = form.notes
+                              .replace(`• ${srv.name}\n`, "")
+                              .replace(`• ${srv.name}`, "")
+                              .replace(srv.name, "")
+                              .trim();
+                            setForm({ ...form, notes: updated });
+                          } else {
+                            const prefix = form.notes.trim() ? `${form.notes.trim()}\n• ` : "Serviços realizados:\n• ";
+                            setForm({ ...form, notes: `${prefix}${srv.name}` });
+                          }
+                        }}
+                        className={cn(
+                          "rounded-lg px-2.5 py-1 text-xs font-medium transition border cursor-pointer",
+                          isIncluded
+                            ? "bg-[#173a34] text-[#d9f56a] border-[#173a34] shadow-2xs"
+                            : "bg-white text-[#284b42] border-[#dce5dc] hover:border-[#173a34] hover:bg-[#f4f7f2]"
+                        )}
+                      >
+                        {isIncluded ? "✓ " : "+ "}{srv.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field

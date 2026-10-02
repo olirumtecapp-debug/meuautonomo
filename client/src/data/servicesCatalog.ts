@@ -607,3 +607,150 @@ export function getServicePlaceholderForProfession(professionName: string): stri
   }
   return "Ex.: Atendimento padrão ou serviço principal";
 }
+
+// Retorna sugestões de papéis/cargos e placeholder para cadastro de membros de equipe com base no ramo do negócio
+export function getTeamRoleSuggestionsForProfession(
+  professionName?: string,
+  categoryName?: string
+): { suggestions: string[]; placeholder: string } {
+  const clean = (str: string) =>
+    (str || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  const combined = `${clean(professionName || "")} ${clean(categoryName || "")}`;
+
+  // 1. Beleza, Estética, Salão, Cabelo, Unhas, Cílios
+  if (
+    combined.includes("beleza") ||
+    combined.includes("cabel") ||
+    combined.includes("unha") ||
+    combined.includes("cilio") ||
+    combined.includes("estetica") ||
+    combined.includes("salao") ||
+    combined.includes("estudio") ||
+    combined.includes("spa")
+  ) {
+    return {
+      placeholder: "Ex.: Manicure & Nail Designer",
+      suggestions: [
+        "Cabeleireira(o) / Colorista",
+        "Manicure & Nail Designer",
+        "Designer de Sobrancelhas",
+        "Lash Designer (Cílios)",
+        "Esteticista Facial & Corporal",
+        "Maquiadora Profissional",
+        "Barbeiro / Barboterapeuta",
+        "Podóloga / Podólogo",
+        "Massoterapeuta / Depiladora",
+        "Tatuador(a) / Body Piercer"
+      ]
+    };
+  }
+
+  // 2. Casa, Reparos, Construção, Manutenção
+  if (
+    combined.includes("casa") ||
+    combined.includes("manutenc") ||
+    combined.includes("reparo") ||
+    combined.includes("eletric") ||
+    combined.includes("encanad") ||
+    combined.includes("pintor") ||
+    combined.includes("pedreir") ||
+    combined.includes("marido") ||
+    combined.includes("obra") ||
+    combined.includes("reforma")
+  ) {
+    return {
+      placeholder: "Ex.: Eletricista Parceiro(a)",
+      suggestions: [
+        "Eletricista Parceiro(a)",
+        "Encanador(a) / Instalador(a)",
+        "Pintor(a) Residencial",
+        "Marceneiro(a) / Montador(a)",
+        "Pedreiro(a) / Azulejista",
+        "Técnico(a) de Ar-Condicionado",
+        "Vidraceiro(a) / Serralheiro(a)",
+        "Gesseiro(a) / Drywall",
+        "Jardineiro(a) / Piscineiro(a)"
+      ]
+    };
+  }
+
+  // 3. Automotivo
+  if (combined.includes("auto") || combined.includes("mecanic") || combined.includes("carro") || combined.includes("oficina")) {
+    return {
+      placeholder: "Ex.: Mecânico(a) Geral",
+      suggestions: [
+        "Mecânico(a) Geral",
+        "Eletricista Automotivo",
+        "Funileiro(a) / Pintor(a)",
+        "Estética Automotiva / Detalhador",
+        "Alinhador(a) / Geometria",
+        "Borracheiro(a)",
+        "Instalador(a) de Som & Acessórios"
+      ]
+    };
+  }
+
+  // 4. Tecnologia, Design, Mídia
+  if (combined.includes("tecnolog") || combined.includes("ti") || combined.includes("midia") || combined.includes("design") || combined.includes("foto")) {
+    return {
+      placeholder: "Ex.: Fotógrafo(a) ou Designer",
+      suggestions: [
+        "Fotógrafo(a)",
+        "Videomaker / Filmaker",
+        "Designer Gráfico",
+        "Editor(a) de Vídeo",
+        "Social Media & Tráfego",
+        "Desenvolvedor(a) Web/App",
+        "Técnico(a) de Suporte / Hardware"
+      ]
+    };
+  }
+
+  // 5. Saúde, Terapias, Bem-estar
+  if (combined.includes("saude") || combined.includes("bem-estar") || combined.includes("terapia") || combined.includes("personal")) {
+    return {
+      placeholder: "Ex.: Fisioterapeuta ou Nutricionista",
+      suggestions: [
+        "Personal Trainer",
+        "Fisioterapeuta",
+        "Nutricionista",
+        "Massoterapeuta",
+        "Psicólogo(a)",
+        "Terapeuta Holístico(a)",
+        "Instrutor(a) de Pilates / Yoga",
+        "Cuidador(a) / Enfermagem"
+      ]
+    };
+  }
+
+  // 6. Eventos, Gastronomia, Festas
+  if (combined.includes("evento") || combined.includes("festa") || combined.includes("gastronom") || combined.includes("buffet")) {
+    return {
+      placeholder: "Ex.: Confeiteiro(a) ou Bartender",
+      suggestions: [
+        "Confeiteiro(a) / Doceiro(a)",
+        "Churrasqueiro(a)",
+        "Garçom / Bartender",
+        "Decorador(a) de Festas",
+        "DJ / Sonorização",
+        "Cerimonialista / Produtor(a)"
+      ]
+    };
+  }
+
+  return {
+    placeholder: "Ex.: Especialista Parceiro(a)",
+    suggestions: [
+      "Profissional Parceiro(a)",
+      "Atendente Especialista",
+      "Prestador(a) Associado(a)",
+      "Técnico(a) Especialista",
+      "Consultor(a) Parceiro(a)"
+    ]
+  };
+}
+
