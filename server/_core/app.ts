@@ -2,6 +2,7 @@ import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { registerOgMetaRoutes } from "../routes/og-meta";
 import { handleAsaasWebhook } from "../webhooks/asaas";
 import { createPixPayment, getPaymentStatus } from "../routes/asaas-checkout";
 import { appRouter } from "../routers";
@@ -16,6 +17,7 @@ export function createExpressApp() {
   
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  registerOgMetaRoutes(app);
 
   // Webhook oficial do Asaas (PIX automático e reembolsos CDC)
   app.post("/api/webhooks/asaas", handleAsaasWebhook);

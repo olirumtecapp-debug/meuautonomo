@@ -1320,6 +1320,166 @@ function registerStorageProxy(app2) {
   });
 }
 
+// server/routes/og-meta.ts
+import fs3 from "fs";
+import path3 from "path";
+function escapeHtml(str) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+function escapeXml(unsafe) {
+  return unsafe.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case "&":
+        return "&amp;";
+      case "'":
+        return "&apos;";
+      case '"':
+        return "&quot;";
+      default:
+        return c;
+    }
+  });
+}
+function findIndexHtml() {
+  const possiblePaths = [
+    path3.resolve(process.cwd(), "dist/public/index.html"),
+    path3.resolve(process.cwd(), "public/index.html"),
+    path3.resolve(process.cwd(), "client/index.html"),
+    path3.resolve(__dirname, "../../dist/public/index.html"),
+    path3.resolve(__dirname, "../public/index.html"),
+    path3.resolve(__dirname, "public/index.html")
+  ];
+  for (const p of possiblePaths) {
+    if (fs3.existsSync(p)) {
+      try {
+        return fs3.readFileSync(p, "utf-8");
+      } catch (err) {
+        console.error("[OG Meta] Erro ao ler index.html em", p, err);
+      }
+    }
+  }
+  return null;
+}
+function registerOgMetaRoutes(app2) {
+  app2.get("/api/og/card/:slug", async (req, res) => {
+    const { slug } = req.params;
+    try {
+      const profile = await getProfileBySlug(slug);
+      const name = profile?.displayName || "Profissional Aut\xF4nomo";
+      const profession = profile?.professionName || "Cart\xE3o Profissional";
+      const initial = name.charAt(0).toUpperCase();
+      const safeName = escapeXml(name);
+      const safeProfession = escapeXml(profession);
+      const svg = `
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cardBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#12352f"/>
+      <stop offset="60%" stop-color="#173a34"/>
+      <stop offset="100%" stop-color="#0c201d"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Fundo com gradiente elegante -->
+  <rect width="1200" height="630" fill="url(#cardBg)"/>
+  
+  <!-- Formas decorativas org\xE2nicas -->
+  <circle cx="1120" cy="90" r="260" fill="#d9f56a" fill-opacity="0.08"/>
+  <circle cx="80" cy="560" r="220" fill="#d9f56a" fill-opacity="0.05"/>
+  
+  <!-- Selo superior do Cart\xE3o -->
+  <rect x="90" y="80" width="240" height="46" rx="23" fill="#d9f56a" fill-opacity="0.15"/>
+  <text x="210" y="110" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#d9f56a" text-anchor="middle" letter-spacing="1.5">CART\xC3O OFICIAL</text>
+
+  <!-- Avatar com inicial de destaque -->
+  <rect x="90" y="160" width="120" height="120" rx="34" fill="#d9f56a"/>
+  <text x="150" y="242" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="64" font-weight="900" fill="#173a34" text-anchor="middle">${initial}</text>
+
+  <!-- Nome do Profissional -->
+  <text x="90" y="345" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="900" fill="#ffffff">${safeName}</text>
+
+  <!-- Profiss\xE3o / Ramo de Atua\xE7\xE3o -->
+  <text x="90" y="415" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="32" font-weight="700" fill="#d9f56a">${safeProfession}</text>
+
+  <!-- Bot\xE3o de A\xE7\xE3o / Chamada -->
+  <rect x="90" y="480" width="480" height="66" rx="20" fill="#d9f56a"/>
+  <text x="330" y="522" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="800" fill="#173a34" text-anchor="middle">Agende seu atendimento online \u2192</text>
+
+  <!-- Assinatura da plataforma -->
+  <text x="1110" y="560" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="600" fill="#ffffff" fill-opacity="0.45" text-anchor="end">MeuAut\xF4nomo</text>
+</svg>`.trim();
+      res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800");
+      return res.send(svg);
+    } catch (err) {
+      console.error("[OG Image Error]:", err);
+      return res.status(500).send("Error generating card image");
+    }
+  });
+  app2.get("/p/:slug", async (req, res) => {
+    const { slug } = req.params;
+    try {
+      const profile = await getProfileBySlug(slug);
+      const html = findIndexHtml();
+      if (!html) {
+        return res.redirect("/");
+      }
+      if (!profile) {
+        return res.send(html);
+      }
+      const host = req.get("x-forwarded-host") || req.get("host") || "meuautonomo.creativeam.com.br";
+      const protocol = req.get("x-forwarded-proto") || "https";
+      const siteUrl = `${protocol}://${host}`;
+      const pageUrl = `${siteUrl}/p/${encodeURIComponent(profile.slug)}`;
+      const safeName = escapeHtml(profile.displayName || "Profissional");
+      const safeProfession = escapeHtml(profile.professionName || "Atendimento Profissional");
+      const title = `${safeName} \u2014 ${safeProfession} | Cart\xE3o Profissional`;
+      const description = escapeHtml(
+        profile.bio || `Confira os servi\xE7os, valores e solicite seu agendamento direto com ${profile.displayName} (${profile.professionName || "Profissional"}).`
+      );
+      let ogImageUrl = "";
+      if (profile.avatarUrl && profile.avatarUrl.startsWith("http")) {
+        ogImageUrl = profile.avatarUrl;
+      } else if (profile.avatarUrl && profile.avatarUrl.startsWith("/")) {
+        ogImageUrl = `${siteUrl}${profile.avatarUrl}`;
+      } else {
+        ogImageUrl = `${siteUrl}/api/og/card/${encodeURIComponent(profile.slug)}`;
+      }
+      const ogTags = `
+    <!-- Metatags do Profissional (WhatsApp, Telegram, Facebook, Google) -->
+    <title>${title}</title>
+    <meta name="description" content="${description}" />
+    <meta property="og:type" content="profile" />
+    <meta property="og:site_name" content="${safeName} \u2014 Cart\xE3o Profissional" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:url" content="${pageUrl}" />
+    <meta property="og:image" content="${ogImageUrl}" />
+    <meta property="og:image:secure_url" content="${ogImageUrl}" />
+    <meta property="og:image:alt" content="${safeName}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${description}" />
+    <meta name="twitter:image" content="${ogImageUrl}" />
+      `.trim();
+      let personalizedHtml = html.replace(/<title>.*?<\/title>/i, "").replace(/<meta\s+name=["']description["'].*?>/i, "").replace("</head>", `  ${ogTags}
+  </head>`);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+      return res.send(personalizedHtml);
+    } catch (err) {
+      console.error("[OG Route Error]:", err);
+      const fallbackHtml = findIndexHtml();
+      if (fallbackHtml) return res.send(fallbackHtml);
+      return res.redirect("/");
+    }
+  });
+}
+
 // server/webhooks/asaas.ts
 init_schema();
 import { eq as eq2 } from "drizzle-orm";
@@ -3962,6 +4122,7 @@ function createExpressApp() {
   app2.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app2);
   registerOAuthRoutes(app2);
+  registerOgMetaRoutes(app2);
   app2.post("/api/webhooks/asaas", handleAsaasWebhook);
   app2.post("/api/asaas/create-pix", createPixPayment);
   app2.get("/api/asaas/payment-status/:paymentId", getPaymentStatus);
