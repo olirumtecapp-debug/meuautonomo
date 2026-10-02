@@ -1014,10 +1014,16 @@ function Onboarding() {
                   />
 
                   <div>
-                    <Label className="mb-2 block text-sm font-semibold text-[#38584f]">
-                      Uma frase sobre seu trabalho <span className="font-normal text-[#9bad9a]">(opcional)</span>
-                    </Label>
+                    <div className="mb-2 flex items-center justify-between">
+                      <Label className="text-sm font-semibold text-[#38584f]">
+                        Uma frase sobre seu trabalho <span className="font-normal text-[#9bad9a]">(opcional)</span>
+                      </Label>
+                      <span className={`text-[11px] font-medium ${(profession.bio?.length || 0) > 450 ? "text-amber-600 font-bold" : "text-[#71867f]"}`}>
+                        {profession.bio?.length || 0} / 500 caracteres
+                      </span>
+                    </div>
                     <Textarea
+                      maxLength={500}
                       value={profession.bio}
                       onChange={(e) => setProfession({ ...profession, bio: e.target.value })}
                       placeholder="Conte rapidamente como você ajuda seus clientes… Ex.: Especialista em reparos residenciais rápidos com garantia e pontualidade."
@@ -4649,8 +4655,19 @@ function SettingsPage() {
             />
             <Field label="WhatsApp" value={current.whatsapp} onChange={value => setForm({ ...current, whatsapp: value })} />
             <div>
-              <Label className="mb-2 block">Descrição</Label>
-              <Textarea value={current.bio} onChange={e => setForm({ ...current, bio: e.target.value })} />
+              <div className="mb-2 flex items-center justify-between">
+                <Label className="text-sm font-semibold text-[#38584f]">Descrição sobre seu trabalho</Label>
+                <span className={`text-[11px] font-medium ${(current.bio?.length || 0) > 450 ? "text-amber-600 font-bold" : "text-[#71867f]"}`}>
+                  {current.bio?.length || 0} / 500 caracteres
+                </span>
+              </div>
+              <Textarea
+                maxLength={500}
+                value={current.bio}
+                onChange={e => setForm({ ...current, bio: e.target.value })}
+                placeholder="Conte sobre sua experiência, especialidades e diferenciais..."
+                className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9] text-sm"
+              />
             </div>
             <Button onClick={save} disabled={update.isPending} className="mt-2 w-fit rounded-xl bg-[#173a34] text-white">
               Salvar perfil

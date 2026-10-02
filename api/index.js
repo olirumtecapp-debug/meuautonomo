@@ -667,7 +667,7 @@ import { parse as parseCookieHeader2 } from "cookie";
 
 // server/db.ts
 init_schema();
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 
 // server/_core/env.ts
@@ -685,15 +685,39 @@ var ENV = {
 // server/db.ts
 init_mockDb();
 var _db = null;
+var _schemaMigrationPromise = null;
+async function ensureSchema(db) {
+  if (!db || db.__isMock || typeof db.execute !== "function") return;
+  if (!_schemaMigrationPromise) {
+    _schemaMigrationPromise = (async () => {
+      try {
+        await db.execute(sql`
+          ALTER TABLE \`professionalProfiles\`
+          ADD COLUMN \`accountType\` ENUM('individual', 'equipe') NOT NULL DEFAULT 'individual'
+        `);
+        console.log("[Database] Migra\xE7\xE3o: Coluna 'accountType' adicionada a professionalProfiles.");
+      } catch (err) {
+        if (err?.code === "ER_DUP_FIELDNAME" || err?.code === "1060" || String(err?.message || "").includes("Duplicate column") || String(err?.message || "").includes("already exists")) {
+        } else {
+          console.warn("[Database] Aviso de migra\xE7\xE3o (accountType):", err?.message || err);
+        }
+      }
+    })();
+  }
+  await _schemaMigrationPromise;
+}
 async function getDb() {
   if (process.env.DATABASE_URL) {
     if (!_db || _db.__isMock) {
       try {
         _db = drizzle(process.env.DATABASE_URL);
+        await ensureSchema(_db);
       } catch (error) {
         console.warn("[Database] Failed to connect to DATABASE_URL:", error);
         _db = getMockDb();
       }
+    } else {
+      await ensureSchema(_db);
     }
     return _db;
   }
@@ -779,14 +803,46 @@ async function getAllUsers() {
 async function getProfileByUserId(userId) {
   const db = await getDb();
   if (!db) return void 0;
-  const result = await db.select().from(professionalProfiles).where(eq(professionalProfiles.userId, userId)).limit(1);
-  return result[0];
+  try {
+    const result = await db.select().from(professionalProfiles).where(eq(professionalProfiles.userId, userId)).limit(1);
+    return result[0];
+  } catch (err) {
+    if (String(err?.message || "").includes("accountType") && typeof db.execute === "function") {
+      try {
+        await db.execute(sql`
+          ALTER TABLE \`professionalProfiles\`
+          ADD COLUMN \`accountType\` ENUM('individual', 'equipe') NOT NULL DEFAULT 'individual'
+        `);
+        const retryResult = await db.select().from(professionalProfiles).where(eq(professionalProfiles.userId, userId)).limit(1);
+        return retryResult[0];
+      } catch (retryErr) {
+        console.error("[Database] Retry getProfileByUserId falhou:", retryErr);
+      }
+    }
+    throw err;
+  }
 }
 async function getProfileBySlug(slug) {
   const db = await getDb();
   if (!db) return void 0;
-  const result = await db.select().from(professionalProfiles).where(eq(professionalProfiles.slug, slug)).limit(1);
-  return result[0];
+  try {
+    const result = await db.select().from(professionalProfiles).where(eq(professionalProfiles.slug, slug)).limit(1);
+    return result[0];
+  } catch (err) {
+    if (String(err?.message || "").includes("accountType") && typeof db.execute === "function") {
+      try {
+        await db.execute(sql`
+          ALTER TABLE \`professionalProfiles\`
+          ADD COLUMN \`accountType\` ENUM('individual', 'equipe') NOT NULL DEFAULT 'individual'
+        `);
+        const retryResult = await db.select().from(professionalProfiles).where(eq(professionalProfiles.slug, slug)).limit(1);
+        return retryResult[0];
+      } catch (retryErr) {
+        console.error("[Database] Retry getProfileBySlug falhou:", retryErr);
+      }
+    }
+    throw err;
+  }
 }
 async function createNotification(profileId, title, body, type) {
   const db = await getDb();
