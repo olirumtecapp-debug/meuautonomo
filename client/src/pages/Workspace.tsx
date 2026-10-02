@@ -27,6 +27,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   ClipboardList,
+  Clock,
   Clock3,
   CreditCard,
   History,
@@ -50,6 +51,7 @@ import {
   UserRound,
   Users,
   UserCheck,
+  UserX,
   Percent,
   MessageSquare,
   Building2,
@@ -1148,6 +1150,132 @@ function Page({ title, eyebrow, description, action, help, children }: { title: 
 function EmptyState({ icon: Icon, title, description, action }: { icon: typeof CalendarDays; title: string; description: string; action?: React.ReactNode }) { return <div className="grid place-items-center rounded-[24px] border border-dashed border-[#cddbcf] bg-white/60 px-6 py-16 text-center"><div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[#eef5d2] text-[#829a14]"><Icon className="h-6 w-6" /></div><h3 className="text-lg font-bold text-[#173a34]">{title}</h3><p className="mt-2 max-w-sm text-sm text-[#78908a]">{description}</p>{action && <div className="mt-5">{action}</div>}</div>; }
 function StatusBadge({ status }: { status: string }) { return <Badge className={cn("border-0 font-semibold", statusClass[status] || "bg-[#edf2ec] text-[#5d746d]")}>{statusLabel[status] || status}</Badge>; }
 
+function UnresolvedPastAlert({
+  onGenerateReceipt,
+}: {
+  onGenerateReceipt?: (item: any) => void;
+}) {
+  const unresolvedQuery = trpc.appointment.unresolvedPast.useQuery(undefined, {
+    refetchInterval: 10000,
+    refetchOnWindowFocus: true,
+  });
+  const clients = trpc.customer.list.useQuery();
+  const services = trpc.service.list.useQuery();
+  const teamMembers = trpc.team.list.useQuery();
+  const updateStatus = trpc.appointment.updateStatus.useMutation();
+  const utils = trpc.useUtils();
+
+  const items = unresolvedQuery.data || [];
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mb-6 rounded-[24px] border border-amber-300 bg-linear-to-r from-[#fffcf2] via-[#fff9e8] to-[#fef5dc] p-4.5 sm:p-5 shadow-xs">
+      <div className="flex items-start gap-3.5">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#fbe5be] text-[#9b5800]">
+          <Clock className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="border-0 bg-[#b36b00] px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white shadow-xs">
+              Lembrete de Fechamento
+            </Badge>
+            <span className="text-xs font-bold text-[#8a5200]">
+              {items.length === 1
+                ? "1 atendimento anterior aguardando confirmação"
+                : `${items.length} atendimentos anteriores aguardando confirmação`}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-[#6e5025] sm:text-sm">
+            O horário previsto já encerrou. O serviço foi realizado ou o cliente não compareceu? Atualize abaixo em 1 clique para manter seus relatórios e recibos em dia:
+          </p>
+
+          <div className="mt-3.5 space-y-2.5">
+            {items.map(item => {
+              const client = clients.data?.find(c => c.id === item.clientId);
+              const service = services.data?.find(s => s.id === item.serviceId);
+              const member = teamMembers.data?.find(m => m.id === item.teamMemberId);
+              const clientName = client?.name || (item.clientId ? `Cliente #${item.clientId}` : "Cliente a confirmar");
+              const serviceName = service?.name || item.notes || "Atendimento";
+
+              return (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-amber-200/90 bg-white/95 p-3.5 shadow-xs sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-[#173a34] text-sm">{clientName}</p>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-[#eef5d2] px-2 py-0.5 text-[11px] font-semibold text-[#667700]">
+                        <BriefcaseBusiness className="h-3 w-3" />
+                        {serviceName}
+                      </span>
+                      {member && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-[#e8f1f5] px-2 py-0.5 text-[11px] font-semibold text-[#2f5e77]">
+                          <UserCheck className="h-3 w-3" />
+                          {member.name}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-[#71867f]">
+                      Agendado para: <strong>{dateLabel(item.startsAt)} às {timeLabel(item.startsAt)}</strong> ({item.durationMinutes} min) · <strong>{money(item.amountCents)}</strong>
+                      {item.location ? ` · ${item.location}` : ""}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          await updateStatus.mutateAsync({ id: item.id, status: "concluido" });
+                          utils.appointment.unresolvedPast.invalidate();
+                          utils.appointment.list.invalidate();
+                          utils.dashboard.summary.invalidate();
+                          toast.success(`Atendimento de ${clientName} concluído com sucesso!`, {
+                            action: onGenerateReceipt ? {
+                              label: "Emitir Recibo",
+                              onClick: () => onGenerateReceipt(item),
+                            } : undefined,
+                          });
+                        } catch (err: any) {
+                          toast.error(err?.message || "Não foi possível atualizar.");
+                        }
+                      }}
+                      disabled={updateStatus.isPending}
+                      className="h-8.5 rounded-xl bg-[#1b5e3a] px-3.5 text-xs font-semibold text-white shadow-xs hover:bg-[#25794c]"
+                    >
+                      <Check className="mr-1.5 h-3.5 w-3.5 text-[#9effc5]" /> Concluir e Dar Baixa
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          await updateStatus.mutateAsync({ id: item.id, status: "faltou" });
+                          utils.appointment.unresolvedPast.invalidate();
+                          utils.appointment.list.invalidate();
+                          utils.dashboard.summary.invalidate();
+                          toast.info(`Atendimento marcado como 'Não compareceu'.`);
+                        } catch (err: any) {
+                          toast.error(err?.message || "Não foi possível atualizar.");
+                        }
+                      }}
+                      disabled={updateStatus.isPending}
+                      className="h-8.5 rounded-xl border-amber-300 bg-white px-3 text-xs font-medium text-[#8a5200] hover:bg-amber-50"
+                    >
+                      <UserX className="mr-1.5 h-3.5 w-3.5 text-red-500" /> Não compareceu
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Dashboard() {
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
   const range = useMemo(() => ({ from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined, to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined }), [from, to]);
@@ -1157,6 +1285,7 @@ function Dashboard() {
   const [, setLocation] = useLocation();
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialTab, setTutorialTab] = useState<"passos" | "estudio" | "dicas">("passos");
+  const [receiptAppointment, setReceiptAppointment] = useState<ReceiptData | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(() => {
     return typeof window !== "undefined" && localStorage.getItem("meu-autonomo-tutorial-banner-dismissed") === "true";
   });
@@ -1166,6 +1295,29 @@ function Dashboard() {
   const next = data.today.find(item => item.status !== "cancelado");
   const nextClient = next ? clients.data?.find(c => c.id === next.clientId) : null;
   const nextService = next ? services.data?.find(s => s.id === next.serviceId) : null;
+
+  const handleGenerateReceipt = (item: any) => {
+    const client = clients.data?.find(c => c.id === item.clientId);
+    const service = services.data?.find(s => s.id === item.serviceId);
+    const clientName = client?.name || (item.clientId ? `Cliente #${item.clientId}` : "Cliente");
+    const serviceName = service?.name || item.notes || "Prestação de serviços";
+
+    setReceiptAppointment({
+      receiptNumber: `REC-${String(item.id).padStart(4, "0")}`,
+      date: item.startsAt,
+      professionalName: data.profile.displayName || "Profissional",
+      profession: data.profile.professionName || "Prestador de Serviços",
+      professionalPhone: data.profile.whatsapp || data.profile.phone || "",
+      professionalCity: data.profile.city || "",
+      pixKey: data.profile.pixKey || "",
+      clientName: clientName,
+      clientPhone: client?.whatsapp || client?.phone || "",
+      serviceDescription: serviceName,
+      amountCents: item.amountCents,
+      paymentMethod: item.paymentMethod || "Acerto direto com o prestador",
+      authCode: item.receiptCode || `MA-REC-A${item.id}`,
+    });
+  };
   return <Page title={`${greeting()}, ${(data.profile.displayName || "profissional").split(" ")[0]}!`} eyebrow="Hoje" description="Uma visão rápida para você abrir e já saber o que precisa fazer." help={<HelpButton title="Como funciona o Painel?"><p><strong>O Painel</strong> é a sua central de comando. Aqui você vê, de relance, o que acontece no seu dia e no seu mês.</p><p><strong>Métricas:</strong> Atendimentos do dia, valor previsto, recebido no mês e valor em aberto.</p><p><strong>Próximo atendimento:</strong> O que vem a seguir na agenda, com horário, cliente e serviço.</p><p><strong>Solicitações recentes:</strong> Pedidos recebidos de clientes para você avaliar e transformar em agendamentos.</p><p><strong>Filtro de período:</strong> Use o filtro de datas para ver métricas de períodos específicos.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><RangeFilter from={from} to={to} setFrom={setFrom} setTo={setTo} /><Button onClick={() => setLocation("/agenda")} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Novo atendimento</Button></div>}>
     {!bannerDismissed && (
       <div className="relative mb-6 overflow-hidden rounded-[24px] border border-[#d2e4b8] bg-linear-to-r from-[#f7fbe8] via-[#f0f8df] to-[#e6f3d0] p-5 shadow-[0_8px_30px_rgba(23,58,52,0.06)] sm:p-6">
@@ -1232,8 +1384,14 @@ function Dashboard() {
       </div>
     )}
     <GuidedTutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} defaultTab={tutorialTab} />
+    <UnresolvedPastAlert onGenerateReceipt={handleGenerateReceipt} />
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric title="Atendimentos hoje" value={String(data.metrics.todayCount)} hint="na sua agenda" icon={CalendarDays} accent="lime" /><Metric title="Previsto hoje" value={money(data.metrics.todayProjectedCents)} hint="em atendimentos" icon={WalletCards} accent="blue" /><Metric title="Recebido no mês" value={money(data.metrics.receivedCents)} hint="pagamentos registrados" icon={CircleDollarSign} accent="green" /><Metric title="A receber" value={money(data.metrics.pendingCents)} hint="em aberto" icon={ClipboardList} accent="orange" /></div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_1fr]"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader className="flex-row items-center justify-between"><div><CardTitle className="text-lg text-[#173a34]">Próximo atendimento</CardTitle><p className="mt-1 text-sm text-[#82948e]">O que vem a seguir no seu dia</p></div><CalendarDays className="h-5 w-5 text-[#8aa500]" /></CardHeader><CardContent>{next ? <div className="rounded-2xl bg-[#f4f8ed] p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-2xl font-bold text-[#173a34]">{timeLabel(next.startsAt)}</p><p className="mt-1 text-sm text-[#71867f]">{dateLabel(next.startsAt)} · {next.durationMinutes} min</p></div><StatusBadge status={next.status} /></div><div className="mt-5 grid gap-3 text-sm text-[#5b746c] sm:grid-cols-2"><p><UserRound className="mr-2 inline h-4 w-4 text-[#8aa500]" />{nextClient ? nextClient.name : next.clientId ? `Cliente #${next.clientId}` : "Cliente a confirmar"}</p>{nextService && <p><BriefcaseBusiness className="mr-2 inline h-4 w-4 text-[#8aa500]" /><strong className="font-semibold text-[#284b42]">{nextService.name}</strong></p>}<p><WalletCards className="mr-2 inline h-4 w-4 text-[#8aa500]" />{money(next.amountCents)}</p><p><MapPin className="mr-2 inline h-4 w-4 text-[#8aa500]" />{next.location || "Local a combinar"}</p></div><div className="mt-5 flex flex-wrap gap-2"><Button variant="outline" className="rounded-xl border-[#ccdccc] bg-white text-[#34564d]" onClick={() => setLocation("/agenda")}>Ver agenda <ChevronRight className="ml-1 h-4 w-4" /></Button>{next.location && <Button variant="ghost" className="rounded-xl text-[#71867f]" onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(next.location || "")}`, "_blank")}>Abrir rota <ExternalLink className="ml-1 h-4 w-4" /></Button>}</div></div> : <EmptyState icon={CalendarDays} title="Agenda livre por enquanto" description="Adicione seu próximo atendimento e deixe seu dia organizado." action={<Button onClick={() => setLocation("/agenda")} className="rounded-xl bg-[#173a34] text-white"><Plus className="mr-2 h-4 w-4" /> Adicionar atendimento</Button>} />}</CardContent></Card><div className="grid gap-6"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-lg text-[#173a34]">Solicitações recentes</CardTitle><Button variant="ghost" onClick={() => setLocation("/solicitacoes")} className="text-xs text-[#71867f]">Ver todas <ArrowRight className="ml-1 h-3 w-3" /></Button></CardHeader><CardContent className="space-y-3">{data.recentRequests.length ? data.recentRequests.map(request => <button key={request.id} onClick={() => setLocation("/solicitacoes")} className="flex w-full items-center gap-3 rounded-2xl p-2 text-left transition hover:bg-[#f5f8f2]"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#eef5d2] text-[#819815]"><ClipboardList className="h-4 w-4" /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-[#2b4d44]">{request.requesterName}</p><p className="truncate text-xs text-[#83968f]">{request.description}</p></div><StatusBadge status={request.status} /></button>) : <p className="py-5 text-sm text-[#83968f]">Quando um cliente pedir um serviço, ele aparecerá aqui.</p>}</CardContent></Card><Card className="rounded-[24px] border-0 bg-[#173a34] text-white shadow-[0_10px_35px_rgba(19,42,39,0.12)]"><CardContent className="p-6"><div className="mb-4 flex items-center gap-2 text-[#d9f56a]"><Sparkles className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-[0.15em]">Seu cartão</span></div><h3 className="text-xl font-bold">Compartilhe seu trabalho.</h3><p className="mt-2 text-sm leading-6 text-white/65">Tenha um link profissional para enviar no WhatsApp, Instagram e onde seus clientes estiverem.</p><Button onClick={() => setLocation("/cartao")} className="mt-5 rounded-xl bg-[#d9f56a] text-[#173a34] hover:bg-[#e8ff8e]">Abrir meu cartão <ArrowRight className="ml-2 h-4 w-4" /></Button></CardContent></Card></div></div>
+    <ReceiptModal
+      open={Boolean(receiptAppointment)}
+      onOpenChange={v => !v && setReceiptAppointment(null)}
+      data={receiptAppointment}
+    />
   </Page>;
 }
 function Metric({ title, value, hint, icon: Icon, accent }: { title: string; value: string; hint: string; icon: typeof CalendarDays; accent: string }) { const colors: Record<string,string> = { lime: "bg-[#eef5d2] text-[#809614]", blue: "bg-[#e8f1f5] text-[#3f738e]", green: "bg-[#e3f3e8] text-[#3e885c]", orange: "bg-[#fff1d9] text-[#a27320]" }; return <Card className="rounded-[22px] border-0 bg-white shadow-[0_8px_26px_rgba(19,42,39,0.04)]"><CardContent className="p-5"><div className="flex items-start justify-between"><div><p className="text-xs font-semibold text-[#83968f]">{title}</p><p className="mt-2 text-2xl font-bold tracking-tight text-[#173a34]">{value}</p><p className="mt-1 text-xs text-[#9aa9a3]">{hint}</p></div><div className={cn("grid h-10 w-10 place-items-center rounded-xl", colors[accent])}><Icon className="h-5 w-5" /></div></div></CardContent></Card>; }
@@ -1353,6 +1511,14 @@ function Agenda() {
 
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ clientId: "", serviceId: "", teamMemberId: "", startsAt: getNextAppointmentSlot(), durationMinutes: "60", amount: "", location: "", notes: "", status: "confirmado" });
+  const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>("all");
+
+  const filteredAppointments = useMemo(() => {
+    const list = appointments.data || [];
+    if (!teamMembers.data?.length || selectedMemberFilter === "all") return list;
+    if (selectedMemberFilter === "owner") return list.filter(a => !a.teamMemberId);
+    return list.filter(a => a.teamMemberId === Number(selectedMemberFilter));
+  }, [appointments.data, teamMembers.data, selectedMemberFilter]);
 
   const [quoteScheduleOpen, setQuoteScheduleOpen] = useState(false);
   const [selectedQuoteToSchedule, setSelectedQuoteToSchedule] = useState<any | null>(null);
@@ -1503,22 +1669,14 @@ function Agenda() {
                   />
                 )}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <FormSelect
-                    label="Situação"
-                    value={form.status}
-                    onChange={value => setForm({ ...form, status: value })}
-                    options={[["confirmado", "Confirmado"], ["agendado", "Agendado"], ["concluido", "Concluído"]].map(([value, label]) => ({ value, label }))}
-                  />
                   <div>
                     <Label className="mb-2 block">Data e horário</Label>
                     <Input type="datetime-local" value={form.startsAt} onChange={e => setForm({ ...form, startsAt: e.target.value })} />
                   </div>
+                  <Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} />
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} />
                   <Field label="Valor" prefix="R$ " value={form.amount} onChange={value => setForm({ ...form, amount: value })} />
-                </div>
-                <div>
                   <Field label="Local" value={form.location} onChange={value => setForm({ ...form, location: value })} placeholder="Endereço ou link" />
                 </div>
                 <div>
@@ -1625,6 +1783,58 @@ function Agenda() {
         </div>
       )}
 
+      {/* Alerta inteligente de atendimentos anteriores pendentes de baixa/conclusão */}
+      <UnresolvedPastAlert onGenerateReceipt={handleGenerateReceipt} />
+
+      {/* Seletor rápido de membros da equipe (Modo Estúdio / Equipe) */}
+      {Boolean(teamMembers.data?.length) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-[#edf1eb] bg-white p-2.5 shadow-xs">
+          <span className="px-2 text-xs font-semibold text-[#5f756d]">Visualizar agenda:</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedMemberFilter("all")}
+            className={cn(
+              "h-8 rounded-xl px-3 text-xs font-medium",
+              selectedMemberFilter === "all"
+                ? "bg-[#173a34] text-white hover:bg-[#28564d] hover:text-white"
+                : "text-[#5f756d] hover:bg-[#f4f7f4]"
+            )}
+          >
+            👥 Toda a equipe
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedMemberFilter("owner")}
+            className={cn(
+              "h-8 rounded-xl px-3 text-xs font-medium",
+              selectedMemberFilter === "owner"
+                ? "bg-[#173a34] text-white hover:bg-[#28564d] hover:text-white"
+                : "text-[#5f756d] hover:bg-[#f4f7f4]"
+            )}
+          >
+            👤 Eu mesmo(a) (Titular)
+          </Button>
+          {(teamMembers.data || []).filter(m => m.active).map(m => (
+            <Button
+              key={m.id}
+              size="sm"
+              variant="ghost"
+              onClick={() => setSelectedMemberFilter(String(m.id))}
+              className={cn(
+                "h-8 rounded-xl px-3 text-xs font-medium",
+                selectedMemberFilter === String(m.id)
+                  ? "bg-[#173a34] text-white hover:bg-[#28564d] hover:text-white"
+                  : "text-[#5f756d] hover:bg-[#f4f7f4]"
+              )}
+            >
+              {m.role?.toLowerCase().includes("manicure") ? "💅" : "💼"} {m.name} ({m.role})
+            </Button>
+          ))}
+        </div>
+      )}
+
       <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]">
         <CardHeader className="border-b border-[#edf1eb] pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1672,9 +1882,9 @@ function Agenda() {
         <CardContent className="p-0">
           {appointments.isLoading ? (
             <div className="p-8 text-[#82948e]">Carregando agenda…</div>
-          ) : appointments.data?.length ? (
+          ) : filteredAppointments.length ? (
             <div className="divide-y divide-[#edf1eb]">
-              {appointments.data.map(item => (
+              {filteredAppointments.map(item => (
                 <AppointmentRow
                   key={item.id}
                   item={item}
@@ -1689,10 +1899,15 @@ function Agenda() {
             <div className="p-8">
               <EmptyState
                 icon={CalendarDays}
-                title="Sua agenda está livre neste período"
-                description={view !== "all" ? "Nenhum atendimento para o período selecionado. Use as setas para outros períodos ou adicione um novo." : "Adicione seu primeiro atendimento para começar a organizar o dia."}
+                title={appointments.data?.length ? "Nenhum atendimento para o filtro selecionado neste período" : "Sua agenda está livre neste período"}
+                description={appointments.data?.length ? "Alterne o profissional ou escolha outro período no calendário." : view !== "all" ? "Nenhum atendimento para o período selecionado. Use as setas para outros períodos ou adicione um novo." : "Adicione seu primeiro atendimento para começar a organizar o dia."}
                 action={
                   <div className="flex flex-wrap justify-center gap-2">
+                    {selectedMemberFilter !== "all" && (
+                      <Button variant="outline" onClick={() => setSelectedMemberFilter("all")} className="rounded-xl border-[#dce5dc]">
+                        Ver toda a equipe
+                      </Button>
+                    )}
                     {view !== "all" && (
                       <Button variant="outline" onClick={() => setView("all")} className="rounded-xl border-[#dce5dc]">
                         Ver todos os agendamentos

@@ -487,6 +487,35 @@ export const appRouter = router({
         receiptCode: generateReceiptAuthCode("A", r.id, r.profileId, r.amountCents),
       }));
     }),
+    unresolvedPast: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select()
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.profileId, profile.id),
+            ne(appointments.status, "cancelado")
+          )
+        )
+        .orderBy(desc(appointments.startsAt));
+
+      const nowMs = Date.now();
+      const past = rows.filter(r => {
+        const isPending = r.status === "agendado" || r.status === "confirmado" || r.status === "andamento";
+        if (!isPending) return false;
+        const startMs = new Date(r.startsAt).getTime();
+        const endMs = startMs + (r.durationMinutes || 60) * 60_000;
+        return endMs <= nowMs;
+      });
+
+      return past.slice(0, 20).map(r => ({
+        ...r,
+        receiptCode: generateReceiptAuthCode("A", r.id, r.profileId, r.amountCents),
+      }));
+    }),
     create: protectedProcedure.input(z.object({
       teamMemberId: z.number().optional(),
       clientId: z.number().optional(),

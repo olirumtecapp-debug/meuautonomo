@@ -2540,6 +2540,29 @@ var appRouter = router({
         receiptCode: generateReceiptAuthCode("A", r.id, r.profileId, r.amountCents)
       }));
     }),
+    unresolvedPast: protectedProcedure.query(async ({ ctx }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select().from(appointments).where(
+        and2(
+          eq4(appointments.profileId, profile.id),
+          ne(appointments.status, "cancelado")
+        )
+      ).orderBy(desc2(appointments.startsAt));
+      const nowMs = Date.now();
+      const past = rows.filter((r) => {
+        const isPending = r.status === "agendado" || r.status === "confirmado" || r.status === "andamento";
+        if (!isPending) return false;
+        const startMs = new Date(r.startsAt).getTime();
+        const endMs = startMs + (r.durationMinutes || 60) * 6e4;
+        return endMs <= nowMs;
+      });
+      return past.slice(0, 20).map((r) => ({
+        ...r,
+        receiptCode: generateReceiptAuthCode("A", r.id, r.profileId, r.amountCents)
+      }));
+    }),
     create: protectedProcedure.input(z2.object({
       teamMemberId: z2.number().optional(),
       clientId: z2.number().optional(),
