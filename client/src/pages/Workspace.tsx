@@ -35,6 +35,7 @@ import {
   ExternalLink,
   FileText,
   Link2,
+  LogOut,
   MapPin,
   Paperclip,
   Pencil,
@@ -646,7 +647,7 @@ function ServiceNameField({
 }
 
 function Onboarding() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [step, setStep] = useState(0);
   const [accountType, setAccountType] = useState<"individual" | "equipe">("individual");
 
@@ -753,9 +754,46 @@ function Onboarding() {
   return (
     <div className="min-h-screen bg-[#f5f7f2] px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-3xl">
-        <div className="mb-10 flex items-center justify-center sm:justify-start">
-          <img src="/logo.png" alt="MeuAutônomo" className="h-12 w-auto object-contain" />
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <img src="/logo.png" alt="MeuAutônomo" className="h-10 sm:h-12 w-auto object-contain" />
+          {user && (
+            <div className="flex items-center gap-3 rounded-2xl border border-[#dce5dc] bg-white px-3.5 py-1.5 text-xs text-[#526d64] shadow-xs">
+              <span>
+                Conectado como: <strong className="text-[#173a34]">{user.email || user.name}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={logout}
+                className="inline-flex items-center gap-1 font-bold text-red-600 hover:text-red-700 hover:underline cursor-pointer"
+                title="Sair desta conta para criar ou entrar com outra"
+              >
+                <LogOut className="h-3.5 w-3.5" /> Sair / Trocar conta
+              </button>
+            </div>
+          )}
         </div>
+
+        {isSystemAdminName && (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 shadow-xs">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-amber-950">Atenção: Você está conectado com a conta de Administrador ({user?.email}).</p>
+              <p className="mt-1 text-amber-800">
+                Se você deseja cadastrar uma conta nova para testar os modos e o fluxo como cliente do zero, clique em <strong>Sair desta conta</strong> para abrir a tela de novo cadastro.
+              </p>
+              <div className="mt-2.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={logout}
+                  className="rounded-xl border-amber-400 bg-white font-bold text-amber-900 hover:bg-amber-100 text-xs h-8"
+                >
+                  <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sair do Administrador e Cadastrar do Zero
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {step > 0 && (
           <div className="mb-8 grid grid-cols-3 gap-2">

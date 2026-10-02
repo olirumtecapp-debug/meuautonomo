@@ -2,6 +2,7 @@ import { startLogin } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { COOKIE_NAME } from "@shared/const";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -35,22 +36,19 @@ export function useAuth(options?: UseAuthOptions) {
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
-        return;
+        // Ignora caso ja esteja deslogado
       }
-      throw error;
     } finally {
-      // Clear the Preview auto-login token mirrored into sessionStorage, so
-      // header-based sessions (Safari ITP / WebView) are logged out too. The
-      // backend cookie is cleared by the logout mutation.
       try {
         localStorage.removeItem("manus-token");
         sessionStorage.removeItem("manus-token");
         sessionStorage.removeItem("manus-cookie");
         localStorage.removeItem("manus-runtime-user-info");
-        document.cookie = "manus-auth-session-token=; Path=/; Max-Age=-1";
+        document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = "manus-auth-session-token=; Path=/; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
       } catch {}
       utils.auth.me.setData(undefined, null);
-      window.location.href = "/";
+      window.location.href = "/?logout=true";
     }
   }, [logoutMutation, utils]);
 

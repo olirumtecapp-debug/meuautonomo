@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AuthModal } from "@/components/AuthModal";
-import { ArrowRight, CalendarDays, CheckCircle2, CircleDollarSign, ClipboardList, LogIn, Menu, Sparkles, UserPlus, Users, X } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, CircleDollarSign, ClipboardList, LogIn, LogOut, Menu, Sparkles, UserPlus, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -17,7 +17,7 @@ export default function Home() {
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<"register" | "login">("register");
   const { theme, setTheme } = useTheme();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const openAuth = (tab: "register" | "login") => {
     setAuthTab(tab);
@@ -48,9 +48,19 @@ export default function Home() {
             <option value="system">Automático</option>
           </select>
           {user ? (
-            <Button onClick={() => window.location.href = "/app"} className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]">
-              <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Meu Espaço ({user.name?.split(" ")[0] || "Autônomo"})
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => window.location.href = "/app"} className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]">
+                <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Meu Espaço ({user.name?.split(" ")[0] || "Autônomo"})
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={logout}
+                className="rounded-xl px-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+                title="Sair desta conta para criar ou entrar com outra"
+              >
+                <LogOut className="mr-1 h-3.5 w-3.5" /> Sair
+              </Button>
+            </div>
           ) : (
             <>
               <Button variant="ghost" onClick={() => openAuth("login")} className="rounded-xl text-[#173a34] hover:bg-[#e4ece4]">
@@ -75,9 +85,12 @@ export default function Home() {
             <option value="system">Automático</option>
           </select>
           {user ? (
-            <div className="pt-2">
+            <div className="grid gap-2 pt-2">
               <Button onClick={() => window.location.href = "/app"} className="w-full rounded-xl bg-[#173a34] text-white">
-                <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Acessar Meu Espaço
+                <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Acessar Meu Espaço ({user.name?.split(" ")[0] || "Autônomo"})
+              </Button>
+              <Button variant="outline" onClick={logout} className="w-full rounded-xl border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50">
+                <LogOut className="mr-1.5 h-4 w-4" /> Sair desta conta
               </Button>
             </div>
           ) : (
@@ -109,9 +122,18 @@ export default function Home() {
             </p>
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               {user ? (
-                <Button onClick={() => window.location.href = "/app"} className="h-13 rounded-2xl bg-[#173a34] px-6 text-base text-white shadow-[0_12px_24px_rgba(19,42,39,0.16)] hover:bg-[#28564d]">
-                  Ir para meu espaço <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
+                <div className="flex flex-col gap-3 sm:flex-row w-full sm:w-auto">
+                  <Button onClick={() => window.location.href = "/app"} className="h-13 rounded-2xl bg-[#173a34] px-6 text-base text-white shadow-[0_12px_24px_rgba(19,42,39,0.16)] hover:bg-[#28564d]">
+                    Ir para meu espaço <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={logout}
+                    className="h-13 rounded-2xl border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" /> Sair para criar outra conta
+                  </Button>
+                </div>
               ) : (
                 <>
                   <Button onClick={() => openAuth("register")} className="h-13 rounded-2xl bg-[#173a34] px-6 text-base text-white shadow-[0_12px_24px_rgba(19,42,39,0.16)] hover:bg-[#28564d]">

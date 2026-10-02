@@ -124,7 +124,15 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
   const voucherStatus = voucherStatusQuery.data;
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = menuItems.find(item => item.path === location);
-  const firstName = (user?.name || "profissional").split(" ")[0];
+  const isGenericAdminUser = Boolean(
+    user?.name &&
+    (user.name.toLowerCase().includes("admin") ||
+     user.name.toLowerCase().includes("administrador") ||
+     user.name.toLowerCase().includes("master"))
+  );
+  const rawDisplayName = profileQuery.data?.displayName?.trim();
+  const professionalName = rawDisplayName || (!isGenericAdminUser && user?.name?.trim()) || "Profissional";
+  const firstName = professionalName.split(" ")[0];
 
   const applyReferralMutation = trpc.referral.applyCode.useMutation({
     onSuccess: (res) => {
@@ -240,7 +248,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
               <DropdownMenuTrigger asChild>
                 <button className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d9f56a] group-data-[collapsible=icon]:justify-center">
                   <Avatar className="h-9 w-9 border border-white/20 bg-white/10"><AvatarFallback className="bg-[#d9f56a] text-[#132a27]">{firstName.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
-                  <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm font-semibold">{user?.name || "Profissional"}</p><p className="mt-0.5 truncate text-xs text-white/50">{user?.email || "Minha conta"}</p></div>
+                  <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden"><p className="truncate text-sm font-semibold">{professionalName}</p><p className="mt-0.5 truncate text-xs text-white/50">{user?.email || "Minha conta"}</p></div>
                   <Menu className="h-4 w-4 text-white/50 group-data-[collapsible=icon]:hidden" />
                 </button>
               </DropdownMenuTrigger>
@@ -313,7 +321,10 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
               <span className="hidden sm:inline">Cupom / Voucher</span>
               <span className="sm:hidden">Cupom</span>
             </button>
-            <span className="hidden text-right text-xs text-[#58716b] sm:block">Bom dia, <strong className="text-[#173a34]">{firstName}</strong></span>
+            <span className="hidden text-right text-xs text-[#58716b] sm:block">
+              {new Date().getHours() < 12 ? "Bom dia" : new Date().getHours() < 18 ? "Boa tarde" : "Boa noite"},{" "}
+              <strong className="text-[#173a34]">{firstName}</strong>
+            </span>
             <NotificationsBell />
             <div className="grid h-9 w-9 place-items-center rounded-full bg-[#d9f56a] text-sm font-bold text-[#173a34]">{firstName.charAt(0).toUpperCase()}</div>
           </div>
