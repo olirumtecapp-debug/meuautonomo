@@ -1507,7 +1507,7 @@ async function getPaymentStatus(req, res) {
 
 // server/routers.ts
 init_schema();
-import { and as and2, desc as desc2, eq as eq4, gte, lt, ne } from "drizzle-orm";
+import { and as and2, desc as desc2, eq as eq4, gte, lt, ne, like } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z as z2 } from "zod";
 import { TRPCError as TRPCError3 } from "@trpc/server";
@@ -2756,7 +2756,11 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const rows = await db.select().from(quotes).where(eq4(quotes.profileId, profile.id)).orderBy(desc2(quotes.createdAt));
+      const [rows, profileAppointments, profileRequests] = await Promise.all([
+        db.select().from(quotes).where(eq4(quotes.profileId, profile.id)).orderBy(desc2(quotes.createdAt)),
+        db.select({ id: appointments.id, notes: appointments.notes, clientId: appointments.clientId, amountCents: appointments.amountCents, status: appointments.status }).from(appointments).where(eq4(appointments.profileId, profile.id)),
+        db.select({ id: requests.id, status: requests.status }).from(requests).where(eq4(requests.profileId, profile.id))
+      ]);
       return Promise.all(
         rows.map(async (q) => {
           let clientName = q.clientName;
@@ -2778,11 +2782,16 @@ var appRouter = router({
               clientPhone = clientPhone || r.requesterPhone;
             }
           }
+          const matchedRequest = q.requestId ? profileRequests.find((r) => r.id === q.requestId) : null;
+          const isScheduled = profileAppointments.some(
+            (a) => a.notes?.includes(`[Or\xE7amento #${q.id}]`) || q.clientId && a.clientId === q.clientId && (a.amountCents === q.totalCents || q.description && a.notes?.includes(q.description.slice(0, 25))) || matchedRequest?.status === "agendada"
+          );
           return {
             ...q,
             clientName: clientName || null,
             clientEmail: clientEmail || null,
             clientPhone: clientPhone || null,
+            isScheduled: Boolean(isScheduled),
             items: await db.select().from(quoteItems).where(eq4(quoteItems.quoteId, q.id))
           };
         })
@@ -2958,6 +2967,20 @@ var appRouter = router({
           await db.update(quotes).set({ clientId: effectiveClientId }).where(eq4(quotes.id, quote.id));
         }
       }
+      const notePrefix = `[Or\xE7amento #${quote.id}]`;
+      const rawNotes = input.notes || quote.description || "";
+      const finalNotes = rawNotes.includes(notePrefix) ? rawNotes : `${notePrefix} ${rawNotes}`.trim();
+      const existingAppointment = (await db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), like(appointments.notes, `%${notePrefix}%`))).limit(1))[0];
+      if (existingAppointment) {
+        await db.update(appointments).set({
+          startsAt: new Date(input.startsAt),
+          durationMinutes: input.durationMinutes,
+          location: input.location || existingAppointment.location,
+          notes: finalNotes,
+          amountCents: quote.totalCents
+        }).where(eq4(appointments.id, existingAppointment.id));
+        return { success: true, appointmentId: existingAppointment.id, updated: true };
+      }
       const inserted = await db.insert(appointments).values({
         profileId: profile.id,
         clientId: effectiveClientId ?? null,
@@ -2966,7 +2989,7 @@ var appRouter = router({
         durationMinutes: input.durationMinutes,
         location: input.location || "",
         amountCents: quote.totalCents,
-        notes: input.notes || quote.description || "",
+        notes: finalNotes,
         status: "confirmado",
         paymentStatus: "pendente"
       });

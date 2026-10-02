@@ -1413,7 +1413,7 @@ function Agenda() {
   };
 
   const acceptedQuotes = useMemo(() => {
-    return (quotesQuery.data || []).filter(q => q.status === "aceito");
+    return (quotesQuery.data || []).filter(q => q.status === "aceito" && !(q as any).isScheduled);
   }, [quotesQuery.data]);
 
   return (
@@ -3127,6 +3127,11 @@ function Quotes() {
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="font-bold text-[#284b42]">{quote.description || `Orçamento #${quote.id}`}</h3>
                             <StatusBadge status={quote.status} />
+                            {(quote as any).isScheduled && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-300">
+                                <Check className="h-3 w-3 text-emerald-600" /> Agendado na agenda
+                              </span>
+                            )}
                           </div>
                           <p className="mt-1 text-sm text-[#82948e]">
                             <strong className="text-[#284b42] font-semibold">{clientDisplayName}</strong> · {dateLabel(quote.createdAt)} · Total de {money(quote.totalCents)}
@@ -3220,9 +3225,15 @@ function Quotes() {
                           <Button
                             size="sm"
                             onClick={() => handleOpenScheduleModal(quote)}
-                            className="rounded-xl bg-[#173a34] text-xs font-semibold text-white hover:bg-[#28564d]"
+                            className={cn(
+                              "rounded-xl text-xs font-semibold text-white",
+                              (quote as any).isScheduled
+                                ? "bg-[#28564d] hover:bg-[#173a34]"
+                                : "bg-[#173a34] hover:bg-[#28564d]"
+                            )}
                           >
-                            <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#d9f56a]" /> Agendar na Agenda
+                            <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#d9f56a]" />
+                            {(quote as any).isScheduled ? "Reagendar / Alterar data" : "Agendar na Agenda"}
                           </Button>
                         )}
                         {quote.status === "aceito" && (
