@@ -2128,7 +2128,7 @@ Quer ativar para experimentar no seu próximo serviço?`}
                   badge: "Monetização",
                   badgeColor: "bg-[#d9f56a] text-[#173a34]",
                   icon: CreditCard,
-                  desc: "Página oficial de planos: Grátis (R$ 0), PRO Solo (R$ 49,90 vitalício) e PRO Equipe (R$ 89,90), com resgate de voucher e simulação de webhook do Asaas.",
+                  desc: "Página oficial de planos: Grátis (R$ 0), PRO Individual (R$ 59,90 vitalício) e PRO Equipe & Estúdio (R$ 99,90 vitalício), com resgate de voucher e webhook do Asaas.",
                 },
                 {
                   title: "Simulador Visual dos Fluxos",
@@ -2212,12 +2212,20 @@ Quer ativar para experimentar no seu próximo serviço?`}
                   desc: "Página pública com foto, bio, botões de WhatsApp, localização e QR Code pronto para impressão em balcão.",
                 },
                 {
-                  title: "Guia Passo a Passo (Tutorial)",
+                  title: "Tutorial: Modo Individual (Solo)",
                   path: "/guia",
-                  badge: "Tutorial",
-                  badgeColor: "bg-yellow-100 text-yellow-900",
+                  badge: "Tutorial Solo",
+                  badgeColor: "bg-emerald-100 text-emerald-900",
                   icon: BookOpen,
-                  desc: "Manual interativo ensinando o profissional a usar cada função do sistema em poucos minutos.",
+                  desc: "Manual prático com 6 passos para quem trabalha sozinho: catálogo de serviços, orçamentos no WhatsApp, agenda e financeiro pessoal.",
+                },
+                {
+                  title: "Tutorial: Modo Equipe & Estúdio",
+                  path: "/guia",
+                  badge: "Tutorial Equipe",
+                  badgeColor: "bg-purple-100 text-purple-900",
+                  icon: Building2,
+                  desc: "Manual prático com 7 passos para salões e oficinas: gestão de colaboradoras, segurança, comissões (Lei 13.352) e links individuais.",
                 },
                 {
                   title: "Vídeo / Reels de Demonstração",

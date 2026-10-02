@@ -301,10 +301,12 @@ export function GuidedTutorialModal({
               </span>
             </div>
             <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl text-white">
-              Como Funciona o MeuAutônomo?
+              {isTeamMode ? "Como Funciona o Modo Equipe & Estúdio?" : "Como Funciona o Modo Individual?"}
             </h2>
             <p className="mt-1 text-sm text-white/70">
-              Criado sob medida para autônomos, estúdios e pequenos negócios atenderem melhor, fecharem mais orçamentos e controlarem o dinheiro.
+              {isTeamMode
+                ? "Criado sob medida para estúdios, salões e oficinas gerenciarem parceiras, comissões (Lei 13.352) e atendimentos simultâneos."
+                : "Criado sob medida para o profissional autônomo individual atender melhor, fechar mais orçamentos no WhatsApp e controlar seus ganhos sem taxas."}
             </p>
           </div>
         </div>

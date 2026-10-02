@@ -4956,9 +4956,13 @@ export function TutorialPage() {
 
   return (
     <Page
-      title="Guia do Usuário & Tutorial Prático"
-      eyebrow="Aprenda a Usar"
-      description="Tudo o que você precisa saber para dominar cada ferramenta do MeuAutônomo, aumentar seu faturamento e organizar seu trabalho."
+      eyebrow={isTeamMode ? "Aprenda a Usar • Modo Equipe & Estúdio" : "Aprenda a Usar • Modo Individual"}
+      title={isTeamMode ? "Guia do Salão, Oficina & Estúdio Parceiro" : "Guia Prático do Autônomo Solo"}
+      description={
+        isTeamMode
+          ? "Como gerenciar múltiplos colaboradores, agenda simultânea e cálculo automático de comissões pela Lei do Salão-Parceiro."
+          : "Tudo o que você precisa saber para gerenciar seus serviços, fechar orçamentos no WhatsApp e receber 100% no PIX sem taxas."
+      }
       action={
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -4984,15 +4988,21 @@ export function TutorialPage() {
             <div className="max-w-2xl">
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-[#173a34] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[#d9f56a]">
-                  Passo a Passo
+                  {isTeamMode ? "👥 Modo Equipe Ativo" : "👤 Modo Individual Ativo"}
                 </span>
-                <span className="text-xs font-semibold text-[#667700]">Guia Completo da Plataforma</span>
+                <span className="text-xs font-semibold text-[#667700]">
+                  {isTeamMode ? "Guia de Gestão de Equipe & Parceiros" : "Guia Exclusivo para Autônomo Solo"}
+                </span>
               </div>
               <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#173a34] md:text-3xl">
-                Tudo o que você precisa para decolar seu negócio
+                {isTeamMode
+                  ? "7 Passos para Gerenciar sua Equipe & Negócio"
+                  : "6 Passos para Dominar seu Trabalho Sozinho"}
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-[#486255] md:text-base">
-                O MeuAutônomo foi feito para autônomos individuais e donas de estúdios ou salões. Escolha uma das seções abaixo para ver como aplicar no seu dia a dia.
+                {isTeamMode
+                  ? "Aprenda a cadastrar suas parceiras, enviar links individuais de acesso no celular delas e calcular os repasses de comissão sem expor seu faturamento geral."
+                  : "Interface 100% enxuta, sem ruído de equipe. Foque nos seus clientes, monte propostas pelo WhatsApp e acompanhe seu lucro líquido diário."}
               </p>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:w-96">
@@ -5002,7 +5012,9 @@ export function TutorialPage() {
                 className="flex flex-col items-center rounded-2xl bg-white p-4 text-center shadow-xs transition hover:bg-[#f3f8e5] hover:shadow-sm"
               >
                 <Sparkles className="h-6 w-6 text-[#8aa500]" />
-                <span className="mt-2 text-xs font-bold text-[#173a34]">7 Passos Básicos</span>
+                <span className="mt-2 text-xs font-bold text-[#173a34]">
+                  {isTeamMode ? "7 Passos Equipe" : "6 Passos Solo"}
+                </span>
                 <span className="text-[11px] text-[#71867f]">Para começar</span>
               </button>
               <button
@@ -5011,8 +5023,12 @@ export function TutorialPage() {
                 className="flex flex-col items-center rounded-2xl bg-white p-4 text-center shadow-xs transition hover:bg-[#f3f8e5] hover:shadow-sm"
               >
                 <Building2 className="h-6 w-6 text-[#28564d]" />
-                <span className="mt-2 text-xs font-bold text-[#173a34]">Estúdio & Equipe</span>
-                <span className="text-[11px] text-[#71867f]">Salão-Parceiro</span>
+                <span className="mt-2 text-xs font-bold text-[#173a34]">
+                  {isTeamMode ? "Estúdio & Equipe" : "Mudar p/ Equipe"}
+                </span>
+                <span className="text-[11px] text-[#71867f]">
+                  {isTeamMode ? "Salão-Parceiro" : "Quando migrar?"}
+                </span>
               </button>
               <button
                 type="button"
@@ -5028,19 +5044,13 @@ export function TutorialPage() {
         </div>
 
         {/* Abas com Conteúdo Detalhado */}
-        <Tabs defaultValue="simulador" className="w-full">
+        <Tabs defaultValue="passos" className="w-full">
           <TabsList className="mb-6 grid w-full grid-cols-2 lg:grid-cols-4 rounded-2xl bg-[#e8eee5] p-1.5 h-auto gap-1">
-            <TabsTrigger
-              value="simulador"
-              className="rounded-xl py-3 text-xs sm:text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-[#173a34] data-[state=active]:shadow-xs"
-            >
-              ✨ Simulador Visual (Ver na Prática)
-            </TabsTrigger>
             <TabsTrigger
               value="passos"
               className="rounded-xl py-3 text-xs sm:text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-[#173a34] data-[state=active]:shadow-xs"
             >
-              🚀 7 Passos para Começar
+              {isTeamMode ? "👑 7 Passos para Começar" : "🚀 6 Passos para Começar"}
             </TabsTrigger>
             <TabsTrigger
               value="estudio"
@@ -5053,6 +5063,12 @@ export function TutorialPage() {
               className="rounded-xl py-3 text-xs sm:text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-[#173a34] data-[state=active]:shadow-xs"
             >
               💡 Dicas & Perguntas
+            </TabsTrigger>
+            <TabsTrigger
+              value="simulador"
+              className="rounded-xl py-3 text-xs sm:text-sm font-bold data-[state=active]:bg-white data-[state=active]:text-[#173a34] data-[state=active]:shadow-xs"
+            >
+              ✨ Simulador Visual
             </TabsTrigger>
           </TabsList>
 

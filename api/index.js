@@ -287,87 +287,17 @@ function createCleanStore() {
       {
         id: 1,
         openId: "dev-user-local",
-        name: "Profissional Aut\xF4nomo",
+        name: "Admin MeuAut\xF4nomo",
         email: "contato@meuautonomo.com.br",
         loginMethod: "local-dev",
         role: "admin",
         createdAt: now,
         updatedAt: now,
         lastSignedIn: now
-      },
-      {
-        id: 2,
-        openId: "user_murilo",
-        name: "Murilo Silva",
-        email: "olirumdev1@gmail.com",
-        loginMethod: "local-password",
-        passwordHash: "95baf1482029d051ad76fdd7dfafdef2:eb47f0b260707c3069a1997a069ada00206456af8679b0e650268d0fb17af1ed35bbcaff5b39289ddf3d2ef72f868d2dc5be0e121e3848cda87b83e9f9142c06",
-        role: "admin",
-        createdAt: now,
-        updatedAt: now,
-        lastSignedIn: now
       }
     ],
-    professionalProfiles: [
-      {
-        id: 1,
-        userId: 1,
-        displayName: "Meu Perfil Profissional",
-        slug: "meu-perfil",
-        professionCategory: "Servi\xE7os Gerais",
-        professionName: "Profissional Aut\xF4nomo",
-        bio: "Servi\xE7os profissionais com qualidade, transpar\xEAncia e pontualidade.",
-        city: "S\xE3o Paulo - SP",
-        serviceRegion: "S\xE3o Paulo e Regi\xE3o",
-        phone: "(11) 99999-9999",
-        whatsapp: "(11) 99999-9999",
-        avatarUrl: null,
-        pixKey: null,
-        pixKeyType: null,
-        showPrices: true,
-        bookingEnabled: true,
-        accountType: "individual",
-        createdAt: now,
-        updatedAt: now
-      },
-      {
-        id: 2,
-        userId: 2,
-        displayName: "Murilo Silva",
-        slug: "murilo-silva",
-        professionCategory: "Est\xE9tica & Beleza",
-        professionName: "Est\xFAdio & Beleza",
-        bio: "Atendimento profissional com hora marcada, qualidade e aten\xE7\xE3o aos detalhes.",
-        city: "S\xE3o Paulo - SP",
-        serviceRegion: "S\xE3o Paulo e Regi\xE3o",
-        phone: "(11) 99999-9999",
-        whatsapp: "(11) 99999-9999",
-        avatarUrl: null,
-        pixKey: null,
-        pixKeyType: null,
-        showPrices: true,
-        bookingEnabled: true,
-        accountType: "equipe",
-        createdAt: now,
-        updatedAt: now
-      }
-    ],
-    availability: [
-      {
-        id: 1,
-        profileId: 1,
-        schedule: JSON.stringify({
-          days: ["mon", "tue", "wed", "thu", "fri", "sat"],
-          start: "08:00",
-          end: "18:00",
-          breaks: [{ start: "12:00", end: "13:00" }]
-        }),
-        timezone: "America/Sao_Paulo",
-        unavailableDays: null,
-        createdAt: now,
-        updatedAt: now
-      }
-    ],
+    professionalProfiles: [],
+    availability: [],
     // Tabelas de negócio zeradas para testes reais do usuário:
     services: [],
     clients: [],
