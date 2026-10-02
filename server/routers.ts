@@ -30,6 +30,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { enviarEmail, modeloOrcamentoAprovado } from "./email";
 import { DEFAULT_ADMIN_PASSWORD, getAdminEmail, getAdminUsername, isDemoMode, setDemoMode } from "./demoConfig";
 import crypto from "node:crypto";
+import { generateReceiptAuthCode } from "./receiptAuth";
 import {
   calculateCommissionAndStudio,
   calculateDeduplicatedMetrics,
@@ -480,7 +481,11 @@ export const appRouter = router({
       const conditions = [eq(appointments.profileId, profile.id)];
       if (input?.from) conditions.push(gte(appointments.startsAt, new Date(input.from)));
       if (input?.to) conditions.push(lt(appointments.startsAt, new Date(input.to)));
-      return db.select().from(appointments).where(and(...conditions)).orderBy(appointments.startsAt);
+      const rows = await db.select().from(appointments).where(and(...conditions)).orderBy(appointments.startsAt);
+      return rows.map(r => ({
+        ...r,
+        receiptCode: generateReceiptAuthCode("A", r.id, r.createdAt, r.amountCents),
+      }));
     }),
     create: protectedProcedure.input(z.object({
       teamMemberId: z.number().optional(),
@@ -756,6 +761,7 @@ export const appRouter = router({
 
           return {
             ...q,
+            receiptCode: generateReceiptAuthCode("Q", q.id, q.createdAt, q.totalCents),
             clientName: clientName || null,
             clientEmail: clientEmail || null,
             clientPhone: clientPhone || null,
@@ -1948,6 +1954,88 @@ export const appRouter = router({
           planExpiresAt: newExpires,
         };
       }),
+  }),
+
+  receipt: router({
+    validate: publicProcedure
+      .input(z.object({ code: z.string() }))
+      .query(async ({ input }) => {
+        const rawCode = input.code.trim().toUpperCase();
+        const match = rawCode.match(/^MA-REC-([AQ])(\d+)-([A-Z0-9]+)$/);
+        if (!match) {
+          return { valid: false, error: "Formato de código inválido. O formato oficial deve ser MA-REC-A12-XXXXXX ou MA-REC-Q12-XXXXXX." };
+        }
+        const [, type, idStr] = match;
+        const id = parseInt(idStr, 10);
+        if (isNaN(id) || id <= 0) {
+          return { valid: false, error: "Identificador de recibo inválido." };
+        }
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+        if (type === "A") {
+          const appointment = (await db.select().from(appointments).where(eq(appointments.id, id)).limit(1))[0];
+          if (!appointment) {
+            return { valid: false, error: "Atendimento ou recibo não localizado no sistema." };
+          }
+          const expectedCode = generateReceiptAuthCode("A", appointment.id, appointment.createdAt, appointment.amountCents);
+          if (expectedCode.toUpperCase() !== rawCode) {
+            return { valid: false, error: "Código de autenticidade adulterado ou divergente do registro original." };
+          }
+          const profile = (await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, appointment.profileId)).limit(1))[0];
+          const client = appointment.clientId ? (await db.select().from(clients).where(eq(clients.id, appointment.clientId)).limit(1))[0] : null;
+          const service = appointment.serviceId ? (await db.select().from(services).where(eq(services.id, appointment.serviceId)).limit(1))[0] : null;
+
+          return {
+            valid: true,
+            code: rawCode,
+            receiptNumber: `REC-${String(appointment.id).padStart(4, "0")}`,
+            type: "Comprovante de Atendimento Concluído",
+            professionalName: profile?.displayName || "Profissional",
+            profession: profile?.professionName || "Profissional Autônomo",
+            professionalCity: profile?.city && profile?.state ? `${profile.city} - ${profile.state}` : (profile?.city || ""),
+            professionalPhone: profile?.whatsapp || profile?.phone || "",
+            clientName: client?.name || (appointment.clientId ? `Cliente #${appointment.clientId}` : "Cliente"),
+            serviceDescription: service?.name || appointment.notes || "Prestação de Serviços",
+            amountCents: appointment.amountCents,
+            date: appointment.startsAt || appointment.createdAt,
+            issuedAt: appointment.updatedAt || appointment.createdAt,
+            paymentMethod: appointment.paymentMethod ? appointment.paymentMethod.toUpperCase() : "Acerto direto com o prestador",
+            paymentStatus: appointment.status === "concluido" ? "Quitado / Recebido" : "Confirmado",
+            legalBasis: "Em conformidade com a Lei Federal nº 14.063/2020 (Assinatura Eletrônica Simples) e Art. 320 do Código Civil Brasileiro"
+          };
+        } else {
+          const quote = (await db.select().from(quotes).where(eq(quotes.id, id)).limit(1))[0];
+          if (!quote) {
+            return { valid: false, error: "Orçamento ou recibo não localizado no sistema." };
+          }
+          const expectedCode = generateReceiptAuthCode("Q", quote.id, quote.createdAt, quote.totalCents);
+          if (expectedCode.toUpperCase() !== rawCode) {
+            return { valid: false, error: "Código de autenticidade adulterado ou divergente do registro original." };
+          }
+          const profile = (await db.select().from(professionalProfiles).where(eq(professionalProfiles.id, quote.profileId)).limit(1))[0];
+          const client = quote.clientId ? (await db.select().from(clients).where(eq(clients.id, quote.clientId)).limit(1))[0] : null;
+
+          return {
+            valid: true,
+            code: rawCode,
+            receiptNumber: `REC-${String(quote.id).padStart(4, "0")}`,
+            type: "Comprovante de Proposta / Orçamento Aprovado",
+            professionalName: profile?.displayName || "Profissional",
+            profession: profile?.professionName || "Profissional Autônomo",
+            professionalCity: profile?.city && profile?.state ? `${profile.city} - ${profile.state}` : (profile?.city || ""),
+            professionalPhone: profile?.whatsapp || profile?.phone || "",
+            clientName: quote.clientName || client?.name || "Cliente",
+            serviceDescription: quote.description || "Prestação de Serviços",
+            amountCents: quote.totalCents,
+            date: quote.respondedAt || quote.createdAt,
+            issuedAt: quote.respondedAt || quote.createdAt,
+            paymentMethod: quote.paymentTerms || "Acerto direto com o prestador",
+            paymentStatus: "Aprovado / Quitado",
+            legalBasis: "Em conformidade com a Lei Federal nº 14.063/2020 (Assinatura Eletrônica Simples) e Art. 320 do Código Civil Brasileiro"
+          };
+        }
+      })
   }),
 });
 

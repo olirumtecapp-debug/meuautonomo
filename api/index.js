@@ -1946,7 +1946,16 @@ function modeloOrcamentoAprovado(params) {
 }
 
 // server/routers.ts
-import crypto2 from "node:crypto";
+import crypto3 from "node:crypto";
+
+// server/receiptAuth.ts
+import crypto2 from "crypto";
+function generateReceiptAuthCode(type, id, createdAt, amountCents) {
+  const secretSalt = process.env.SESSION_SECRET || "meuautonomo-receipt-salt-2026";
+  const ts = new Date(createdAt).getTime();
+  const hash = crypto2.createHmac("sha256", secretSalt).update(`${type}:${id}:${ts}:${amountCents}`).digest("hex").slice(0, 6).toUpperCase();
+  return `MA-REC-${type}${id}-${hash}`;
+}
 
 // server/billingRules.ts
 function isBillableAppointment(status) {
@@ -2141,16 +2150,16 @@ function calculateTeamReport(members, appointments2, payments2, expenses2 = []) 
 
 // server/routers.ts
 function hashPassword(password) {
-  const salt = crypto2.randomBytes(16).toString("hex");
-  const hash = crypto2.scryptSync(password, salt, 64).toString("hex");
+  const salt = crypto3.randomBytes(16).toString("hex");
+  const hash = crypto3.scryptSync(password, salt, 64).toString("hex");
   return `${salt}:${hash}`;
 }
 function verifyPassword(password, stored) {
   try {
     const [salt, key] = stored.split(":");
     if (!salt || !key) return false;
-    const hash = crypto2.scryptSync(password, salt, 64).toString("hex");
-    return crypto2.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(key, "hex"));
+    const hash = crypto3.scryptSync(password, salt, 64).toString("hex");
+    return crypto3.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(key, "hex"));
   } catch {
     return false;
   }
@@ -2526,7 +2535,11 @@ var appRouter = router({
       const conditions = [eq4(appointments.profileId, profile.id)];
       if (input?.from) conditions.push(gte(appointments.startsAt, new Date(input.from)));
       if (input?.to) conditions.push(lt(appointments.startsAt, new Date(input.to)));
-      return db.select().from(appointments).where(and2(...conditions)).orderBy(appointments.startsAt);
+      const rows = await db.select().from(appointments).where(and2(...conditions)).orderBy(appointments.startsAt);
+      return rows.map((r) => ({
+        ...r,
+        receiptCode: generateReceiptAuthCode("A", r.id, r.createdAt, r.amountCents)
+      }));
     }),
     create: protectedProcedure.input(z2.object({
       teamMemberId: z2.number().optional(),
@@ -2788,6 +2801,7 @@ var appRouter = router({
           );
           return {
             ...q,
+            receiptCode: generateReceiptAuthCode("Q", q.id, q.createdAt, q.totalCents),
             clientName: clientName || null,
             clientEmail: clientEmail || null,
             clientPhone: clientPhone || null,
@@ -3791,6 +3805,82 @@ var appRouter = router({
         message: `C\xF3digo de indica\xE7\xE3o aceito! Voc\xEA e ${referrer[0].displayName} ganharam 15 dias de Plano PRO gr\xE1tis!`,
         planExpiresAt: newExpires
       };
+    })
+  }),
+  receipt: router({
+    validate: publicProcedure.input(z2.object({ code: z2.string() })).query(async ({ input }) => {
+      const rawCode = input.code.trim().toUpperCase();
+      const match = rawCode.match(/^MA-REC-([AQ])(\d+)-([A-Z0-9]+)$/);
+      if (!match) {
+        return { valid: false, error: "Formato de c\xF3digo inv\xE1lido. O formato oficial deve ser MA-REC-A12-XXXXXX ou MA-REC-Q12-XXXXXX." };
+      }
+      const [, type, idStr] = match;
+      const id = parseInt(idStr, 10);
+      if (isNaN(id) || id <= 0) {
+        return { valid: false, error: "Identificador de recibo inv\xE1lido." };
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
+      if (type === "A") {
+        const appointment = (await db.select().from(appointments).where(eq4(appointments.id, id)).limit(1))[0];
+        if (!appointment) {
+          return { valid: false, error: "Atendimento ou recibo n\xE3o localizado no sistema." };
+        }
+        const expectedCode = generateReceiptAuthCode("A", appointment.id, appointment.createdAt, appointment.amountCents);
+        if (expectedCode.toUpperCase() !== rawCode) {
+          return { valid: false, error: "C\xF3digo de autenticidade adulterado ou divergente do registro original." };
+        }
+        const profile = (await db.select().from(professionalProfiles).where(eq4(professionalProfiles.id, appointment.profileId)).limit(1))[0];
+        const client = appointment.clientId ? (await db.select().from(clients).where(eq4(clients.id, appointment.clientId)).limit(1))[0] : null;
+        const service = appointment.serviceId ? (await db.select().from(services).where(eq4(services.id, appointment.serviceId)).limit(1))[0] : null;
+        return {
+          valid: true,
+          code: rawCode,
+          receiptNumber: `REC-${String(appointment.id).padStart(4, "0")}`,
+          type: "Comprovante de Atendimento Conclu\xEDdo",
+          professionalName: profile?.displayName || "Profissional",
+          profession: profile?.professionName || "Profissional Aut\xF4nomo",
+          professionalCity: profile?.city && profile?.state ? `${profile.city} - ${profile.state}` : profile?.city || "",
+          professionalPhone: profile?.whatsapp || profile?.phone || "",
+          clientName: client?.name || (appointment.clientId ? `Cliente #${appointment.clientId}` : "Cliente"),
+          serviceDescription: service?.name || appointment.notes || "Presta\xE7\xE3o de Servi\xE7os",
+          amountCents: appointment.amountCents,
+          date: appointment.startsAt || appointment.createdAt,
+          issuedAt: appointment.updatedAt || appointment.createdAt,
+          paymentMethod: appointment.paymentMethod ? appointment.paymentMethod.toUpperCase() : "Acerto direto com o prestador",
+          paymentStatus: appointment.status === "concluido" ? "Quitado / Recebido" : "Confirmado",
+          legalBasis: "Em conformidade com a Lei Federal n\xBA 14.063/2020 (Assinatura Eletr\xF4nica Simples) e Art. 320 do C\xF3digo Civil Brasileiro"
+        };
+      } else {
+        const quote = (await db.select().from(quotes).where(eq4(quotes.id, id)).limit(1))[0];
+        if (!quote) {
+          return { valid: false, error: "Or\xE7amento ou recibo n\xE3o localizado no sistema." };
+        }
+        const expectedCode = generateReceiptAuthCode("Q", quote.id, quote.createdAt, quote.totalCents);
+        if (expectedCode.toUpperCase() !== rawCode) {
+          return { valid: false, error: "C\xF3digo de autenticidade adulterado ou divergente do registro original." };
+        }
+        const profile = (await db.select().from(professionalProfiles).where(eq4(professionalProfiles.id, quote.profileId)).limit(1))[0];
+        const client = quote.clientId ? (await db.select().from(clients).where(eq4(clients.id, quote.clientId)).limit(1))[0] : null;
+        return {
+          valid: true,
+          code: rawCode,
+          receiptNumber: `REC-${String(quote.id).padStart(4, "0")}`,
+          type: "Comprovante de Proposta / Or\xE7amento Aprovado",
+          professionalName: profile?.displayName || "Profissional",
+          profession: profile?.professionName || "Profissional Aut\xF4nomo",
+          professionalCity: profile?.city && profile?.state ? `${profile.city} - ${profile.state}` : profile?.city || "",
+          professionalPhone: profile?.whatsapp || profile?.phone || "",
+          clientName: quote.clientName || client?.name || "Cliente",
+          serviceDescription: quote.description || "Presta\xE7\xE3o de Servi\xE7os",
+          amountCents: quote.totalCents,
+          date: quote.respondedAt || quote.createdAt,
+          issuedAt: quote.respondedAt || quote.createdAt,
+          paymentMethod: quote.paymentTerms || "Acerto direto com o prestador",
+          paymentStatus: "Aprovado / Quitado",
+          legalBasis: "Em conformidade com a Lei Federal n\xBA 14.063/2020 (Assinatura Eletr\xF4nica Simples) e Art. 320 do C\xF3digo Civil Brasileiro"
+        };
+      }
     })
   })
 });

@@ -7,7 +7,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Printer, Copy, Check, FileCheck, Share2 } from "lucide-react";
+import { Printer, Copy, Check, FileCheck, Share2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 export interface ReceiptData {
@@ -23,6 +23,7 @@ export interface ReceiptData {
   clientPhone?: string;
   serviceDescription: string;
   amountCents: number;
+  authCode?: string;
 }
 
 export function ReceiptModal({
@@ -45,6 +46,10 @@ export function ReceiptModal({
     year: "numeric",
   });
 
+  const validationUrl = data.authCode
+    ? `${window.location.origin}/validar-recibo?codigo=${data.authCode}`
+    : `${window.location.origin}/validar-recibo`;
+
   const generateWhatsappText = () => {
     return (
       `*RECIBO DE PRESTAÇÃO DE SERVIÇOS* 📄\n` +
@@ -56,7 +61,9 @@ export function ReceiptModal({
       `*Descrição:* ${data.serviceDescription}\n` +
       `*VALOR PAGO:* ${money(data.amountCents)}\n` +
       `*FORMA DE PAGAMENTO:* ${data.paymentMethod || "Acerto direto com o prestador"}\n\n` +
-      `_Recebi a quantia acima descrita diretamente do cliente referente aos serviços prestados, dando plena e geral quitação. (Transação realizada 100% direta entre as partes - Plataforma MeuAutônomo não retém valores)._`
+      (data.authCode ? `🛡️ *Assinatura Eletrônica:* ${data.authCode}\n` : "") +
+      `🔗 *Validar autenticidade oficial:* ${validationUrl}\n\n` +
+      `_Recebi a quantia acima descrita diretamente do cliente referente aos serviços prestados, dando plena e geral quitação nos termos da Lei Federal nº 14.063/2020 e Art. 320 do Código Civil._`
     );
   };
 
@@ -137,14 +144,52 @@ export function ReceiptModal({
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-4 border-t border-[#edf1eb]">
-            <div className="text-xs text-[#82948e]">
-              Emitido em: <strong className="text-[#38584f]">{dateFormatted}</strong>
-            </div>
-            <div className="text-center sm:text-right">
-              <div className="w-48 border-b border-[#284b42] mb-1"></div>
-              <p className="text-xs font-semibold text-[#173a34]">{data.professionalName}</p>
-              <p className="text-[11px] text-[#789088]">Assinatura do Profissional</p>
+          <div className="rounded-2xl border border-[#b8dfc7] bg-[#f0f9f3] p-4 text-xs text-[#28564d]">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center gap-1.5 font-bold text-[#173a34] text-sm">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  Documento Assinado Eletronicamente
+                </div>
+                {data.authCode && (
+                  <p className="font-mono text-xs font-semibold text-emerald-900">
+                    Chave de Autenticação: <span className="bg-white px-2 py-0.5 rounded border border-emerald-300 select-all">{data.authCode}</span>
+                  </p>
+                )}
+                <p className="text-[11px] text-[#527766]">
+                  Assinado eletronicamente por <strong>{data.professionalName}</strong> em {dateFormatted}.
+                </p>
+                <p className="text-[10px] text-[#6b8c7c]">
+                  Em conformidade com a Lei Federal nº 14.063/2020 e Art. 320 do Código Civil Brasileiro.
+                </p>
+                {data.authCode && (
+                  <p className="pt-1 text-[11px] text-[#173a34]">
+                    Consultar autenticidade:{" "}
+                    <a
+                      href={validationUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-emerald-700 underline hover:text-emerald-900"
+                    >
+                      meuautonomo.creativeam.com.br/validar-recibo
+                    </a>
+                  </p>
+                )}
+              </div>
+
+              {data.authCode && (
+                <div className="flex flex-col items-center shrink-0 self-center sm:self-auto bg-white p-2 rounded-xl border border-emerald-200 shadow-2xs">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&margin=0&data=${encodeURIComponent(validationUrl)}`}
+                    alt="QR Code de Validação"
+                    className="h-18 w-18"
+                    crossOrigin="anonymous"
+                  />
+                  <span className="mt-1 text-[9px] font-semibold text-[#527766] uppercase tracking-wider text-center">
+                    Escanear p/ validar
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
