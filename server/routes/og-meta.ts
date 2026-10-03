@@ -25,7 +25,11 @@ function escapeXml(unsafe: string): string {
   });
 }
 
+let cachedIndexHtml: string | null = null;
+const profileCache = new Map<string, { data: any; expiresAt: number }>();
+
 function findIndexHtml(): string | null {
+  if (cachedIndexHtml) return cachedIndexHtml;
   const possiblePaths = [
     path.resolve(process.cwd(), "dist/public/index.html"),
     path.resolve(process.cwd(), "public/index.html"),
@@ -38,13 +42,26 @@ function findIndexHtml(): string | null {
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
       try {
-        return fs.readFileSync(p, "utf-8");
+        cachedIndexHtml = fs.readFileSync(p, "utf-8");
+        return cachedIndexHtml;
       } catch (err) {
         console.error("[OG Meta] Erro ao ler index.html em", p, err);
       }
     }
   }
   return null;
+}
+
+async function getCachedProfile(slug: string) {
+  const cached = profileCache.get(slug);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+  const fresh = await getProfileBySlug(slug);
+  if (fresh) {
+    profileCache.set(slug, { data: fresh, expiresAt: Date.now() + 5 * 60 * 1000 });
+  }
+  return fresh;
 }
 
 export function registerOgMetaRoutes(app: express.Express) {
@@ -112,7 +129,7 @@ export function registerOgMetaRoutes(app: express.Express) {
   app.get("/p/:slug", async (req, res) => {
     const { slug } = req.params;
     try {
-      const profile = await getProfileBySlug(slug);
+      const profile = await getCachedProfile(slug);
       const html = findIndexHtml();
 
       if (!html) {
@@ -136,7 +153,7 @@ export function registerOgMetaRoutes(app: express.Express) {
         `Confira os serviços, valores e solicite seu agendamento direto com ${profile.displayName} (${profile.professionName || "Profissional"}).`
       );
 
-      // Imagem de prévia do WhatsApp
+      // Imagem de prévia do WhatsApp e Redes Sociais
       let ogImageUrl = "";
       if (profile.avatarUrl && profile.avatarUrl.startsWith("http")) {
         ogImageUrl = profile.avatarUrl;
@@ -147,10 +164,11 @@ export function registerOgMetaRoutes(app: express.Express) {
       }
 
       const ogTags = `
-    <!-- Metatags do Profissional (WhatsApp, Telegram, Facebook, Google) -->
+    <!-- Metatags do Profissional (WhatsApp, Facebook, Instagram, Twitter, Google) -->
     <title>${title}</title>
     <meta name="description" content="${description}" />
     <meta property="og:type" content="profile" />
+    <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="${safeName} — Cartão Profissional" />
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
@@ -164,14 +182,17 @@ export function registerOgMetaRoutes(app: express.Express) {
     <meta name="twitter:image" content="${ogImageUrl}" />
       `.trim();
 
-      // Substitui title e description padrão pelas informações do profissional
+      const preloadedScript = `<script>window.__PRELOADED_PROFILE__ = ${JSON.stringify(profile)};</script>`;
+
+      // Substitui title e description padrão pelas informações do profissional e injeta preload
       let personalizedHtml = html
         .replace(/<title>.*?<\/title>/i, "")
         .replace(/<meta\s+name=["']description["'].*?>/i, "")
-        .replace("</head>", `  ${ogTags}\n  </head>`);
+        .replace("</head>", `  ${ogTags}\n  ${preloadedScript}\n  </head>`);
 
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+      // Cache global na CDN da Vercel (Edge) por até 24h e revalidação assíncrona instantânea
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800");
       return res.send(personalizedHtml);
     } catch (err) {
       console.error("[OG Route Error]:", err);

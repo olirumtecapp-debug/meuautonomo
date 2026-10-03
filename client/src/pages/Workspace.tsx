@@ -2699,6 +2699,7 @@ function ServiceDialog({
 function Requests() {
   const requests = trpc.request.list.useQuery(undefined, { refetchInterval: 5000, refetchOnWindowFocus: true });
   const services = trpc.service.list.useQuery();
+  const team = trpc.team.list.useQuery();
   const utils = trpc.useUtils();
 
   const update = trpc.request.updateStatus.useMutation({
@@ -2763,6 +2764,7 @@ function Requests() {
   const [selectedRequestForAppointment, setSelectedRequestForAppointment] = useState<any | null>(null);
   const [appointmentForm, setAppointmentForm] = useState({
     serviceId: "",
+    teamMemberId: "",
     startsAt: "",
     durationMinutes: "60",
     amount: "",
@@ -2815,6 +2817,7 @@ function Requests() {
     }
     setAppointmentForm({
       serviceId: matchedService ? String(matchedService.id) : "",
+      teamMemberId: "",
       startsAt: defaultStart,
       durationMinutes: matchedService ? String(matchedService.durationMinutes) : "60",
       amount: matchedService ? formatBrlInput(matchedService.priceCents) : "150,00",
@@ -2855,6 +2858,7 @@ function Requests() {
     convertAppointment.mutate({
       id: selectedRequestForAppointment.id,
       serviceId: appointmentForm.serviceId ? Number(appointmentForm.serviceId) : undefined,
+      teamMemberId: appointmentForm.teamMemberId ? Number(appointmentForm.teamMemberId) : undefined,
       startsAt: new Date(appointmentForm.startsAt).toISOString(),
       durationMinutes: Number(appointmentForm.durationMinutes) || 60,
       amountCents: parseBrlToCents(appointmentForm.amount),
@@ -3116,6 +3120,19 @@ function Requests() {
               </div>
             </div>
 
+            {team.data && team.data.length > 0 && (
+              <FormSelect
+                label="Profissional / Parceiro da Equipe"
+                value={appointmentForm.teamMemberId}
+                onChange={val => setAppointmentForm({ ...appointmentForm, teamMemberId: val })}
+                placeholder="Eu mesmo (titular)"
+                options={[
+                  { value: "", label: "Eu mesmo (titular)" },
+                  ...team.data.map(m => ({ value: String(m.id), label: `${m.name} (${m.role})` }))
+                ]}
+              />
+            )}
+
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label="Duração (minutos)"
@@ -3263,6 +3280,19 @@ function Requests() {
                       >
                         <Calendar className="mr-1.5 h-3.5 w-3.5 text-[#d9f56a]" /> Criar atendimento
                       </Button>
+                      {request.requesterPhone && (
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const cleanPhone = request.requesterPhone.replace(/\D/g, "");
+                            const greetingMsg = `Olá ${request.requesterName}! Vi sua solicitação no MeuAutônomo para o serviço: "${request.description.slice(0, 50)}...". Como posso te ajudar?`;
+                            window.open(`https://wa.me/55${cleanPhone.startsWith("55") ? cleanPhone : cleanPhone}?text=${encodeURIComponent(greetingMsg)}`, "_blank");
+                          }}
+                          className="h-9 rounded-lg border-[#cbe4d1] bg-[#eef7f0] text-xs font-semibold text-[#173a34] hover:bg-[#d8eedf]"
+                        >
+                          <Share2 className="mr-1.5 h-3.5 w-3.5 text-[#2d7d54]" /> Falar no WhatsApp
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <Select
@@ -4769,6 +4799,7 @@ export function TeamPage() {
 
 function ProfessionalCard() {
   const profile = trpc.profile.get.useQuery();
+  const [instagramModalOpen, setInstagramModalOpen] = useState(false);
   if (!profile.data) return null;
   const shareUrl = `${window.location.origin}/p/${profile.data.slug}`;
   const copy = () => {
@@ -4781,6 +4812,11 @@ function ProfessionalCard() {
     const profession = profile.data?.professionName ? ` (${profile.data.professionName})` : "";
     const text = `Olá! Aqui é *${name}*${profession} ✨\n\nAcesse meu cartão profissional para ver meus serviços, valores e agendar seu horário:\n${shareUrl}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
+  const handleShareFacebook = () => {
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    window.open(fbUrl, "_blank", "width=600,height=500,menubar=no,toolbar=no");
   };
 
   const handleNativeShare = () => {
@@ -4915,14 +4951,39 @@ function ProfessionalCard() {
                 </a>
               </div>
 
-              {/* BOTÃO DIRETO DO WHATSAPP */}
-              <Button
-                variant="outline"
-                onClick={handleShareWhatsApp}
-                className="mt-2.5 h-10 sm:h-11 w-full rounded-xl border-[#cbe4d1] bg-[#eef7f0] text-[#173a34] hover:bg-[#e0f1e4] text-xs sm:text-sm font-semibold cursor-pointer"
-              >
-                <Share2 className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#2d7d54]" /> Enviar no WhatsApp de um Cliente
-              </Button>
+              {/* REDES SOCIAIS: WHATSAPP, FACEBOOK E INSTAGRAM */}
+              <div className="mt-3.5 space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#6d887f]">Divulgar nas redes sociais</p>
+                
+                {/* WHATSAPP */}
+                <Button
+                  variant="outline"
+                  onClick={handleShareWhatsApp}
+                  className="h-10 sm:h-11 w-full rounded-xl border-[#cbe4d1] bg-[#eef7f0] text-[#173a34] hover:bg-[#dff1e3] text-xs sm:text-sm font-semibold cursor-pointer justify-start px-4"
+                >
+                  <Share2 className="mr-2.5 h-4 w-4 text-[#25D366] shrink-0" /> Enviar no WhatsApp
+                </Button>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* FACEBOOK */}
+                  <Button
+                    variant="outline"
+                    onClick={handleShareFacebook}
+                    className="h-10 sm:h-11 w-full rounded-xl border-[#cdddec] bg-[#f0f6fc] text-[#1877F2] hover:bg-[#e4effa] text-xs sm:text-sm font-semibold cursor-pointer justify-start px-3.5"
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4 text-[#1877F2] shrink-0" /> Postar no Facebook
+                  </Button>
+
+                  {/* INSTAGRAM */}
+                  <Button
+                    variant="outline"
+                    onClick={() => setInstagramModalOpen(true)}
+                    className="h-10 sm:h-11 w-full rounded-xl border-[#ebd2e0] bg-[#fdf2f7] text-[#C13584] hover:bg-[#fae6f1] text-xs sm:text-sm font-semibold cursor-pointer justify-start px-3.5"
+                  >
+                    <Sparkles className="mr-2 h-4 w-4 text-[#C13584] shrink-0" /> Como usar no Instagram
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -4931,12 +4992,74 @@ function ProfessionalCard() {
               <p className="text-xs font-bold uppercase tracking-wider text-[#52674c]">Dica de divulgação</p>
               <p className="mt-1.5 text-base sm:text-lg font-bold text-[#304d2c] leading-snug">Seu cartão é seu ponto de encontro.</p>
               <p className="mt-2 text-xs sm:text-sm leading-relaxed text-[#6d805f]">
-                Coloque o link na bio do Instagram, no status do WhatsApp e envie para clientes após cada orçamento ou atendimento.
+                Coloque o link na <strong>bio do Instagram</strong>, poste no <strong>Facebook</strong>, envie no status do WhatsApp e compartilhe com cada cliente após um atendimento.
               </p>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* DIÁLOGO / GUIA VISUAL DE COMO USAR NO INSTAGRAM */}
+      <Dialog open={instagramModalOpen} onOpenChange={setInstagramModalOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#173a34]">
+              <Sparkles className="h-5 w-5 text-[#C13584]" /> Como divulgar no Instagram
+            </DialogTitle>
+            <DialogDescription>
+              O Instagram permite divulgar seu cartão de duas formas muito eficientes:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3 text-sm text-[#406157]">
+            {/* Opção 1: Bio */}
+            <div className="rounded-2xl border border-[#dce5dc] bg-[#fbfcf9] p-4">
+              <div className="flex items-center gap-2 font-bold text-[#173a34]">
+                <div className="grid h-6 w-6 place-items-center rounded-full bg-[#fdf2f7] text-[#C13584] text-xs font-bold">1</div>
+                <span>Link na Bio (Perfil do Instagram)</span>
+              </div>
+              <p className="mt-2 text-xs sm:text-sm text-[#627e74] leading-relaxed">
+                No seu app do Instagram, vá no seu perfil &gt; <strong>Editar perfil</strong> &gt; <strong>Links</strong> &gt; <strong>Adicionar link externo</strong> e cole o link do seu cartão. Ele ficará sempre visível para qualquer pessoa que visitar sua página.
+              </p>
+            </div>
+
+            {/* Opção 2: Stories */}
+            <div className="rounded-2xl border border-[#dce5dc] bg-[#fbfcf9] p-4">
+              <div className="flex items-center gap-2 font-bold text-[#173a34]">
+                <div className="grid h-6 w-6 place-items-center rounded-full bg-[#fdf2f7] text-[#C13584] text-xs font-bold">2</div>
+                <span>Figurinha de Link nos Stories</span>
+              </div>
+              <p className="mt-2 text-xs sm:text-sm text-[#627e74] leading-relaxed">
+                Tire uma foto ou vídeo de um serviço feito, toque no ícone de <strong>Figurinhas</strong> (o rostinho sorrindo no topo dos Stories), escolha <strong>"LINK"</strong>, cole seu link e publique. Seus seguidores tocarão no link e abrirão seu cartão diretamente!
+              </p>
+            </div>
+
+            {/* Caixa com o link para cópia imediata */}
+            <div className="rounded-xl border border-pink-200 bg-[#fff5f9] p-3.5">
+              <p className="text-xs font-semibold text-[#8a2d59] mb-1.5">Seu link para colar no Instagram:</p>
+              <div className="flex items-center justify-between gap-2 bg-white p-2 rounded-lg border border-pink-100">
+                <span className="text-xs font-mono text-[#173a34] truncate">{shareUrl}</span>
+                <Button
+                  size="sm"
+                  onClick={copy}
+                  className="h-8 px-3 rounded-md bg-[#C13584] hover:bg-[#a92b71] text-white text-xs font-bold shrink-0"
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copiar
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              onClick={() => setInstagramModalOpen(false)}
+              className="w-full rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"
+            >
+              Entendido!
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Page>
   );
 }
@@ -5945,7 +6068,16 @@ function FormSelect({ label, value, onChange, options, placeholder = "Selecionar
 }
 
 export function PublicProfile({ slug }: { slug: string }) {
-  const query = trpc.publicProfile.bySlug.useQuery({ slug });
+  // Pré-carregamento instantâneo vindo do SSR/Edge da Vercel (carregamento imediato no WhatsApp)
+  const preloaded = typeof window !== "undefined" ? (window as any).__PRELOADED_PROFILE__ : null;
+  const initialData = (preloaded && preloaded.slug === slug)
+    ? { profile: preloaded, services: [] }
+    : undefined;
+
+  const query = trpc.publicProfile.bySlug.useQuery({ slug }, {
+    initialData,
+    staleTime: 30_000,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [open, setOpen] = useState(false);

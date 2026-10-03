@@ -1344,7 +1344,10 @@ function escapeXml(unsafe) {
     }
   });
 }
+var cachedIndexHtml = null;
+var profileCache = /* @__PURE__ */ new Map();
 function findIndexHtml() {
+  if (cachedIndexHtml) return cachedIndexHtml;
   const possiblePaths = [
     path3.resolve(process.cwd(), "dist/public/index.html"),
     path3.resolve(process.cwd(), "public/index.html"),
@@ -1356,13 +1359,25 @@ function findIndexHtml() {
   for (const p of possiblePaths) {
     if (fs3.existsSync(p)) {
       try {
-        return fs3.readFileSync(p, "utf-8");
+        cachedIndexHtml = fs3.readFileSync(p, "utf-8");
+        return cachedIndexHtml;
       } catch (err) {
         console.error("[OG Meta] Erro ao ler index.html em", p, err);
       }
     }
   }
   return null;
+}
+async function getCachedProfile(slug) {
+  const cached = profileCache.get(slug);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.data;
+  }
+  const fresh = await getProfileBySlug(slug);
+  if (fresh) {
+    profileCache.set(slug, { data: fresh, expiresAt: Date.now() + 5 * 60 * 1e3 });
+  }
+  return fresh;
 }
 function registerOgMetaRoutes(app2) {
   app2.get("/api/og/card/:slug", async (req, res) => {
@@ -1423,7 +1438,7 @@ function registerOgMetaRoutes(app2) {
   app2.get("/p/:slug", async (req, res) => {
     const { slug } = req.params;
     try {
-      const profile = await getProfileBySlug(slug);
+      const profile = await getCachedProfile(slug);
       const html = findIndexHtml();
       if (!html) {
         return res.redirect("/");
@@ -1450,10 +1465,11 @@ function registerOgMetaRoutes(app2) {
         ogImageUrl = `${siteUrl}/api/og/card/${encodeURIComponent(profile.slug)}`;
       }
       const ogTags = `
-    <!-- Metatags do Profissional (WhatsApp, Telegram, Facebook, Google) -->
+    <!-- Metatags do Profissional (WhatsApp, Facebook, Instagram, Twitter, Google) -->
     <title>${title}</title>
     <meta name="description" content="${description}" />
     <meta property="og:type" content="profile" />
+    <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="${safeName} \u2014 Cart\xE3o Profissional" />
     <meta property="og:title" content="${title}" />
     <meta property="og:description" content="${description}" />
@@ -1466,10 +1482,12 @@ function registerOgMetaRoutes(app2) {
     <meta name="twitter:description" content="${description}" />
     <meta name="twitter:image" content="${ogImageUrl}" />
       `.trim();
+      const preloadedScript = `<script>window.__PRELOADED_PROFILE__ = ${JSON.stringify(profile)};</script>`;
       let personalizedHtml = html.replace(/<title>.*?<\/title>/i, "").replace(/<meta\s+name=["']description["'].*?>/i, "").replace("</head>", `  ${ogTags}
+  ${preloadedScript}
   </head>`);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300");
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800");
       return res.send(personalizedHtml);
     } catch (err) {
       console.error("[OG Route Error]:", err);
@@ -2943,11 +2961,12 @@ var appRouter = router({
     }),
     convertToAppointment: protectedProcedure.input(z2.object({
       id: z2.number(),
-      startsAt: z2.string().datetime().optional(),
-      serviceId: z2.number().optional(),
+      startsAt: z2.string().optional(),
+      serviceId: z2.number().optional().nullable(),
+      teamMemberId: z2.number().optional().nullable(),
       amountCents: z2.number().int().optional(),
-      location: z2.string().optional(),
-      notes: z2.string().optional()
+      location: z2.string().optional().nullable(),
+      notes: z2.string().optional().nullable()
     })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
@@ -2968,7 +2987,14 @@ var appRouter = router({
       }
       const effectiveServiceId = input.serviceId ?? request.serviceId ?? void 0;
       const service = effectiveServiceId ? await getOwnedService(profile.id, effectiveServiceId) : void 0;
-      const start = input.startsAt ? new Date(input.startsAt) : request.desiredAt ? new Date(request.desiredAt) : new Date(Date.now() + 24 * 3600 * 1e3);
+      let start;
+      if (input.startsAt && !isNaN(new Date(input.startsAt).getTime())) {
+        start = new Date(input.startsAt);
+      } else if (request.desiredAt && !isNaN(new Date(request.desiredAt).getTime())) {
+        start = new Date(request.desiredAt);
+      } else {
+        start = new Date(Date.now() + 24 * 3600 * 1e3);
+      }
       const durationMinutes = service?.durationMinutes ?? 60;
       const amountCents = input.amountCents ?? service?.priceCents ?? 0;
       const location = input.location ?? request.address ?? "";
@@ -2977,6 +3003,7 @@ var appRouter = router({
         profileId: profile.id,
         clientId: effectiveClientId,
         serviceId: effectiveServiceId,
+        teamMemberId: input.teamMemberId ?? null,
         startsAt: start,
         durationMinutes,
         location,

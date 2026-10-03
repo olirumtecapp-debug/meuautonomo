@@ -757,11 +757,12 @@ export const appRouter = router({
     }),
     convertToAppointment: protectedProcedure.input(z.object({
       id: z.number(),
-      startsAt: z.string().datetime().optional(),
-      serviceId: z.number().optional(),
+      startsAt: z.string().optional(),
+      serviceId: z.number().optional().nullable(),
+      teamMemberId: z.number().optional().nullable(),
       amountCents: z.number().int().optional(),
-      location: z.string().optional(),
-      notes: z.string().optional(),
+      location: z.string().optional().nullable(),
+      notes: z.string().optional().nullable(),
     })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
@@ -784,9 +785,16 @@ export const appRouter = router({
 
       const effectiveServiceId = input.serviceId ?? request.serviceId ?? undefined;
       const service = effectiveServiceId ? await getOwnedService(profile.id, effectiveServiceId) : undefined;
-      const start = input.startsAt
-        ? new Date(input.startsAt)
-        : (request.desiredAt ? new Date(request.desiredAt) : new Date(Date.now() + 24 * 3600 * 1000));
+      
+      let start: Date;
+      if (input.startsAt && !isNaN(new Date(input.startsAt).getTime())) {
+        start = new Date(input.startsAt);
+      } else if (request.desiredAt && !isNaN(new Date(request.desiredAt).getTime())) {
+        start = new Date(request.desiredAt);
+      } else {
+        start = new Date(Date.now() + 24 * 3600 * 1000);
+      }
+
       const durationMinutes = service?.durationMinutes ?? 60;
       const amountCents = input.amountCents ?? service?.priceCents ?? 0;
       const location = input.location ?? request.address ?? "";
@@ -796,6 +804,7 @@ export const appRouter = router({
         profileId: profile.id,
         clientId: effectiveClientId,
         serviceId: effectiveServiceId,
+        teamMemberId: input.teamMemberId ?? null,
         startsAt: start,
         durationMinutes,
         location,
