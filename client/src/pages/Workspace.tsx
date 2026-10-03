@@ -35,6 +35,7 @@ import {
   ExternalLink,
   FileText,
   Link2,
+  Loader2,
   LogOut,
   MapPin,
   Paperclip,
@@ -5945,12 +5946,7 @@ function FormSelect({ label, value, onChange, options, placeholder = "Selecionar
 
 export function PublicProfile({ slug }: { slug: string }) {
   const query = trpc.publicProfile.bySlug.useQuery({ slug });
-  const create = trpc.request.createPublic.useMutation({
-    onSuccess: () => {
-      toast.success("Solicitação enviada.");
-      setSent(true);
-    },
-  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -5964,6 +5960,16 @@ export function PublicProfile({ slug }: { slug: string }) {
     preferredTime: "",
   });
   const [files, setFiles] = useState<File[]>([]);
+
+  const create = trpc.request.createPublic.useMutation({
+    onSuccess: () => {
+      toast.success("Solicitação enviada com sucesso!");
+      setSent(true);
+    },
+    onError: (err) => {
+      toast.error(err.message || "Não foi possível enviar a solicitação. Verifique os dados.");
+    },
+  });
 
   // Atualiza dinamicamente o título da aba do navegador para o nome do profissional
   useEffect(() => {
@@ -5981,27 +5987,87 @@ export function PublicProfile({ slug }: { slug: string }) {
 
   const { profile, services } = query.data;
 
-  const submit = () => {
-    if (!form.requesterName || !form.requesterPhone || !form.description) return toast.error("Preencha nome, telefone e conte o que você precisa.");
-    const spellDesc = form.description ? checkServiceSpelling(form.description) : null;
-    const finalDescription = spellDesc?.hasCorrection ? spellDesc.correctedText : form.description;
-    Promise.all(files.map(file => new Promise<any>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve({ name: file.name, mimeType: file.type, size: file.size, dataUrl: String(reader.result) });
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    }))).then(attachments => create.mutate({
-      slug,
-      requesterName: form.requesterName,
-      requesterPhone: form.requesterPhone,
-      requesterEmail: form.requesterEmail || undefined,
-      serviceId: form.serviceId ? Number(form.serviceId) : undefined,
-      description: finalDescription,
-      address: form.address || undefined,
-      desiredAt: form.desiredAt ? new Date(form.desiredAt).toISOString() : undefined,
-      preferredTime: form.preferredTime || undefined,
-      attachments,
-    }));
+  const submit = async () => {
+    const cleanName = form.requesterName.trim();
+    const cleanPhone = form.requesterPhone.trim();
+    const cleanDesc = form.description.trim();
+
+    if (!cleanName) {
+      return toast.error("Por favor, informe seu nome.");
+    }
+    if (!cleanPhone) {
+      return toast.error("Por favor, informe seu WhatsApp ou telefone de contato.");
+    }
+    if (cleanPhone.replace(/\D/g, "").length < 8 && cleanPhone.length < 8) {
+      return toast.error("Informe um número de telefone ou WhatsApp válido com DDD.");
+    }
+    if (!cleanDesc) {
+      return toast.error("Por favor, conte o que você precisa.");
+    }
+
+    const cleanEmail = form.requesterEmail.trim();
+    if (cleanEmail && !cleanEmail.includes("@")) {
+      return toast.error("Informe um e-mail válido ou deixe o campo em branco.");
+    }
+
+    setIsSubmitting(true);
+    try {
+      let attachments: any[] = [];
+      if (files.length > 0) {
+        try {
+          attachments = await Promise.all(
+            files.map(file => new Promise<any>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve({
+                name: file.name,
+                mimeType: file.type || "application/octet-stream",
+                size: file.size,
+                dataUrl: String(reader.result),
+              });
+              reader.onerror = () => resolve(null);
+              reader.readAsDataURL(file);
+            }))
+          );
+          attachments = attachments.filter(Boolean);
+        } catch (e) {
+          console.warn("Erro ao ler anexos:", e);
+          attachments = [];
+        }
+      }
+
+      const spellDesc = checkServiceSpelling(cleanDesc);
+      const finalDescription = spellDesc?.hasCorrection ? spellDesc.correctedText : cleanDesc;
+
+      let safeDesiredAt: string | undefined = undefined;
+      if (form.desiredAt && form.desiredAt.trim()) {
+        try {
+          const d = new Date(form.desiredAt);
+          if (!isNaN(d.getTime())) {
+            safeDesiredAt = d.toISOString();
+          }
+        } catch {
+          safeDesiredAt = undefined;
+        }
+      }
+
+      await create.mutateAsync({
+        slug,
+        requesterName: cleanName,
+        requesterPhone: cleanPhone,
+        requesterEmail: cleanEmail || undefined,
+        serviceId: form.serviceId ? Number(form.serviceId) : undefined,
+        description: finalDescription,
+        address: form.address.trim() || undefined,
+        desiredAt: safeDesiredAt,
+        preferredTime: form.preferredTime.trim() || undefined,
+        attachments,
+      });
+    } catch (err: any) {
+      console.error("Erro no envio da solicitação:", err);
+      toast.error(err?.message || "Não foi possível enviar a solicitação. Tente novamente.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -6100,12 +6166,28 @@ export function PublicProfile({ slug }: { slug: string }) {
         </div>
       </main>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen && sent) {
+          setSent(false);
+          setForm({
+            requesterName: "",
+            requesterPhone: "",
+            requesterEmail: "",
+            serviceId: "",
+            description: "",
+            address: "",
+            desiredAt: "",
+            preferredTime: "",
+          });
+          setFiles([]);
+        }
+      }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
           <DialogHeader>
-            <DialogTitle>{sent ? "Solicitação enviada" : "Solicitar serviço"}</DialogTitle>
+            <DialogTitle>{sent ? "Solicitação enviada com sucesso" : "Solicitar serviço"}</DialogTitle>
             <DialogDescription>
-              {sent ? "Obrigado. O profissional recebeu seu pedido e entrará em contato." : `Conte para ${profile.displayName.split(" ")[0]} o que você precisa.`}
+              {sent ? "Obrigado! O profissional recebeu seu pedido com prioridade e entrará em contato com você." : `Conte para ${profile.displayName.split(" ")[0]} o que você precisa.`}
             </DialogDescription>
           </DialogHeader>
           {sent ? (
@@ -6113,7 +6195,17 @@ export function PublicProfile({ slug }: { slug: string }) {
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#e3f3e8] text-[#3e885c]">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
-              <p className="mt-4 text-sm text-[#71867f]">Você já pode fechar esta janela.</p>
+              <p className="mt-4 font-semibold text-[#173a34]">Pedido recebido!</p>
+              <p className="mt-1 text-sm text-[#71867f]">Você já pode fechar esta janela.</p>
+              <Button
+                onClick={() => {
+                  setOpen(false);
+                  setSent(false);
+                }}
+                className="mt-6 rounded-xl bg-[#173a34] text-white px-6"
+              >
+                Concluir
+              </Button>
             </div>
           ) : (
             <div className="grid gap-4 py-3">
@@ -6122,7 +6214,16 @@ export function PublicProfile({ slug }: { slug: string }) {
                 <Field label="WhatsApp ou telefone" value={form.requesterPhone} onChange={value => setForm({ ...form, requesterPhone: value })} />
               </div>
               <Field label="E-mail (opcional)" value={form.requesterEmail} onChange={value => setForm({ ...form, requesterEmail: value })} />
-              <FormSelect label="Serviço desejado" value={form.serviceId} onChange={value => setForm({ ...form, serviceId: value })} placeholder="Ainda não sei" options={services.map(s => ({ value: String(s.id), label: s.name }))} />
+              <FormSelect
+                label="Serviço desejado"
+                value={form.serviceId}
+                onChange={value => setForm({ ...form, serviceId: value })}
+                placeholder="Ainda não sei / Outro serviço"
+                options={[
+                  { value: "", label: "Ainda não sei / Outro serviço" },
+                  ...services.map(s => ({ value: String(s.id), label: s.name }))
+                ]}
+              />
               <div>
                 <Label className="mb-2 block">O que você precisa?</Label>
                 <Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Descreva o serviço, medidas, contexto…" className="min-h-28" />
@@ -6144,8 +6245,20 @@ export function PublicProfile({ slug }: { slug: string }) {
           )}
           <DialogFooter>
             {!sent && (
-              <Button onClick={submit} disabled={create.isPending} className="rounded-xl bg-[#173a34] text-white">
-                <Send className="mr-2 h-4 w-4" /> Enviar solicitação
+              <Button
+                onClick={submit}
+                disabled={create.isPending || isSubmitting}
+                className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d] cursor-pointer"
+              >
+                {create.isPending || isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando solicitação...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" /> Enviar solicitação
+                  </>
+                )}
               </Button>
             )}
           </DialogFooter>

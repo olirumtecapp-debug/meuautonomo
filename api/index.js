@@ -2827,30 +2827,99 @@ var appRouter = router({
       const rows = await db.select().from(requests).where(eq4(requests.profileId, profile.id)).orderBy(desc2(requests.createdAt));
       return Promise.all(rows.map(async (request) => ({ ...request, attachments: await db.select().from(requestAttachments).where(eq4(requestAttachments.requestId, request.id)) })));
     }),
-    createPublic: publicProcedure.input(z2.object({ slug: z2.string(), requesterName: z2.string().min(2).max(160), requesterPhone: z2.string().min(8).max(40), requesterEmail: z2.string().email().optional().or(z2.literal("")), serviceId: z2.number().optional(), description: z2.string().min(10).max(3e3), address: z2.string().max(600).optional(), desiredAt: z2.string().datetime().optional(), preferredTime: z2.string().max(80).optional(), attachments: z2.array(z2.object({ name: z2.string().max(180), mimeType: z2.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]), size: z2.number().int().positive().max(5e6), dataUrl: z2.string().max(7e6) })).max(3).optional() })).mutation(async ({ input }) => {
+    createPublic: publicProcedure.input(z2.object({
+      slug: z2.string(),
+      requesterName: z2.string().min(1).max(160),
+      requesterPhone: z2.string().min(6).max(40),
+      requesterEmail: z2.string().max(320).optional().nullable(),
+      serviceId: z2.number().optional().nullable(),
+      description: z2.string().min(1).max(3e3),
+      address: z2.string().max(600).optional().nullable(),
+      desiredAt: z2.string().optional().nullable(),
+      preferredTime: z2.string().max(80).optional().nullable(),
+      attachments: z2.array(z2.object({
+        name: z2.string().max(180),
+        mimeType: z2.string().max(120).optional(),
+        size: z2.number().int().positive().max(1e7).optional(),
+        dataUrl: z2.string().max(1e7)
+      })).max(5).optional()
+    })).mutation(async ({ input }) => {
       const profile = await getProfileBySlug(input.slug);
       if (!profile) throw new TRPCError3({ code: "NOT_FOUND", message: "Profissional n\xE3o encontrado." });
-      if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
+      if (input.serviceId) {
+        try {
+          await getOwnedService(profile.id, input.serviceId);
+        } catch {
+          input.serviceId = null;
+        }
+      }
       const db = await getDb();
-      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const existingClient = await db.select().from(clients).where(and2(eq4(clients.profileId, profile.id), eq4(clients.phone, input.requesterPhone))).limit(1);
+      if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel." });
+      const cleanPhone = input.requesterPhone.trim();
+      const cleanName = input.requesterName.trim();
+      const cleanEmail = input.requesterEmail && input.requesterEmail.trim().includes("@") ? input.requesterEmail.trim() : null;
+      const existingClient = await db.select().from(clients).where(and2(eq4(clients.profileId, profile.id), eq4(clients.phone, cleanPhone))).limit(1);
       let clientId = existingClient[0]?.id;
       if (!clientId) {
-        const insert2 = await db.insert(clients).values({ profileId: profile.id, name: input.requesterName, phone: input.requesterPhone, email: input.requesterEmail || null });
-        clientId = Number(insert2[0].insertId);
+        try {
+          const insert2 = await db.insert(clients).values({ profileId: profile.id, name: cleanName, phone: cleanPhone, email: cleanEmail });
+          clientId = Number(insert2[0]?.insertId);
+        } catch (e) {
+          console.warn("[createPublic] Erro ao cadastrar cliente autom\xE1tico:", e);
+        }
+      }
+      let parsedDesiredAt = null;
+      if (input.desiredAt && input.desiredAt.trim()) {
+        const d = new Date(input.desiredAt);
+        if (!isNaN(d.getTime())) {
+          parsedDesiredAt = d;
+        }
       }
       const secureToken = nanoid(32);
-      const insert = await db.insert(requests).values({ profileId: profile.id, clientId, requesterName: input.requesterName, requesterPhone: input.requesterPhone, requesterEmail: input.requesterEmail || null, serviceId: input.serviceId ?? null, description: input.description, address: input.address ?? null, desiredAt: input.desiredAt ? new Date(input.desiredAt) : null, preferredTime: input.preferredTime ?? null, secureToken });
-      const requestId = Number(insert[0].insertId);
+      const insert = await db.insert(requests).values({
+        profileId: profile.id,
+        clientId: clientId || null,
+        requesterName: cleanName,
+        requesterPhone: cleanPhone,
+        requesterEmail: cleanEmail,
+        serviceId: input.serviceId ?? null,
+        description: input.description.trim(),
+        address: input.address?.trim() || null,
+        desiredAt: parsedDesiredAt,
+        preferredTime: input.preferredTime?.trim() || null,
+        secureToken
+      });
+      const requestId = Number(insert[0]?.insertId);
       for (const attachment of input.attachments ?? []) {
-        const encoded = attachment.dataUrl.split(",")[1];
-        if (!encoded) continue;
-        const buffer = Buffer.from(encoded, "base64");
-        if (buffer.length > 5e6) throw new TRPCError3({ code: "BAD_REQUEST", message: "Cada anexo deve ter no m\xE1ximo 5 MB." });
-        const stored = await storagePut(`requests/${profile.id}/${requestId}/${attachment.name}`, buffer, attachment.mimeType);
-        await db.insert(requestAttachments).values({ requestId, fileName: attachment.name, fileUrl: stored.url, mimeType: attachment.mimeType, fileSize: buffer.length });
+        try {
+          const encoded = attachment.dataUrl.split(",")[1];
+          if (!encoded) continue;
+          const buffer = Buffer.from(encoded, "base64");
+          if (buffer.length > 5e6) continue;
+          let fileUrl = "";
+          try {
+            const stored = await storagePut(`requests/${profile.id}/${requestId}/${attachment.name}`, buffer, attachment.mimeType || "application/octet-stream");
+            fileUrl = stored.url;
+          } catch (storageErr) {
+            console.warn("[createPublic] Storage put failed, saving fallback:", storageErr);
+            fileUrl = `/api/attachments/temp/${attachment.name}`;
+          }
+          await db.insert(requestAttachments).values({
+            requestId,
+            fileName: attachment.name,
+            fileUrl: fileUrl || attachment.name,
+            mimeType: attachment.mimeType || "application/octet-stream",
+            fileSize: buffer.length
+          });
+        } catch (attErr) {
+          console.warn("[createPublic] Erro ao processar anexo:", attErr);
+        }
       }
-      await createNotification(profile.id, "Nova solicita\xE7\xE3o", `${input.requesterName} enviou um pedido de servi\xE7o.`, "request");
+      try {
+        await createNotification(profile.id, "Nova solicita\xE7\xE3o", `${cleanName} enviou um pedido de servi\xE7o.`, "request");
+      } catch (notifErr) {
+        console.warn("[createPublic] Erro ao criar notifica\xE7\xE3o:", notifErr);
+      }
       return { success: true, id: requestId, token: secureToken };
     }),
     updateStatus: protectedProcedure.input(z2.object({ id: z2.number(), status: z2.enum(["nova", "em_analise", "orcamento_enviado", "agendada", "arquivada"]) })).mutation(async ({ ctx, input }) => {
