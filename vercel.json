@@ -4,11 +4,18 @@
   "outputDirectory": "dist/public",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.js"
+      "source": "/p/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|Pinterest|TelegramBot|Slackbot|LinkedInBot).*"
+        }
+      ],
+      "destination": "/api/og-preview?slug=$1"
     },
     {
-      "source": "/p/(.*)",
+      "source": "/api/(.*)",
       "destination": "/api/index.js"
     },
     {

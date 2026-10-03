@@ -711,13 +711,11 @@ async function getDb() {
     if (!_db || _db.__isMock) {
       try {
         _db = drizzle(process.env.DATABASE_URL);
-        await ensureSchema(_db);
+        ensureSchema(_db).catch((err) => console.warn("[Database] ensureSchema error:", err?.message || err));
       } catch (error) {
         console.warn("[Database] Failed to connect to DATABASE_URL:", error);
         _db = getMockDb();
       }
-    } else {
-      await ensureSchema(_db);
     }
     return _db;
   }
@@ -1380,6 +1378,69 @@ async function getCachedProfile(slug) {
   return fresh;
 }
 function registerOgMetaRoutes(app2) {
+  app2.get("/api/og-preview", async (req, res) => {
+    const slug = (req.query.slug || "").trim();
+    const host = req.get("x-forwarded-host") || req.get("host") || "meuautonomo.creativeam.com.br";
+    const protocol = req.get("x-forwarded-proto") || "https";
+    const siteUrl = `${protocol}://${host}`;
+    if (!slug) {
+      return res.redirect("/");
+    }
+    try {
+      const profilePromise = getCachedProfile(slug);
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2500));
+      const profile = await Promise.race([profilePromise, timeoutPromise]);
+      const name = profile?.displayName || "Profissional";
+      const profession = profile?.professionName || "Atendimento Profissional";
+      const safeName = escapeHtml(name);
+      const safeProfession = escapeHtml(profession);
+      const title = `${safeName} \u2014 ${safeProfession} | Cart\xE3o Profissional`;
+      const description = escapeHtml(
+        profile?.bio || `Confira os servi\xE7os, valores e solicite seu agendamento direto com ${name} (${profession}).`
+      );
+      const pageUrl = `${siteUrl}/p/${encodeURIComponent(slug)}`;
+      let ogImageUrl = `${siteUrl}/pwa-512.png`;
+      if (profile?.avatarUrl && profile.avatarUrl.startsWith("http")) {
+        ogImageUrl = profile.avatarUrl;
+      } else if (profile?.avatarUrl && profile.avatarUrl.startsWith("/")) {
+        ogImageUrl = `${siteUrl}${profile.avatarUrl}`;
+      }
+      const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>${title}</title>
+  <meta name="description" content="${description}" />
+  <meta property="og:type" content="profile" />
+  <meta property="og:locale" content="pt_BR" />
+  <meta property="og:site_name" content="${safeName} \u2014 Cart\xE3o Profissional" />
+  <meta property="og:title" content="${title}" />
+  <meta property="og:description" content="${description}" />
+  <meta property="og:url" content="${pageUrl}" />
+  <meta property="og:image" content="${ogImageUrl}" />
+  <meta property="og:image:secure_url" content="${ogImageUrl}" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="512" />
+  <meta property="og:image:height" content="512" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${title}" />
+  <meta name="twitter:description" content="${description}" />
+  <meta name="twitter:image" content="${ogImageUrl}" />
+  <meta http-equiv="refresh" content="0;url=${pageUrl}" />
+</head>
+<body style="font-family:sans-serif;text-align:center;padding:40px;background:#fbfcf9;">
+  <p>Carregando cart\xE3o de <strong>${safeName}</strong>...</p>
+  <p><a href="${pageUrl}">Clique aqui se n\xE3o for redirecionado automaticamente</a></p>
+</body>
+</html>`;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800");
+      return res.send(html);
+    } catch (err) {
+      console.error("[OG Preview Error]:", err);
+      return res.redirect(`/p/${encodeURIComponent(slug)}`);
+    }
+  });
   app2.get("/api/og/card/:slug", async (req, res) => {
     const { slug } = req.params;
     try {

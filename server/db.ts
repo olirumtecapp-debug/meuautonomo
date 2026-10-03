@@ -44,13 +44,11 @@ export async function getDb(): Promise<ReturnType<typeof drizzle>> {
     if (!_db || _db.__isMock) {
       try {
         _db = drizzle(process.env.DATABASE_URL);
-        await ensureSchema(_db);
+        ensureSchema(_db).catch((err) => console.warn("[Database] ensureSchema error:", err?.message || err));
       } catch (error) {
         console.warn("[Database] Failed to connect to DATABASE_URL:", error);
         _db = getMockDb();
       }
-    } else {
-      await ensureSchema(_db);
     }
     return _db;
   }
