@@ -203,15 +203,15 @@ function ProfessionSelectField({
   return (
     <div className="space-y-4 rounded-2xl border border-[#dce5dc] bg-[#fbfcf9] p-4 sm:p-5">
       {/* 1º PASSO: MODALIDADE / RAMO DE ATUAÇÃO */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-bold text-[#173a34] flex items-center gap-1.5">
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-[#173a34] text-[11px] font-bold text-[#d9f56a]">
+      <div className="space-y-2 w-full min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+          <Label className="text-sm font-bold text-[#173a34] flex items-center gap-1.5 flex-wrap">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-[#173a34] text-[11px] font-bold text-[#d9f56a] shrink-0">
               1
             </span>
-            Modalidade / Área de atuação
+            <span>Modalidade / Área de atuação</span>
           </Label>
-          <span className="text-[11px] font-medium text-[#7a938c]">
+          <span className="text-[11px] font-medium text-[#7a938c] shrink-0">
             Ramo do seu serviço
           </span>
         </div>
@@ -245,8 +245,8 @@ function ProfessionSelectField({
 
       {/* CASO SEJA CATEGORIA MANUAL */}
       {chosenCategory === "__outra_categoria__" && (
-        <div className="grid gap-3 sm:grid-cols-2 rounded-xl bg-white p-3.5 border border-[#dce5dc]">
-          <div>
+        <div className="grid gap-3 sm:grid-cols-2 rounded-xl bg-white p-3.5 border border-[#dce5dc] w-full min-w-0">
+          <div className="min-w-0">
             <Label className="mb-1.5 block text-xs font-bold text-[#38584f]">
               Nome da Modalidade / Área
             </Label>
@@ -260,7 +260,7 @@ function ProfessionSelectField({
               className="h-11 rounded-xl border-[#dce5dc] bg-[#fbfcf9] text-sm"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <Label className="mb-1.5 block text-xs font-bold text-[#38584f]">
               Sua Atividade / Profissão
             </Label>
@@ -276,15 +276,15 @@ function ProfessionSelectField({
 
       {/* 2º PASSO: ATIVIDADE ESPECÍFICA (ABRE APÓS ESCOLHER A MODALIDADE) */}
       {chosenCategory && chosenCategory !== "__outra_categoria__" && (
-        <div className="space-y-2 pt-1 border-t border-[#edf1eb]">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-bold text-[#173a34] flex items-center gap-1.5">
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-[#173a34] text-[11px] font-bold text-[#d9f56a]">
+        <div className="space-y-2 pt-2 border-t border-[#edf1eb] w-full min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <Label className="text-sm font-bold text-[#173a34] flex items-center gap-1.5 flex-wrap min-w-0">
+              <span className="grid h-5 w-5 place-items-center rounded-full bg-[#173a34] text-[11px] font-bold text-[#d9f56a] shrink-0">
                 2
               </span>
-              Atividade / Profissão ({activeCatObj?.category})
+              <span className="break-words">Atividade / Profissão ({activeCatObj?.category})</span>
             </Label>
-            <span className="text-[11px] font-medium text-[#7a938c]">
+            <span className="text-[11px] font-medium text-[#7a938c] shrink-0">
               Escolha sua especialidade
             </span>
           </div>
@@ -312,8 +312,8 @@ function ProfessionSelectField({
               </SelectContent>
             </Select>
           ) : (
-            <div className="space-y-2 rounded-xl bg-white p-3.5 border border-[#dce5dc]">
-              <div className="flex items-center justify-between">
+            <div className="space-y-2 rounded-xl bg-white p-3.5 border border-[#dce5dc] w-full min-w-0">
+              <div className="flex flex-wrap items-center justify-between gap-1">
                 <Label className="text-xs font-bold text-[#38584f]">
                   Digite o nome da sua atividade:
                 </Label>
@@ -340,20 +340,20 @@ function ProfessionSelectField({
       {/* SE AINDA NÃO ESCOLHEU A MODALIDADE */}
       {!chosenCategory && (
         <div className="flex items-center gap-2 rounded-xl border border-dashed border-[#dce5dc] bg-[#f4f7f1] p-3 text-xs text-[#6e857e]">
-          <span className="text-sm">💡</span>
+          <span className="text-sm shrink-0">💡</span>
           <span>Selecione a modalidade acima no <strong>passo 1</strong> para liberar a lista de atividades correspondentes.</span>
         </div>
       )}
 
       {/* BADGE DE CONFIRMAÇÃO VISUAL */}
       {chosenCategory && professionName && (
-        <div className="flex items-center gap-2 pt-1 text-xs text-[#4e6a61]">
-          <span className="font-semibold text-[#284b42]">Seu perfil profissional:</span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#f1f7dd] px-3 py-1 font-bold text-[#566c0e]">
-            {activeCatObj?.icon && <span>{activeCatObj.icon}</span>}
-            <span>{chosenCategory === "__outra_categoria__" ? (customCategory || "Personalizado") : chosenCategory}</span>
-            <ChevronRight className="h-3 w-3 text-[#7a931a]" />
-            <span className="text-[#173a34]">{professionName}</span>
+        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-[#4e6a61]">
+          <span className="font-semibold text-[#284b42] shrink-0">Seu perfil profissional:</span>
+          <span className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-[#f1f7dd] px-3 py-1 font-bold text-[#566c0e] max-w-full break-words">
+            {activeCatObj?.icon && <span className="shrink-0">{activeCatObj.icon}</span>}
+            <span className="break-words">{chosenCategory === "__outra_categoria__" ? (customCategory || "Personalizado") : chosenCategory}</span>
+            <ChevronRight className="h-3 w-3 text-[#7a931a] shrink-0" />
+            <span className="text-[#173a34] break-words">{professionName}</span>
           </span>
         </div>
       )}
@@ -376,12 +376,12 @@ function PublicAddressField({
   const cleanValue = value === "administrador-geral" || value === "administrador" ? "" : value;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-bold text-[#173a34] flex items-center gap-1.5">
+    <div className="space-y-2 w-full min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+        <Label className="text-sm font-bold text-[#173a34] flex items-center gap-1.5 flex-wrap">
           Link do seu Cartão Digital / Perfil Profissional
         </Label>
-        <span className="text-[11px] font-medium text-[#7a938c]">
+        <span className="text-[11px] font-medium text-[#7a938c] shrink-0">
           Link para WhatsApp e Bio
         </span>
       </div>
@@ -390,8 +390,8 @@ function PublicAddressField({
         Este é o link que você vai mandar para seus clientes no WhatsApp e redes sociais. Eles vão abrir esse link para ver seus serviços, fotos e pedir orçamentos.
       </p>
 
-      <div className="flex h-12 w-full items-center rounded-xl border border-[#dce5dc] bg-[#fbfcf9] shadow-sm transition focus-within:border-[#173a34] focus-within:ring-2 focus-within:ring-[#173a34]/15">
-        <span className="flex h-full shrink-0 select-none items-center border-r border-[#dce5dc] bg-[#eff5ec] px-3.5 text-xs font-bold text-[#2d4b42] sm:text-sm">
+      <div className="flex flex-col sm:flex-row w-full rounded-xl border border-[#dce5dc] bg-[#fbfcf9] shadow-sm transition focus-within:border-[#173a34] focus-within:ring-2 focus-within:ring-[#173a34]/15 overflow-hidden min-w-0">
+        <span className="flex h-10 sm:h-12 shrink-0 select-none items-center border-b sm:border-b-0 sm:border-r border-[#dce5dc] bg-[#eff5ec] px-3 text-xs font-bold text-[#2d4b42] truncate max-w-full">
           {displayPrefix}
         </span>
         <input
@@ -400,13 +400,13 @@ function PublicAddressField({
           onChange={(e) => onChange(slugify(e.target.value))}
           placeholder="ex: carlos-silva ou studio-bella"
           spellCheck={false}
-          className="h-full flex-1 bg-transparent px-3 text-sm font-semibold text-[#173a34] outline-none placeholder:text-[#9bad9a]"
+          className="h-10 sm:h-12 min-w-0 flex-1 bg-transparent px-3 text-sm font-semibold text-[#173a34] outline-none placeholder:text-[#9bad9a]"
         />
       </div>
 
-      <p className="text-xs text-[#738a82]">
+      <p className="text-xs text-[#738a82] break-all">
         🔗 Seus clientes acessarão:{" "}
-        <strong className="text-[#173a34]">
+        <strong className="text-[#173a34] break-all">
           https://{displayPrefix}{cleanValue || "seu-nome-ou-negocio"}
         </strong>
       </p>
@@ -3176,7 +3176,7 @@ function Requests() {
       </Dialog>
 
       {/* Guia Visual do Fluxo das Solicitações */}
-      <div className="mb-6 grid gap-2.5 sm:grid-cols-4 text-xs">
+      <div className="mb-6 grid gap-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 text-xs w-full min-w-0">
         <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
           <div className="flex items-center gap-1.5 font-bold text-amber-900">
             <span className="h-2 w-2 rounded-full bg-amber-500" />
@@ -3859,7 +3859,7 @@ function Quotes() {
         </div>
       )}
 
-      <div className="mb-5 grid gap-2.5 sm:grid-cols-4 text-xs">
+      <div className="mb-5 grid gap-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 text-xs w-full min-w-0">
         <div className="rounded-2xl border border-[#dce5dc] bg-white p-3.5 shadow-sm">
           <div className="flex items-center gap-1.5 font-bold text-[#5d746d]">
             <span className="h-2 w-2 rounded-full bg-[#82948e]" />
@@ -4852,7 +4852,7 @@ function ProfessionalCard() {
         </HelpButton>
       }
     >
-      <div className="grid gap-5 sm:gap-6 lg:grid-cols-[0.85fr_1.15fr] w-full min-w-0 max-w-full">
+      <div className="grid gap-5 sm:gap-6 xl:grid-cols-[0.85fr_1.15fr] w-full min-w-0 max-w-full">
         {/* PRÉVIA DO CARTÃO DIGITAL DO PROFISSIONAL */}
         <Card className="overflow-hidden rounded-[24px] sm:rounded-[28px] border-0 bg-[#173a34] text-white shadow-[0_16px_45px_rgba(19,42,39,0.18)] w-full min-w-0">
           <CardContent className="relative p-5 sm:p-7 md:p-9 min-w-0">
@@ -5159,9 +5159,9 @@ function SettingsPage() {
         </HelpButton>
       }
     >
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-12 w-full min-w-0">
         {/* CARD MODO DE OPERAÇÃO (INDIVIDUAL VS EQUIPE) */}
-        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] lg:col-span-2">
+        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] xl:col-span-12 w-full min-w-0">
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
@@ -5188,10 +5188,10 @@ function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 w-full min-w-0">
               <div
                 className={cn(
-                  "rounded-2xl border-2 p-4 transition-all flex flex-col justify-between",
+                  "rounded-2xl border-2 p-4 transition-all flex flex-col justify-between min-w-0",
                   profile.data.accountType === "individual"
                     ? "border-[#173a34] bg-[#f9fbf8]"
                     : "border-[#edf1eb] bg-white opacity-85"
@@ -5226,7 +5226,7 @@ function SettingsPage() {
 
               <div
                 className={cn(
-                  "rounded-2xl border-2 p-4 transition-all flex flex-col justify-between",
+                  "rounded-2xl border-2 p-4 transition-all flex flex-col justify-between min-w-0",
                   profile.data.accountType === "equipe"
                     ? "border-purple-600 bg-[#faf5ff]"
                     : "border-[#edf1eb] bg-white opacity-85"
@@ -5261,12 +5261,13 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]">
+        {/* PERFIL PROFISSIONAL */}
+        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] xl:col-span-7 w-full min-w-0">
           <CardHeader>
             <CardTitle className="text-lg text-[#173a34]">Perfil profissional</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="flex items-center gap-4 rounded-2xl bg-[#f5f8f2] p-4">
+          <CardContent className="grid gap-4 w-full min-w-0">
+            <div className="flex items-center gap-4 rounded-2xl bg-[#f5f8f2] p-4 min-w-0">
               <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#d9f56a] text-xl font-bold text-[#173a34]">
                 {current.avatarUrl ? <img src={current.avatarUrl} alt={current.displayName} className="h-full w-full object-cover" /> : current.displayName.charAt(0).toUpperCase()}
               </div>
@@ -5286,7 +5287,7 @@ function SettingsPage() {
                     });
                     reader.readAsDataURL(file);
                   }}
-                  className="h-9 rounded-lg border-[#dce5dc] bg-white text-xs"
+                  className="h-9 rounded-lg border-[#dce5dc] bg-white text-xs max-w-full"
                 />
               </div>
             </div>
@@ -5302,7 +5303,7 @@ function SettingsPage() {
               onChange={value => setForm({ ...current, city: value, serviceRegion: value ? `${value} e região` : current.serviceRegion })}
             />
             <Field label="WhatsApp" value={current.whatsapp} onChange={value => setForm({ ...current, whatsapp: value })} />
-            <div>
+            <div className="w-full min-w-0">
               <div className="mb-2 flex items-center justify-between">
                 <Label className="text-sm font-semibold text-[#38584f]">Descrição sobre seu trabalho</Label>
                 <span className={`text-[11px] font-medium ${(current.bio?.length || 0) > 450 ? "text-amber-600 font-bold" : "text-[#71867f]"}`}>
@@ -5314,7 +5315,7 @@ function SettingsPage() {
                 value={current.bio}
                 onChange={e => setForm({ ...current, bio: e.target.value })}
                 placeholder="Conte sobre sua experiência, especialidades e diferenciais..."
-                className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9] text-sm"
+                className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9] text-sm w-full"
               />
             </div>
             <Button onClick={save} disabled={update.isPending} className="mt-2 w-fit rounded-xl bg-[#173a34] text-white">
@@ -5323,28 +5324,29 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]">
+        {/* CHAVE PIX E DISPONIBILIDADE */}
+        <div className="space-y-6 xl:col-span-5 w-full min-w-0">
+          <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#e3f3e8] text-[#2c7a45]">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#e3f3e8] text-[#2c7a45] shrink-0">
                   <CreditCard className="h-4 w-4" />
                 </div>
-                <div>
-                  <CardTitle className="text-lg text-[#173a34]">Chave PIX para Recebimentos</CardTitle>
-                  <p className="text-xs text-[#82948e]">Aparece na proposta aprovada e no recibo para seu cliente</p>
+                <div className="min-w-0">
+                  <CardTitle className="text-lg text-[#173a34] truncate">Chave PIX para Recebimentos</CardTitle>
+                  <p className="text-xs text-[#82948e] line-clamp-1">Aparece na proposta aprovada e no recibo para seu cliente</p>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <Label className="mb-2 block">Tipo de Chave</Label>
+            <CardContent className="space-y-4 w-full min-w-0">
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 w-full min-w-0">
+                <div className="sm:col-span-1 min-w-0">
+                  <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Tipo de Chave</Label>
                   <Select
                     value={current.pixKeyType || "cpf"}
                     onValueChange={v => setForm({ ...current, pixKeyType: v })}
                   >
-                    <SelectTrigger className="h-10 rounded-xl border-[#dce5dc] bg-white">
+                    <SelectTrigger className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm w-full">
                       <SelectValue placeholder="Tipo de Chave" />
                     </SelectTrigger>
                     <SelectContent>
@@ -5356,7 +5358,7 @@ function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 min-w-0">
                   <Field
                     label="Chave PIX"
                     placeholder={
@@ -5384,22 +5386,22 @@ function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]">
+          <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
             <CardHeader>
               <CardTitle className="text-lg text-[#173a34]">Disponibilidade</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-5 w-full min-w-0">
               <p className="text-sm leading-6 text-[#71867f]">
                 Esses horários são usados para validar novos agendamentos e evitar conflitos.
               </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label className="mb-2 block">Começo</Label>
-                  <Input id="availability-start" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).start : "08:00"} />
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 w-full min-w-0">
+                <div className="min-w-0">
+                  <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Começo</Label>
+                  <Input id="availability-start" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).start : "08:00"} className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm" />
                 </div>
-                <div>
-                  <Label className="mb-2 block">Fim</Label>
-                  <Input id="availability-end" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).end : "18:00"} />
+                <div className="min-w-0">
+                  <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Fim</Label>
+                  <Input id="availability-end" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).end : "18:00"} className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm" />
                 </div>
               </div>
               <Button
@@ -6638,14 +6640,14 @@ export function PublicQuote({ token }: { token: string }) {
                 {profile?.pixKey && (
                   <div className="mt-4 rounded-2xl border border-[#b8dfc4] bg-[#f0f9f3] p-5 text-left shadow-sm">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#2e6e4a] text-white font-bold text-xs">
                           PIX
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <h4 className="font-bold text-[#173a34]">Opção Direta via PIX (Se Combinado)</h4>
-                          <p className="text-xs text-[#526d64]">
-                            Chave {profile.pixKeyType ? profile.pixKeyType.toUpperCase() : "PIX"}: <strong className="font-mono text-xs text-[#173a34] bg-white px-2 py-0.5 rounded border border-[#c5e2ce]">{profile.pixKey}</strong>
+                          <p className="text-xs text-[#526d64] break-all">
+                            Chave {profile.pixKeyType ? profile.pixKeyType.toUpperCase() : "PIX"}: <strong className="font-mono text-xs text-[#173a34] bg-white px-2 py-0.5 rounded border border-[#c5e2ce] break-all">{profile.pixKey}</strong>
                           </p>
                         </div>
                       </div>

@@ -75,15 +75,15 @@ export function StateCitySelect({
   return (
     <div className={`space-y-2.5 ${className}`}>
       {label && (
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
           <Label className="flex items-center gap-1.5 text-sm font-semibold text-[#38584f]">
-            <MapPin className="h-4 w-4 text-[#759021]" />
-            {label}
+            <MapPin className="h-4 w-4 text-[#759021] shrink-0" />
+            <span>{label}</span>
           </Label>
           {selectedUf && selectedCity && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#f1f7dd] px-2.5 py-0.5 text-xs font-semibold text-[#566c0e]">
-              <Check className="h-3 w-3" />
-              {formatCityState(selectedCity, selectedUf)}
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#f1f7dd] px-2.5 py-0.5 text-xs font-semibold text-[#566c0e] max-w-full truncate">
+              <Check className="h-3 w-3 shrink-0" />
+              <span className="truncate">{formatCityState(selectedCity, selectedUf)}</span>
             </span>
           )}
         </div>
