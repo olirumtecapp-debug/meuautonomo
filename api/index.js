@@ -3541,6 +3541,20 @@ var appRouter = router({
       await db.delete(teamMembers).where(and2(eq4(teamMembers.id, input.id), eq4(teamMembers.profileId, profile.id)));
       return { success: true };
     }),
+    uploadAvatar: protectedProcedure.input(z2.object({
+      fileName: z2.string().max(180),
+      mimeType: z2.enum(["image/jpeg", "image/png", "image/webp"]),
+      dataUrl: z2.string().max(7e6)
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const encoded = input.dataUrl.split(",")[1];
+      if (!encoded) throw new TRPCError3({ code: "BAD_REQUEST", message: "Arquivo inv\xE1lido." });
+      const buffer = Buffer.from(encoded, "base64");
+      if (buffer.length > 5e6) throw new TRPCError3({ code: "BAD_REQUEST", message: "A foto deve ter no m\xE1ximo 5 MB." });
+      const sanitizedName = input.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const stored = await storagePut(`profiles/${profile.id}/team-avatar-${Date.now()}-${sanitizedName}`, buffer, input.mimeType);
+      return { success: true, avatarUrl: stored.url };
+    }),
     report: protectedProcedure.input(z2.object({
       from: z2.string().datetime().optional(),
       to: z2.string().datetime().optional(),

@@ -89,17 +89,17 @@ export function StateCitySelect({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-12">
+      <div className="grid gap-3 sm:grid-cols-12 w-full min-w-0">
         {/* ESTADO (UF) */}
-        <div className="sm:col-span-4">
+        <div className="sm:col-span-4 min-w-0">
           <Label className="mb-1.5 block text-xs font-medium text-[#5c756d]">
             {stateLabel}
           </Label>
-          <div className="relative">
+          <div className="relative w-full min-w-0">
             <select
               value={selectedUf}
               onChange={(e) => handleStateChange(e.target.value)}
-              className="h-11 w-full appearance-none rounded-xl border border-[#dce5dc] bg-white px-3 py-2 pr-9 text-sm font-medium text-[#173a34] shadow-xs transition hover:border-[#b8cbb8] focus:border-[#173a34] focus:outline-hidden focus:ring-2 focus:ring-[#173a34]/15"
+              className="h-11 w-full min-w-0 appearance-none rounded-xl border border-[#dce5dc] bg-white px-3 py-2 pr-9 text-sm font-medium text-[#173a34] shadow-xs transition hover:border-[#b8cbb8] focus:border-[#173a34] focus:outline-hidden focus:ring-2 focus:ring-[#173a34]/15 truncate"
             >
               <option value="">Selecione o Estado...</option>
               {BRAZILIAN_STATES.map((state) => (
@@ -113,7 +113,7 @@ export function StateCitySelect({
         </div>
 
         {/* CIDADE */}
-        <div className="sm:col-span-8">
+        <div className="sm:col-span-8 min-w-0">
           <div className="mb-1.5 flex items-center justify-between">
             <Label className="block text-xs font-medium text-[#5c756d]">
               {cityLabel}
@@ -125,7 +125,7 @@ export function StateCitySelect({
                   setIsManualCity(!isManualCity);
                   setSelectedCity("");
                 }}
-                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#557718] hover:underline"
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#557718] hover:underline shrink-0"
               >
                 {isManualCity ? (
                   <>
@@ -143,26 +143,26 @@ export function StateCitySelect({
           </div>
 
           {!selectedUf ? (
-            <div className="flex h-11 items-center rounded-xl border border-dashed border-[#dce5dc] bg-[#f7f9f5] px-3 text-xs text-[#82978f]">
-              <span>⬅️ Primeiro selecione o Estado (UF) para ver as cidades</span>
+            <div className="flex h-11 items-center rounded-xl border border-dashed border-[#dce5dc] bg-[#f7f9f5] px-3 text-xs text-[#82978f] w-full min-w-0 truncate">
+              <span className="truncate">⬅️ Primeiro selecione o Estado (UF) para ver as cidades</span>
             </div>
           ) : isManualCity ? (
-            <div className="relative">
+            <div className="relative w-full min-w-0">
               <Input
                 type="text"
                 value={selectedCity}
                 onChange={(e) => handleManualCityChange(e.target.value)}
                 placeholder={`Digite o nome da cidade em ${selectedUf}...`}
-                className="h-11 rounded-xl border-[#dce5dc] bg-white text-sm font-medium text-[#173a34] focus:border-[#173a34]"
+                className="h-11 w-full min-w-0 rounded-xl border-[#dce5dc] bg-white text-sm font-medium text-[#173a34] focus:border-[#173a34]"
                 autoFocus
               />
             </div>
           ) : (
-            <div className="relative">
+            <div className="relative w-full min-w-0">
               <select
                 value={selectedCity}
                 onChange={(e) => handleCitySelectChange(e.target.value)}
-                className="h-11 w-full appearance-none rounded-xl border border-[#dce5dc] bg-white px-3 py-2 pr-9 text-sm font-medium text-[#173a34] shadow-xs transition hover:border-[#b8cbb8] focus:border-[#173a34] focus:outline-hidden focus:ring-2 focus:ring-[#173a34]/15"
+                className="h-11 w-full min-w-0 appearance-none rounded-xl border border-[#dce5dc] bg-white px-3 py-2 pr-9 text-sm font-medium text-[#173a34] shadow-xs transition hover:border-[#b8cbb8] focus:border-[#173a34] focus:outline-hidden focus:ring-2 focus:ring-[#173a34]/15 truncate"
               >
                 <option value="">Selecione sua cidade...</option>
                 {cityList.map((city) => (

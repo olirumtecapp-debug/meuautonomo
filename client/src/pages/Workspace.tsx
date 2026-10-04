@@ -1412,10 +1412,10 @@ function Field({
   const effectiveType = isPhone ? "tel" : isCurrency ? "text" : (type || "text");
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 w-full min-w-0">
       <Label className="block text-sm font-semibold text-[#38584f]">{label}</Label>
       {prefix || isCurrency ? (
-        <div className="flex h-12 w-full items-center rounded-xl border border-[#dce5dc] bg-[#fbfcf9] shadow-sm transition focus-within:border-[#173a34] focus-within:ring-2 focus-within:ring-[#173a34]/15">
+        <div className="flex h-12 w-full min-w-0 items-center rounded-xl border border-[#dce5dc] bg-[#fbfcf9] shadow-sm transition focus-within:border-[#173a34] focus-within:ring-2 focus-within:ring-[#173a34]/15 overflow-hidden">
           <span className="flex h-full shrink-0 select-none items-center border-r border-[#dce5dc] bg-[#eff5ec] px-3.5 text-xs font-bold text-[#557168] sm:text-sm">
             {prefix || "R$ "}
           </span>
@@ -1430,7 +1430,7 @@ function Field({
             lang="pt-BR"
             autoCorrect="on"
             autoCapitalize="sentences"
-            className="h-full flex-1 bg-transparent px-3 text-sm font-semibold text-[#173a34] outline-none placeholder:text-[#9bad9a]"
+            className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm font-semibold text-[#173a34] outline-none placeholder:text-[#9bad9a]"
           />
         </div>
       ) : (
@@ -1443,10 +1443,10 @@ function Field({
           placeholder={effectivePlaceholder}
           spellCheck={!isPhone && spellCheck}
           lang="pt-BR"
-          className="h-12 rounded-xl border-[#dce5dc] bg-[#fbfcf9] text-sm font-medium focus:border-[#173a34]"
+          className="h-12 w-full min-w-0 rounded-xl border-[#dce5dc] bg-[#fbfcf9] text-sm font-medium focus:border-[#173a34]"
         />
       )}
-      {helpText && <p className="text-xs text-[#71867f] leading-relaxed">{helpText}</p>}
+      {helpText && <p className="text-xs text-[#71867f] leading-relaxed break-words">{helpText}</p>}
     </div>
   );
 }
@@ -4204,6 +4204,29 @@ function Finance() {
   </Page>;
 }
 
+const PARTNER_BADGE_COLORS = [
+  { name: "Verde Floresta", hex: "#28564d" },
+  { name: "Roxo Estúdio", hex: "#7c3aed" },
+  { name: "Rosa Elegante", hex: "#be123c" },
+  { name: "Âmbar Dourado", hex: "#b45309" },
+  { name: "Azul Profissional", hex: "#1d4ed8" },
+  { name: "Turquesa", hex: "#0f766e" },
+  { name: "Magenta Vibrante", hex: "#c026d3" },
+  { name: "Chumbo", hex: "#334155" },
+];
+
+function parsePartnerAvatar(notes?: string | null): { avatarUrl: string | null; cleanNotes: string } {
+  if (!notes) return { avatarUrl: null, cleanNotes: "" };
+  const match = notes.match(/\[avatar:([^\]]+)\]/);
+  if (match) {
+    return {
+      avatarUrl: match[1],
+      cleanNotes: notes.replace(/\[avatar:[^\]]+\]\s*/, "").trim()
+    };
+  }
+  return { avatarUrl: null, cleanNotes: notes };
+}
+
 export function TeamPage() {
   const [period, setPeriod] = useState<"hoje" | "semana" | "mes" | "tudo">("mes");
   const [from, setFrom] = useState("");
@@ -4256,9 +4279,12 @@ export function TeamPage() {
     pixKeyType: "cpf" as "cpf" | "email" | "telefone" | "aleatoria",
     commissionPercent: "50",
     color: "#28564d",
+    avatarUrl: "",
     notes: ""
   };
   const [form, setForm] = useState(emptyForm);
+
+  const uploadAvatarMutation = trpc.team.uploadAvatar.useMutation();
 
   const createMember = trpc.team.create.useMutation({
     onSuccess: () => {
@@ -4298,6 +4324,7 @@ export function TeamPage() {
 
   const openEdit = (member: any) => {
     setEditingMember(member);
+    const parsed = parsePartnerAvatar(member.notes);
     setForm({
       name: member.name,
       role: member.role || "",
@@ -4307,7 +4334,8 @@ export function TeamPage() {
       pixKeyType: member.pixKeyType || "cpf",
       commissionPercent: String(member.commissionPercent || 50),
       color: member.color || "#28564d",
-      notes: member.notes || ""
+      avatarUrl: parsed.avatarUrl || "",
+      notes: parsed.cleanNotes || ""
     });
     setModalOpen(true);
   };
@@ -4316,6 +4344,11 @@ export function TeamPage() {
     if (!form.name.trim()) return toast.error("Informe o nome do profissional parceiro.");
     const comm = Number(form.commissionPercent);
     if (isNaN(comm) || comm < 0 || comm > 100) return toast.error("A comissão deve ser uma porcentagem entre 0% e 100%.");
+
+    let combinedNotes = form.notes.trim();
+    if (form.avatarUrl) {
+      combinedNotes = `[avatar:${form.avatarUrl}]\n${combinedNotes}`.trim();
+    }
 
     const payload = {
       name: form.name.trim(),
@@ -4326,7 +4359,7 @@ export function TeamPage() {
       pixKeyType: form.pixKeyType,
       commissionPercent: comm,
       color: form.color,
-      notes: form.notes.trim() || undefined
+      notes: combinedNotes || undefined
     };
 
     if (editingMember) {
@@ -4478,6 +4511,7 @@ export function TeamPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {teamList.data.map(member => {
+              const parsed = parsePartnerAvatar(member.notes);
               const stats = (report.data?.breakdown || []).find((b: any) => b.member.id === member.id) || {
                 grossCents: 0,
                 commissionCents: 0,
@@ -4495,16 +4529,20 @@ export function TeamPage() {
                 >
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
                         <div
-                          className="grid h-12 w-12 place-items-center rounded-2xl text-lg font-bold text-white shadow-sm"
+                          className="grid h-12 w-12 place-items-center rounded-2xl text-lg font-bold text-white shadow-sm overflow-hidden shrink-0"
                           style={{ backgroundColor: member.color || "#28564d" }}
                         >
-                          {member.name.charAt(0).toUpperCase()}
+                          {parsed.avatarUrl ? (
+                            <img src={parsed.avatarUrl} alt={member.name} className="h-full w-full object-cover" />
+                          ) : (
+                            member.name.charAt(0).toUpperCase()
+                          )}
                         </div>
-                        <div>
-                          <h3 className="font-bold text-[#173a34] text-base">{member.name}</h3>
-                          <p className="text-xs font-medium text-[#71867f]">{member.role || "Profissional Parceiro(a)"}</p>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-[#173a34] text-base truncate">{member.name}</h3>
+                          <p className="text-xs font-medium text-[#71867f] truncate">{member.role || "Profissional Parceiro(a)"}</p>
                         </div>
                       </div>
                       <Badge className={cn("border-0 text-[10px]", member.active ? "bg-[#eef5d2] text-[#6d8000]" : "bg-[#f1f3f1] text-[#82948e]")}>
@@ -4599,6 +4637,91 @@ export function TeamPage() {
           </DialogHeader>
 
           <div className="grid gap-4 py-3">
+            {/* FOTO E IDENTIDADE VISUAL DO(A) PARCEIRO(A) */}
+            <div className="rounded-2xl bg-[#f5f8f2] p-4 border border-[#dce5dc] space-y-3">
+              <Label className="text-sm font-bold text-[#173a34] block">
+                Foto e Cor de Identificação
+              </Label>
+              <div className="flex items-center gap-4">
+                <div
+                  className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl text-xl font-bold text-white shadow-sm overflow-hidden"
+                  style={{ backgroundColor: form.color || "#28564d" }}
+                >
+                  {form.avatarUrl ? (
+                    <img src={form.avatarUrl} alt={form.name || "Foto"} className="h-full w-full object-cover" />
+                  ) : (
+                    form.name ? form.name.charAt(0).toUpperCase() : "P"
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={event => {
+                        const file = event.target.files?.[0];
+                        if (!file || file.size > 5_000_000) return toast.error("Escolha uma imagem de até 5 MB.");
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          uploadAvatarMutation.mutate({
+                            fileName: file.name,
+                            mimeType: file.type as any,
+                            dataUrl: String(reader.result)
+                          }, {
+                            onSuccess: (res) => {
+                              setForm(f => ({ ...f, avatarUrl: res.avatarUrl }));
+                              toast.success("Foto do(a) parceiro(a) enviada com sucesso!");
+                            },
+                            onError: (err) => toast.error(err.message || "Erro ao enviar foto.")
+                          });
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                      className="h-9 w-full min-w-0 rounded-lg border-[#dce5dc] bg-white text-xs cursor-pointer"
+                    />
+                    {form.avatarUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setForm(f => ({ ...f, avatarUrl: "" }))}
+                        className="h-9 text-xs text-rose-600 hover:bg-rose-50 shrink-0"
+                      >
+                        Remover
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[#71867f]">
+                    Envie uma foto (até 5 MB) ou escolha abaixo a cor de crachá para a agenda.
+                  </p>
+                </div>
+              </div>
+
+              {/* PALETA DE CORES PARA O CRACHÁ / AGENDA */}
+              <div className="pt-2 border-t border-[#edf1eb]">
+                <span className="text-[11px] font-semibold text-[#526d64] block mb-2">
+                  Cor de destaque nos agendamentos e relatórios:
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {PARTNER_BADGE_COLORS.map(c => (
+                    <button
+                      key={c.hex}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, color: c.hex }))}
+                      title={c.name}
+                      style={{ backgroundColor: c.hex }}
+                      className={cn(
+                        "h-7 w-7 rounded-full transition-transform cursor-pointer flex items-center justify-center text-white shadow-2xs",
+                        form.color === c.hex ? "ring-2 ring-offset-2 ring-[#173a34] scale-110" : "hover:scale-105 opacity-85 hover:opacity-100"
+                      )}
+                    >
+                      {form.color === c.hex && <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <Field
               label="Nome completo do(a) profissional"
               value={form.name}
@@ -5159,9 +5282,9 @@ function SettingsPage() {
         </HelpButton>
       }
     >
-      <div className="grid gap-6 xl:grid-cols-12 w-full min-w-0">
+      <div className="space-y-6 w-full min-w-0">
         {/* CARD MODO DE OPERAÇÃO (INDIVIDUAL VS EQUIPE) */}
-        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] xl:col-span-12 w-full min-w-0">
+        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
           <CardHeader>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
@@ -5261,167 +5384,171 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* PERFIL PROFISSIONAL */}
-        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] xl:col-span-7 w-full min-w-0">
-          <CardHeader>
-            <CardTitle className="text-lg text-[#173a34]">Perfil profissional</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 w-full min-w-0">
-            <div className="flex items-center gap-4 rounded-2xl bg-[#f5f8f2] p-4 min-w-0">
-              <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#d9f56a] text-xl font-bold text-[#173a34]">
-                {current.avatarUrl ? <img src={current.avatarUrl} alt={current.displayName} className="h-full w-full object-cover" /> : current.displayName.charAt(0).toUpperCase()}
-              </div>
-              <div className="min-w-0 flex-1">
-                <Label className="mb-1 block text-sm text-[#38584f]">Foto do perfil</Label>
-                <Input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={event => {
-                    const file = event.target.files?.[0];
-                    if (!file || file.size > 5_000_000) return toast.error("Escolha uma imagem de até 5 MB.");
-                    const reader = new FileReader();
-                    reader.onload = () => uploadAvatar.mutate({
-                      fileName: file.name,
-                      mimeType: file.type as "image/jpeg" | "image/png" | "image/webp",
-                      dataUrl: String(reader.result)
-                    });
-                    reader.readAsDataURL(file);
-                  }}
-                  className="h-9 rounded-lg border-[#dce5dc] bg-white text-xs max-w-full"
-                />
-              </div>
-            </div>
-            <Field label="Nome" value={current.displayName} onChange={value => setForm({ ...current, displayName: value })} />
-            <ProfessionSelectField
-              professionName={current.professionName}
-              professionCategory={current.professionCategory}
-              onChange={(name, category) => setForm({ ...current, professionName: name, professionCategory: category })}
-            />
-            <PublicAddressField value={current.slug} onChange={value => setForm({ ...current, slug: value })} />
-            <StateCitySelect
-              value={current.city}
-              onChange={value => setForm({ ...current, city: value, serviceRegion: value ? `${value} e região` : current.serviceRegion })}
-            />
-            <Field label="WhatsApp" value={current.whatsapp} onChange={value => setForm({ ...current, whatsapp: value })} />
-            <div className="w-full min-w-0">
-              <div className="mb-2 flex items-center justify-between">
-                <Label className="text-sm font-semibold text-[#38584f]">Descrição sobre seu trabalho</Label>
-                <span className={`text-[11px] font-medium ${(current.bio?.length || 0) > 450 ? "text-amber-600 font-bold" : "text-[#71867f]"}`}>
-                  {current.bio?.length || 0} / 500 caracteres
-                </span>
-              </div>
-              <Textarea
-                maxLength={500}
-                value={current.bio}
-                onChange={e => setForm({ ...current, bio: e.target.value })}
-                placeholder="Conte sobre sua experiência, especialidades e diferenciais..."
-                className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9] text-sm w-full"
-              />
-            </div>
-            <Button onClick={save} disabled={update.isPending} className="mt-2 w-fit rounded-xl bg-[#173a34] text-white">
-              Salvar perfil
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* CHAVE PIX E DISPONIBILIDADE */}
-        <div className="space-y-6 xl:col-span-5 w-full min-w-0">
-          <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
+        {/* GRID PERFIL PROFISSIONAL + CHAVE PIX & DISPONIBILIDADE */}
+        <div className="grid gap-6 lg:grid-cols-12 w-full min-w-0 items-start">
+          {/* PERFIL PROFISSIONAL */}
+          <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] lg:col-span-7 w-full min-w-0">
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#e3f3e8] text-[#2c7a45] shrink-0">
-                  <CreditCard className="h-4 w-4" />
-                </div>
-                <div className="min-w-0">
-                  <CardTitle className="text-lg text-[#173a34] truncate">Chave PIX para Recebimentos</CardTitle>
-                  <p className="text-xs text-[#82948e] line-clamp-1">Aparece na proposta aprovada e no recibo para seu cliente</p>
-                </div>
-              </div>
+              <CardTitle className="text-lg text-[#173a34]">Perfil profissional</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 w-full min-w-0">
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 w-full min-w-0">
-                <div className="sm:col-span-1 min-w-0">
-                  <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Tipo de Chave</Label>
-                  <Select
-                    value={current.pixKeyType || "cpf"}
-                    onValueChange={v => setForm({ ...current, pixKeyType: v })}
-                  >
-                    <SelectTrigger className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm w-full">
-                      <SelectValue placeholder="Tipo de Chave" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cpf">CPF</SelectItem>
-                      <SelectItem value="cnpj">CNPJ</SelectItem>
-                      <SelectItem value="telefone">Telefone</SelectItem>
-                      <SelectItem value="email">E-mail</SelectItem>
-                      <SelectItem value="aleatoria">Chave Aleatória</SelectItem>
-                    </SelectContent>
-                  </Select>
+            <CardContent className="grid gap-4 w-full min-w-0">
+              <div className="flex items-center gap-4 rounded-2xl bg-[#f5f8f2] p-4 min-w-0">
+                <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#d9f56a] text-xl font-bold text-[#173a34]">
+                  {current.avatarUrl ? <img src={current.avatarUrl} alt={current.displayName} className="h-full w-full object-cover" /> : current.displayName.charAt(0).toUpperCase()}
                 </div>
-                <div className="sm:col-span-2 min-w-0">
-                  <Field
-                    label="Chave PIX"
-                    placeholder={
-                      current.pixKeyType === "telefone"
-                        ? "(11) 99999-9999"
-                        : current.pixKeyType === "email"
-                        ? "seu@email.com"
-                        : current.pixKeyType === "cnpj"
-                        ? "00.000.000/0001-00"
-                        : current.pixKeyType === "aleatoria"
-                        ? "Chave aleatória gerada pelo banco"
-                        : "000.000.000-00"
-                    }
-                    value={current.pixKey || ""}
-                    onChange={value => setForm({ ...current, pixKey: value })}
+                <div className="min-w-0 flex-1">
+                  <Label className="mb-1 block text-sm text-[#38584f]">Foto do perfil</Label>
+                  <Input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={event => {
+                      const file = event.target.files?.[0];
+                      if (!file || file.size > 5_000_000) return toast.error("Escolha uma imagem de até 5 MB.");
+                      const reader = new FileReader();
+                      reader.onload = () => uploadAvatar.mutate({
+                        fileName: file.name,
+                        mimeType: file.type as "image/jpeg" | "image/png" | "image/webp",
+                        dataUrl: String(reader.result)
+                      });
+                      reader.readAsDataURL(file);
+                    }}
+                    className="h-9 rounded-lg border-[#dce5dc] bg-white text-xs max-w-full"
                   />
                 </div>
               </div>
-              <div className="rounded-xl bg-[#f5f8f2] p-3 text-xs leading-5 text-[#627a6f]">
-                💡 <strong>Facilidade para receber:</strong> Quando o cliente aprova o orçamento, um botão destacado <em>"Copiar Chave PIX"</em> é exibido automaticamente, agilizando o seu recebimento.
+              <Field label="Nome" value={current.displayName} onChange={value => setForm({ ...current, displayName: value })} />
+              <ProfessionSelectField
+                professionName={current.professionName}
+                professionCategory={current.professionCategory}
+                onChange={(name, category) => setForm({ ...current, professionName: name, professionCategory: category })}
+              />
+              <PublicAddressField value={current.slug} onChange={value => setForm({ ...current, slug: value })} />
+              <StateCitySelect
+                value={current.city}
+                onChange={value => setForm({ ...current, city: value, serviceRegion: value ? `${value} e região` : current.serviceRegion })}
+              />
+              <Field label="WhatsApp" value={current.whatsapp} onChange={value => setForm({ ...current, whatsapp: value })} />
+              <div className="w-full min-w-0">
+                <div className="mb-2 flex items-center justify-between">
+                  <Label className="text-sm font-semibold text-[#38584f]">Descrição sobre seu trabalho</Label>
+                  <span className={`text-[11px] font-medium ${(current.bio?.length || 0) > 450 ? "text-amber-600 font-bold" : "text-[#71867f]"}`}>
+                    {current.bio?.length || 0} / 500 caracteres
+                  </span>
+                </div>
+                <Textarea
+                  maxLength={500}
+                  value={current.bio}
+                  onChange={e => setForm({ ...current, bio: e.target.value })}
+                  placeholder="Conte sobre sua experiência, especialidades e diferenciais..."
+                  className="min-h-24 rounded-2xl border-[#dce5dc] bg-[#fbfcf9] text-sm w-full"
+                />
               </div>
-              <Button onClick={save} disabled={update.isPending} className="rounded-xl bg-[#173a34] text-white">
-                Salvar Chave PIX
+              <Button onClick={save} disabled={update.isPending} className="mt-2 w-fit rounded-xl bg-[#173a34] text-white">
+                Salvar perfil
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
-            <CardHeader>
-              <CardTitle className="text-lg text-[#173a34]">Disponibilidade</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5 w-full min-w-0">
-              <p className="text-sm leading-6 text-[#71867f]">
-                Esses horários são usados para validar novos agendamentos e evitar conflitos.
-              </p>
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 w-full min-w-0">
-                <div className="min-w-0">
-                  <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Começo</Label>
-                  <Input id="availability-start" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).start : "08:00"} className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm" />
+          {/* CHAVE PIX E DISPONIBILIDADE */}
+          <div className="space-y-6 lg:col-span-5 w-full min-w-0">
+            <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#e3f3e8] text-[#2c7a45] shrink-0">
+                    <CreditCard className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <CardTitle className="text-lg text-[#173a34] truncate">Chave PIX para Recebimentos</CardTitle>
+                    <p className="text-xs text-[#82948e] line-clamp-1">Aparece na proposta aprovada e no recibo para seu cliente</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Fim</Label>
-                  <Input id="availability-end" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).end : "18:00"} className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm" />
+              </CardHeader>
+              <CardContent className="space-y-4 w-full min-w-0">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-3 w-full min-w-0">
+                  <div className="sm:col-span-1 min-w-0">
+                    <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Tipo de Chave</Label>
+                    <Select
+                      value={current.pixKeyType || "cpf"}
+                      onValueChange={v => setForm({ ...current, pixKeyType: v })}
+                    >
+                      <SelectTrigger className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm w-full">
+                        <SelectValue placeholder="Tipo de Chave" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cpf">CPF</SelectItem>
+                        <SelectItem value="cnpj">CNPJ</SelectItem>
+                        <SelectItem value="telefone">Telefone</SelectItem>
+                        <SelectItem value="email">E-mail</SelectItem>
+                        <SelectItem value="aleatoria">Chave Aleatória</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2 min-w-0">
+                    <Field
+                      label="Chave PIX"
+                      placeholder={
+                        current.pixKeyType === "telefone"
+                          ? "(11) 99999-9999"
+                          : current.pixKeyType === "email"
+                          ? "seu@email.com"
+                          : current.pixKeyType === "cnpj"
+                          ? "00.000.000/0001-00"
+                          : current.pixKeyType === "aleatoria"
+                          ? "Chave aleatória gerada pelo banco"
+                          : "000.000.000-00"
+                      }
+                      value={current.pixKey || ""}
+                      onChange={value => setForm({ ...current, pixKey: value })}
+                    />
+                  </div>
                 </div>
-              </div>
-              <Button
-                onClick={() => {
-                  const start = (document.getElementById("availability-start") as HTMLInputElement)?.value || "08:00";
-                  const end = (document.getElementById("availability-end") as HTMLInputElement)?.value || "18:00";
-                  saveAvailability.mutate({
-                    schedule: JSON.stringify({ days: ["mon","tue","wed","thu","fri"], start, end }),
-                    unavailableDays: JSON.stringify([])
-                  });
-                }}
-                className="rounded-xl bg-[#173a34] text-white"
-              >
-                Salvar horários
-              </Button>
-            </CardContent>
-          </Card>
+                <div className="rounded-xl bg-[#f5f8f2] p-3 text-xs leading-5 text-[#627a6f]">
+                  💡 <strong>Facilidade para receber:</strong> Quando o cliente aprova o orçamento, um botão destacado <em>"Copiar Chave PIX"</em> é exibido automaticamente, agilizando o seu recebimento.
+                </div>
+                <Button onClick={save} disabled={update.isPending} className="rounded-xl bg-[#173a34] text-white">
+                  Salvar Chave PIX
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
+              <CardHeader>
+                <CardTitle className="text-lg text-[#173a34]">Disponibilidade</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5 w-full min-w-0">
+                <p className="text-sm leading-6 text-[#71867f]">
+                  Esses horários são usados para validar novos agendamentos e evitar conflitos.
+                </p>
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 w-full min-w-0">
+                  <div className="min-w-0">
+                    <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Começo</Label>
+                    <Input id="availability-start" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).start : "08:00"} className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm" />
+                  </div>
+                  <div className="min-w-0">
+                    <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Fim</Label>
+                    <Input id="availability-end" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).end : "18:00"} className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm" />
+                  </div>
+                </div>
+                <Button
+                  onClick={() => {
+                    const start = (document.getElementById("availability-start") as HTMLInputElement)?.value || "08:00";
+                    const end = (document.getElementById("availability-end") as HTMLInputElement)?.value || "18:00";
+                    saveAvailability.mutate({
+                      schedule: JSON.stringify({ days: ["mon","tue","wed","thu","fri"], start, end }),
+                      unavailableDays: JSON.stringify([])
+                    });
+                  }}
+                  className="rounded-xl bg-[#173a34] text-white"
+                >
+                  Salvar horários
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] lg:col-span-2">
+        {/* AMBIENTE DE TESTES */}
+        <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
           <CardHeader>
             <CardTitle className="text-lg text-[#173a34]">Ambiente de Testes</CardTitle>
           </CardHeader>

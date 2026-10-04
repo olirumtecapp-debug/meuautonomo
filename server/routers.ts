@@ -1341,6 +1341,21 @@ export const appRouter = router({
       return { success: true };
     }),
 
+    uploadAvatar: protectedProcedure.input(z.object({
+      fileName: z.string().max(180),
+      mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+      dataUrl: z.string().max(7_000_000)
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await requireProfile(ctx.user.id);
+      const encoded = input.dataUrl.split(",")[1];
+      if (!encoded) throw new TRPCError({ code: "BAD_REQUEST", message: "Arquivo inválido." });
+      const buffer = Buffer.from(encoded, "base64");
+      if (buffer.length > 5_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "A foto deve ter no máximo 5 MB." });
+      const sanitizedName = input.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+      const stored = await storagePut(`profiles/${profile.id}/team-avatar-${Date.now()}-${sanitizedName}`, buffer, input.mimeType);
+      return { success: true, avatarUrl: stored.url };
+    }),
+
     report: protectedProcedure.input(z.object({
       from: z.string().datetime().optional(),
       to: z.string().datetime().optional(),
