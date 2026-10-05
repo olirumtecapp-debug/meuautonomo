@@ -55,7 +55,9 @@ client/
     ├── main.tsx                # Ponto de entrada React (ReactDOM.createRoot)
     ├── pages/                  # Páginas principais da aplicação
     │   ├── Home.tsx            # Landing Page de apresentação e captação
-    │   ├── Workspace.tsx       # Painel do Profissional (Agenda, Clientes, Orçamentos, Equipe, Perfil Público)
+    │   ├── Workspace.tsx       # Painel do Profissional (Agenda, Clientes, Orçamentos, Equipe, Faturamento)
+    │   ├── PublicProfile.tsx   # Cartão Profissional Público (/p/:slug e /:slug) — Isolado e ultra-estável
+    │   ├── PublicQuote.tsx     # Proposta Comercial e Orçamento Digital (/orcamento/:token) — Isolado
     │   ├── Admin.tsx           # Painel Administrativo do MeuAutônomo (Vouchers, Métricas, Gestão)
     │   ├── PlansPage.tsx       # Página de Planos e Assinatura (Free, Pro, Equipe)
     │   ├── ValidateReceipt.tsx # Validador público de recibos e autenticidade jurídica
@@ -120,10 +122,10 @@ server/
 
 | Funcionalidade | Arquivo Frontend | Arquivo Backend | Tabela do Banco |
 |---|---|---|---|
-| **Cartão Público / Perfil** | `Workspace.tsx` (`PublicProfile`) | `routers.ts` (`profile.getBySlug`) | `professionalProfiles` |
+| **Cartão Público / Perfil** | `PublicProfile.tsx` | `routers.ts` (`profile.getBySlug`) | `professionalProfiles` |
 | **Agenda e Horários** | `Workspace.tsx` (`AgendaPage`) | `routers.ts` (`appointments.*`) | `appointments` |
 | **Cadastro de Clientes** | `Workspace.tsx` (`ClientsPage`) | `routers.ts` (`clients.*`) | `clients` |
-| **Orçamentos / Propostas** | `Workspace.tsx` (`QuotesPage`) | `routers.ts` (`quotes.*`) | `quotes` |
+| **Orçamentos / Propostas** | `PublicQuote.tsx` / `Workspace.tsx` | `routers.ts` (`quotes.*`) | `quotes` |
 | **Equipe & Parceiros** | `Workspace.tsx` (`TeamPage`) | `routers.ts` (`team.*`) | `teamMembers` |
 | **Emissão de Recibos** | `ReceiptModal.tsx` | `routers.ts` (`receipt.*`) | `appointments` / `quotes` |
 | **Validação de Recibo** | `ValidateReceipt.tsx` | `routers.ts` (`receipt.validatePublic`) | `receiptAuth.ts` |
