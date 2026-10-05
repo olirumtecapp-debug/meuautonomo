@@ -43,6 +43,11 @@ export function GuidedTutorialModal({
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
 
+  const handleGoTo = (path: string) => {
+    onOpenChange(false);
+    setLocation(path);
+  };
+
   const profile = trpc.profile.get.useQuery();
   const isTeamMode = profile.data?.accountType === "equipe";
 

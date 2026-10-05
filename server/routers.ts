@@ -760,6 +760,7 @@ export const appRouter = router({
       startsAt: z.string().optional(),
       serviceId: z.number().optional().nullable(),
       teamMemberId: z.number().optional().nullable(),
+      durationMinutes: z.number().int().positive().optional(),
       amountCents: z.number().int().optional(),
       location: z.string().optional().nullable(),
       notes: z.string().optional().nullable(),
@@ -795,7 +796,7 @@ export const appRouter = router({
         start = new Date(Date.now() + 24 * 3600 * 1000);
       }
 
-      const durationMinutes = service?.durationMinutes ?? 60;
+      const durationMinutes = input.durationMinutes ?? service?.durationMinutes ?? 60;
       const amountCents = input.amountCents ?? service?.priceCents ?? 0;
       const location = input.location ?? request.address ?? "";
       const notes = input.notes ?? request.description ?? "";
@@ -2178,7 +2179,7 @@ export const appRouter = router({
             type: "Comprovante de Atendimento Concluído",
             professionalName: profile?.displayName || "Profissional",
             profession: profile?.professionName || "Profissional Autônomo",
-            professionalCity: profile?.city && profile?.state ? `${profile.city} - ${profile.state}` : (profile?.city || ""),
+            professionalCity: profile?.city && profile?.serviceRegion ? `${profile.city} (${profile.serviceRegion})` : (profile?.city || profile?.serviceRegion || ""),
             professionalPhone: profile?.whatsapp || profile?.phone || "",
             clientName: client?.name || (appointment.clientId ? `Cliente #${appointment.clientId}` : "Cliente"),
             serviceDescription: service?.name || appointment.notes || "Prestação de Serviços",
@@ -2204,7 +2205,7 @@ export const appRouter = router({
             type: "Comprovante de Proposta / Orçamento Aprovado",
             professionalName: profile?.displayName || "Profissional",
             profession: profile?.professionName || "Profissional Autônomo",
-            professionalCity: profile?.city && profile?.state ? `${profile.city} - ${profile.state}` : (profile?.city || ""),
+            professionalCity: profile?.city && profile?.serviceRegion ? `${profile.city} (${profile.serviceRegion})` : (profile?.city || profile?.serviceRegion || ""),
             professionalPhone: profile?.whatsapp || profile?.phone || "",
             clientName: quote.clientName || client?.name || "Cliente",
             serviceDescription: quote.description || "Prestação de Serviços",

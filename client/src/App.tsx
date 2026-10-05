@@ -68,7 +68,7 @@ function Router() {
     <Route path="/configuracoes" component={AuthenticatedRoute} />
     <Route path="/orcamento/:token" component={QuoteRoute} />
     <Route path="/r/:code" component={ReferralRoute} />
-    <Route path="/validar-recibo" component={ValidateReceiptPage} />
+    <Route path="/validar-recibo" component={() => <ValidateReceiptPage />} />
     <Route path="/validar-recibo/:code" component={({ params }) => <ValidateReceiptPage codeFromRoute={params.code} />} />
     <Route path="/p/:slug" component={ProfileRoute} />
     <Route path="/:slug" component={ProfileRoute} />

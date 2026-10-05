@@ -67,7 +67,7 @@ import {
   Smartphone,
   Lightbulb,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -4400,7 +4400,7 @@ export function TeamPage() {
   };
 
   const roleData = useMemo(() => {
-    return getTeamRoleSuggestionsForProfession(profile.data?.professionName, profile.data?.professionCategory);
+    return getTeamRoleSuggestionsForProfession(profile.data?.professionName, profile.data?.professionCategory || undefined);
   }, [profile.data?.professionName, profile.data?.professionCategory]);
 
   const activeMembersCount = (teamList.data || []).filter(m => m.active).length;
