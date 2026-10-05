@@ -83,11 +83,15 @@ import { formatBrl, formatBrlInput, parseBrlToCents } from "@/utils/currency";
 import { GuidedTutorialModal } from "@/components/GuidedTutorialModal";
 import { SimulatorTour } from "@/components/SimulatorTour";
 import { TeamModuleView } from "./TeamPage";
+import { ClientsPage } from "./ClientsPage";
+export { ClientsPage };
+import { ServicesPage, CatalogPicker } from "./ServicesPage";
+export { ServicesPage, CatalogPicker };
 
 
-const money = (cents = 0) => formatBrl(cents);
-const dateLabel = (date: Date | string) => new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(" de ", " ");
-const timeLabel = (date: Date | string) => new Date(date).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+export const money = (cents = 0) => formatBrl(cents);
+export const dateLabel = (date: Date | string) => new Date(date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(" de ", " ");
+export const timeLabel = (date: Date | string) => new Date(date).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 const greeting = () => { const hour = new Date().getHours(); return hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite"; };
 const slugify = (value: string) => value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 export const formatPhone = (val: string = "") => {
@@ -104,7 +108,7 @@ export const formatPhone = (val: string = "") => {
 
 const statusLabel: Record<string, string> = { agendado: "Agendado", confirmado: "Confirmado", andamento: "Em andamento", concluido: "Concluído", cancelado: "Cancelado", faltou: "Não compareceu", nova: "Nova", em_analise: "Em análise", orcamento_enviado: "Orçamento enviado", agendada: "Agendada", arquivada: "Arquivada", rascunho: "Rascunho", enviado: "Enviado", aceito: "Aceito", recusado: "Recusado", alteracao_solicitada: "Alteração solicitada" };
 const statusClass: Record<string, string> = { concluido: "bg-[#e3f5e3] text-[#2c7a45]", confirmado: "bg-[#e1effa] text-[#23638e]", agendado: "bg-[#fff4d7] text-[#906815]", nova: "bg-[#eef5c8] text-[#667700]", enviado: "bg-[#e8eef8] text-[#496b98]", aceito: "bg-[#e3f5e3] text-[#2c7a45]", pendente: "bg-[#fff4d7] text-[#906815]", pago: "bg-[#e3f5e3] text-[#2c7a45]", parcial: "bg-[#e8eef8] text-[#496b98]", cancelado: "bg-[#f9e5e3] text-[#9c4d43]" };
-const modalityLabel: Record<string, string> = { presencial: "No seu espaço", endereco: "No endereço do cliente", online: "Online", hibrido: "Híbrido" };
+export const modalityLabel: Record<string, string> = { presencial: "No seu espaço", endereco: "No endereço do cliente", online: "Online", hibrido: "Híbrido" };
 
 export function AppHome() {
   const { user, loading: authLoading } = useAuth();
@@ -415,7 +419,7 @@ function PublicAddressField({
   );
 }
 
-function ServiceNameField({
+export function ServiceNameField({
   value,
   onChange,
   onSelectCatalog,
@@ -1485,7 +1489,7 @@ export function HelpButton({ title, children }: { title: string; children: React
 
 export function Page({ title, eyebrow, description, action, help, children }: { title: string; eyebrow?: string; description?: string; action?: React.ReactNode; help?: React.ReactNode; children: React.ReactNode }) { return <div className="container mx-auto px-3.5 sm:px-6 py-5 sm:py-6 md:py-10 max-w-7xl w-full min-w-0"><div className="mb-6 sm:mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div className="min-w-0"><p className="mb-1.5 sm:mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">{eyebrow || "MeuAutônomo"}</p><div className="flex items-center gap-2 flex-wrap"><h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-[#173a34] break-words">{title}</h1>{help}</div>{description && <p className="mt-1.5 sm:mt-2 max-w-2xl text-xs sm:text-sm text-[#6d837c]">{description}</p>}</div>{action && <div className="flex flex-wrap items-center gap-2">{action}</div>}</div>{children}</div>; }
 export function EmptyState({ icon: Icon, title, description, action }: { icon: typeof CalendarDays; title: string; description: string; action?: React.ReactNode }) { return <div className="grid place-items-center rounded-[24px] border border-dashed border-[#cddbcf] bg-white/60 px-6 py-16 text-center"><div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[#eef5d2] text-[#829a14]"><Icon className="h-6 w-6" /></div><h3 className="text-lg font-bold text-[#173a34]">{title}</h3><p className="mt-2 max-w-sm text-sm text-[#78908a]">{description}</p>{action && <div className="mt-5">{action}</div>}</div>; }
-function StatusBadge({ status }: { status: string }) { return <Badge className={cn("border-0 font-semibold", statusClass[status] || "bg-[#edf2ec] text-[#5d746d]")}>{statusLabel[status] || status}</Badge>; }
+export function StatusBadge({ status }: { status: string }) { return <Badge className={cn("border-0 font-semibold", statusClass[status] || "bg-[#edf2ec] text-[#5d746d]")}>{statusLabel[status] || status}</Badge>; }
 
 function UnresolvedPastAlert({
   onGenerateReceipt,
@@ -2284,333 +2288,10 @@ function AppointmentRow({ item, clients, services, teamMembers, onGenerateReceip
   return <div className="flex flex-col gap-4 p-5 transition hover:bg-[#fbfcf9] sm:flex-row sm:items-center"><div className="flex items-center gap-4 sm:w-48"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#f1f7dd] text-center"><span className="text-sm font-bold text-[#718600]">{timeLabel(item.startsAt)}</span></div><div><p className="font-semibold text-[#284b42]">{dateLabel(item.startsAt)}</p><p className="text-xs text-[#82948e]">{item.durationMinutes} minutos</p></div></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-[#284b42]">{clientName}</p>{serviceName && <span className="inline-flex items-center gap-1 rounded-md bg-[#eef5d2] px-2.5 py-0.5 text-xs font-semibold text-[#667700]"><BriefcaseBusiness className="h-3 w-3" />{serviceName}</span>}{member && <span className="inline-flex items-center gap-1 rounded-md bg-[#e8f1f5] px-2.5 py-0.5 text-xs font-semibold text-[#2f5e77]"><UserCheck className="h-3 w-3" />{member.name}</span>}</div><p className="mt-1 truncate text-sm text-[#82948e]">{item.location ? <><MapPin className="mr-1 inline h-3.5 w-3.5 text-[#8aa500]" />{item.location} · </> : ""}{money(item.amountCents)}</p>{item.notes && <p className="mt-0.5 truncate text-xs text-[#9aa9a3] italic">Obs: {item.notes}</p>}</div><div className="flex flex-wrap items-center gap-2"><StatusBadge status={item.status} />{item.status === "concluido" && onGenerateReceipt && <Button variant="outline" size="sm" onClick={() => onGenerateReceipt(item)} className="h-9 rounded-lg border-[#b3d7bf] bg-[#f0f7f2] text-xs font-semibold text-[#173a34] hover:bg-[#e1f0e5]" title="Gerar recibo profissional deste atendimento"><Receipt className="mr-1 h-3.5 w-3.5 text-[#2e6e4a]" /> Recibo</Button>}<Select value={item.status} onValueChange={async value => { await updateStatus.mutateAsync({ id: item.id, status: value as any }); toast.success("Status atualizado."); utils.appointment.list.invalidate(); }}><SelectTrigger className="h-9 w-[140px] rounded-lg border-[#dce5dc] bg-white text-xs"><SelectValue /></SelectTrigger><SelectContent>{["agendado","confirmado","andamento","concluido","cancelado","faltou"].map(value => <SelectItem key={value} value={value}>{statusLabel[value]}</SelectItem>)}</SelectContent></Select><Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><Button variant="outline" className="h-9 rounded-lg border-[#dce5dc] bg-white px-2"><Pencil className="h-3.5 w-3.5" /></Button></DialogTrigger><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Editar atendimento</DialogTitle><DialogDescription>Reagende ou atualize os dados deste horário.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Cliente" value={form.clientId} onChange={value => setForm({ ...form, clientId: value })} options={clients.map(client => ({ value: String(client.id), label: client.name }))} /><FormSelect label="Serviço" value={form.serviceId} onChange={value => { const sel = services.find(s => String(s.id) === value); setForm({ ...form, serviceId: value, amount: sel && (!form.amount || form.amount === "0" || form.amount === "0,00") ? formatBrlInput(sel.priceCents) : form.amount, durationMinutes: sel && !form.durationMinutes ? String(sel.durationMinutes) : form.durationMinutes }); }} options={services.filter(service => service.active).map(service => ({ value: String(service.id), label: service.name }))} /></div>{Boolean(teamMembers?.length) && <FormSelect label="Profissional / Parceiro(a)" value={form.teamMemberId} onChange={value => setForm({ ...form, teamMemberId: value })} placeholder="Eu mesmo(a) (Titular)" options={[{ value: "", label: "Eu mesmo(a) (Titular)" }, ...(teamMembers || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role})` }))]} />}<div className="grid gap-4 sm:grid-cols-2"><div><Label className="mb-2 block">Data e horário</Label><Input type="datetime-local" value={form.startsAt} onChange={event => setForm({ ...form, startsAt: event.target.value })} /></div><Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} /></div><div className="grid gap-4 sm:grid-cols-2"><Field label="Valor" prefix="R$ " value={form.amount} onChange={value => setForm({ ...form, amount: value })} /><Field label="Local" value={form.location} onChange={value => setForm({ ...form, location: value })} /></div><div><Label className="mb-2 block">Observações</Label><Textarea value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })} /></div></div><DialogFooter><Button onClick={save} disabled={update.isPending} className="rounded-xl bg-[#173a34] text-white">Salvar alterações</Button></DialogFooter></DialogContent></Dialog><Button variant="ghost" onClick={async () => { await cancel.mutateAsync({ id: item.id }); toast.success("Atendimento cancelado."); utils.appointment.list.invalidate(); }} className="h-9 rounded-lg px-2 text-[#9c4d43]"><Trash2 className="h-3.5 w-3.5" /></Button></div></div>;
 }
 
-function Clients() {
-  const clients = trpc.customer.list.useQuery();
-  const utils = trpc.useUtils();
-  const create = trpc.customer.create.useMutation({ onSuccess: () => { toast.success("Cliente salvo."); utils.customer.list.invalidate(); setOpen(false); reset(); } });
-  const update = trpc.customer.update.useMutation({ onSuccess: () => { toast.success("Cliente atualizado."); utils.customer.list.invalidate(); setOpen(false); reset(); } });
-  const remove = trpc.customer.remove.useMutation({ onSuccess: () => { toast.success("Cliente removido ou arquivado."); utils.customer.list.invalidate(); setSelectedId(null); setDeleteClientId(null); } });
-  const [open, setOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [deleteClientId, setDeleteClientId] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
-  const empty = { name: "", phone: "", whatsapp: "", email: "", address: "", notes: "", cep: "", archived: false };
-  const [form, setForm] = useState(empty);
-  const [cepLoading, setCepLoading] = useState(false);
-  const history = trpc.customer.history.useQuery({ id: selectedId! }, { enabled: Boolean(selectedId) });
-  const reset = () => { setForm(empty); setEditingId(null); };
-  const openAdd = () => { reset(); setOpen(true); };
-  const openEdit = (client: any) => { setEditingId(client.id); setForm({ name: client.name, phone: client.phone || "", whatsapp: client.whatsapp || "", email: client.email || "", address: client.address || "", notes: client.notes || "", cep: "", archived: client.archived }); setOpen(true); };
-  const handleCepChange = async (val: string) => {
-    const formatted = formatCep(val);
-    setForm(f => ({ ...f, cep: formatted }));
-    const digits = val.replace(/\D/g, "");
-    if (digits.length === 8) {
-      setCepLoading(true);
-      const res = await lookupCep(digits);
-      setCepLoading(false);
-      if (res) {
-        setForm(f => ({ ...f, address: res.formattedAddress }));
-        toast.success("Endereço preenchido via CEP!");
-      } else {
-        toast.error("CEP não encontrado.");
-      }
-    }
-  };
-  const submit = () => { if (!form.name.trim()) return toast.error("Informe o nome do cliente."); if (editingId) update.mutate({ id: editingId, ...form }); else create.mutate(form); };
-  return <Page title="Meus clientes" eyebrow="Relacionamentos" description="Tenha contatos, histórico e próximos passos acessíveis quando precisar." help={<HelpButton title="Como funciona Clientes?"><p><strong>Clientes</strong> é onde você organiza todos os seus contatos. Cadastre nome, telefone, WhatsApp e endereço.</p><p><strong>Histórico:</strong> Clique em "Histórico" para ver todos os atendimentos, orçamentos e pagamentos de um cliente.</p><p><strong>Busca:</strong> Use a barra de pesquisa para encontrar rapidamente pelo nome, telefone ou e-mail.</p><p><strong>Arquivamento:</strong> Clientes inativos podem ser removidos da lista principal sem perder o histórico.</p></HelpButton>} action={<Button onClick={openAdd} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Novo cliente</Button>}>
-    <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) reset(); }}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>{editingId ? "Editar cliente" : "Novo cliente"}</DialogTitle><DialogDescription>Dados salvos para agenda, orçamento e histórico.</DialogDescription></DialogHeader><div className="grid gap-4 py-3 sm:grid-cols-2"><Field label="Nome" value={form.name} onChange={value => setForm({ ...form, name: value })} /><Field label="Telefone" value={form.phone} onChange={value => setForm({ ...form, phone: value })} /><Field label="WhatsApp" value={form.whatsapp} onChange={value => setForm({ ...form, whatsapp: value })} /><Field label="E-mail" value={form.email} onChange={value => setForm({ ...form, email: value })} /><div className="sm:col-span-2"><div className="grid gap-3 sm:grid-cols-3"><div><Label className="mb-2 block">CEP {cepLoading && <span className="text-xs text-[#8aa500]">(buscando...)</span>}</Label><Input placeholder="00000-000" value={form.cep} onChange={e => handleCepChange(e.target.value)} className="h-10 rounded-xl border-[#dce5dc] bg-white" /></div><div className="sm:col-span-2"><Field label="Endereço" value={form.address} onChange={value => setForm({ ...form, address: value })} placeholder="Rua, número, bairro..." /></div></div></div><div className="sm:col-span-2"><Label className="mb-2 block">Observações</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div></div><DialogFooter><Button onClick={submit} disabled={create.isPending || update.isPending} className="rounded-xl bg-[#173a34] text-white">Salvar cliente</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={Boolean(selectedId)} onOpenChange={value => !value && setSelectedId(null)}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>{history.data?.client.name || "Histórico do cliente"}</DialogTitle><DialogDescription>Relacionamentos reais registrados no seu espaço.</DialogDescription></DialogHeader>{history.isLoading ? <p className="py-8 text-sm text-[#82948e]">Carregando histórico…</p> : history.data ? <div className="space-y-5 py-3"><div className="grid grid-cols-3 gap-2"><div className="rounded-xl bg-[#f5f8f2] p-3 text-center"><p className="text-xl font-bold text-[#173a34]">{history.data.appointments.length}</p><p className="text-[11px] text-[#82948e]">atendimentos</p></div><div className="rounded-xl bg-[#f5f8f2] p-3 text-center"><p className="text-xl font-bold text-[#173a34]">{history.data.quotes.length}</p><p className="text-[11px] text-[#82948e]">orçamentos</p></div><div className="rounded-xl bg-[#f5f8f2] p-3 text-center"><p className="text-xl font-bold text-[#173a34]">{history.data.payments.length}</p><p className="text-[11px] text-[#82948e]">pagamentos</p></div></div><div className="space-y-2">{history.data.appointments.map(item => <div key={item.id} className="flex items-center justify-between rounded-xl border border-[#edf1eb] p-3 text-sm"><span className="text-[#526d64]">{dateLabel(item.startsAt)} · {timeLabel(item.startsAt)}</span><StatusBadge status={item.status} /></div>)}{!history.data.appointments.length && <p className="text-sm text-[#82948e]">Nenhum atendimento registrado.</p>}</div></div> : null}</DialogContent></Dialog>
-    <ConfirmModal open={Boolean(deleteClientId)} onOpenChange={v => !v && setDeleteClientId(null)} title="Remover cliente" description="Deseja realmente remover ou arquivar este cliente? O histórico de atendimentos e orçamentos anteriores será preservado." confirmLabel="Remover cliente" variant="danger" onConfirm={() => { if (deleteClientId) remove.mutate({ id: deleteClientId }); }} />
-    <div className="mb-5 max-w-md"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa9a3]" /><Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Pesquisar por nome, telefone ou e-mail" className="h-11 rounded-xl border-[#dce5dc] bg-white pl-9" /></div></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{clients.data?.filter(client => `${client.name} ${client.phone || ""} ${client.email || ""}`.toLowerCase().includes(search.toLowerCase())).map(client => <Card key={client.id} className="rounded-[22px] border-0 shadow-[0_8px_26px_rgba(19,42,39,0.04)]"><CardContent className="p-5"><div className="flex items-start gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[#eef5d2] font-bold text-[#819815]">{client.name.charAt(0).toUpperCase()}</div><div className="min-w-0"><h3 className="truncate font-bold text-[#284b42]">{client.name}</h3><p className="mt-1 text-sm text-[#82948e]">{client.phone ? formatPhone(client.phone) : (client.email || "Contato sem telefone")}</p></div></div><div className="mt-5 space-y-2 text-sm text-[#71867f]">{client.whatsapp && <p><span className="font-semibold text-[#4f6c63]">WhatsApp</span> · {formatPhone(client.whatsapp)}</p>}{client.address && <p className="flex gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#8aa500]" />{client.address}</p>}</div><div className="mt-5 flex gap-2 border-t border-[#edf1eb] pt-4"><Button variant="outline" onClick={() => setSelectedId(client.id)} className="h-9 flex-1 rounded-lg border-[#dce5dc] bg-white text-xs"><History className="mr-1 h-3.5 w-3.5" /> Histórico</Button><Button variant="ghost" onClick={() => openEdit(client)} className="h-9 rounded-lg text-xs"><Pencil className="mr-1 h-3.5 w-3.5" /> Editar</Button><Button variant="ghost" onClick={() => setDeleteClientId(client.id)} className="h-9 rounded-lg text-xs text-[#9c4d43]"><Trash2 className="h-3.5 w-3.5" /></Button></div></CardContent></Card>)}</div>
-    {!clients.isLoading && !clients.data?.length && <EmptyState icon={Users} title="Você ainda não tem clientes" description="Cadastre alguém ou compartilhe seu cartão para começar a receber solicitações." action={<Button onClick={openAdd} className="rounded-xl bg-[#173a34] text-white"><Plus className="mr-2 h-4 w-4" /> Cadastrar cliente</Button>} />}
-  </Page>;
-}
+const Clients = ClientsPage;
 
 
-function CatalogPicker({ onSelect }: { onSelect: (name: string, description: string, price?: string, duration?: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
-
-  const close = () => { setOpen(false); setSelected(null); setSearch(""); };
-
-  const filtered = SERVICE_CATALOG.filter(p =>
-    p.label.toLowerCase().includes(search.toLowerCase()) ||
-    p.services.some(s => s.name.toLowerCase().includes(search.toLowerCase()))
-  );
-
-  const profession = SERVICE_CATALOG.find(p => p.id === selected);
-
-  // Quando há busca e profissão selecionada, filtrar sub-serviços
-  const subServices = profession?.services.filter(s =>
-    !search || s.name.toLowerCase().includes(search.toLowerCase()) || profession.label.toLowerCase().includes(search.toLowerCase())
-  ) ?? [];
-
-  return <>
-    <Button variant="outline" onClick={() => setOpen(true)} className="h-11 rounded-xl border-[#dce5dc] bg-white text-[#4c6960] hover:bg-[#f5f8f2]">
-      <BookOpen className="mr-2 h-4 w-4" /> Usar catálogo
-    </Button>
-    <Dialog open={open} onOpenChange={v => { if (!v) close(); else setOpen(true); }}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px] sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle className="text-[#173a34]">Catálogo de serviços sugeridos</DialogTitle>
-          <DialogDescription>Escolha uma profissão para carregar serviços prontos ou cadastre um serviço do seu jeito.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9bad9a]" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar profissão ou serviço (ex: encanador, pintura...)"
-              className="h-10 w-full rounded-xl border border-[#dce5dc] bg-[#f5f8f2] pl-9 pr-4 text-sm text-[#284b42] outline-none focus:border-[#8aa500]"
-            />
-          </div>
-
-          {search.trim().length > 0 && (
-            <div className="flex items-center justify-between rounded-xl bg-[#f0f7ea] px-3.5 py-2.5 text-xs text-[#3d5e4b] border border-[#d2e4c4]">
-              <span>Não achou na lista o que precisa?</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs font-semibold text-[#6d8315] hover:bg-[#e4eed7]"
-                onClick={() => { onSelect(search.trim(), "", "", ""); close(); }}
-              >
-                <Plus className="mr-1 h-3.5 w-3.5" /> Criar "{search.trim()}"
-              </Button>
-            </div>
-          )}
-
-          {!selected ? (
-            <>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {filtered.map(p => (
-                  <button key={p.id} onClick={() => setSelected(p.id)}
-                    className="flex flex-col items-center gap-1 rounded-2xl border border-[#dce5dc] bg-white p-4 text-center transition hover:border-[#8aa500] hover:bg-[#f5f8f2]">
-                    <span className="text-2xl">{p.emoji}</span>
-                    <span className="text-xs font-semibold text-[#284b42]">{p.label}</span>
-                  </button>
-                ))}
-              </div>
-              {filtered.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-[#dce5dc] p-6 text-center">
-                  <p className="text-sm text-[#82948e]">Nenhuma profissão correspondente encontrada.</p>
-                  <Button variant="outline" className="mt-3 h-9 rounded-xl border-[#8aa500] text-sm text-[#8aa500] hover:bg-[#f5f8f2]"
-                    onClick={() => { onSelect(search, "", "", ""); close(); }}>
-                    <Plus className="mr-1.5 h-4 w-4" /> Cadastrar "{search}" manualmente
-                  </Button>
-                </div>
-              )}
-              <div className="mt-4 rounded-2xl border border-dashed border-[#dce5dc] bg-[#fdfefd] p-4 text-center">
-                <p className="text-xs text-[#71867f]">Sua área de atuação não está na lista?</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2 h-8 rounded-xl border-[#8aa500] text-xs font-medium text-[#738d0d] hover:bg-[#f5f8f2]"
-                  onClick={() => { onSelect("", "", "", ""); close(); }}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Digitar serviço personalizado manualmente
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="space-y-3">
-              <button onClick={() => setSelected(null)} className="flex items-center gap-1 text-sm text-[#71867f] hover:text-[#8aa500]">
-                <ChevronLeft className="h-4 w-4" /> Voltar para todas as profissões
-              </button>
-              <p className="font-semibold text-[#173a34]">{profession?.emoji} {profession?.label}</p>
-              <div className="grid gap-2">
-                {subServices.map(s => (
-                  <button key={s.name}
-                    onClick={() => { onSelect(s.name, s.description, s.price, s.durationMinutes); close(); }}
-                    className="flex items-center justify-between rounded-xl border border-[#dce5dc] bg-white p-3.5 text-left transition hover:border-[#8aa500] hover:bg-[#f5f8f2]">
-                    <div className="min-w-0 flex-1 pr-3">
-                      <span className="font-semibold text-sm text-[#284b42] block truncate">{s.name}</span>
-                      <span className="mt-0.5 block text-xs text-[#82948e] line-clamp-1">{s.description}</span>
-                    </div>
-                    {(s.price || s.durationMinutes) && (
-                      <div className="shrink-0 text-right text-xs">
-                        {s.price && <div className="font-bold text-[#173a34]">R$ {s.price}</div>}
-                        {s.durationMinutes && <div className="text-[11px] text-[#71867f] flex items-center justify-end gap-0.5"><Clock className="h-3 w-3" />{s.durationMinutes} min</div>}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div className="rounded-xl border border-dashed border-[#dce5dc] p-4 text-center">
-                <p className="text-xs text-[#82948e]">Precisa de um serviço diferente para {profession?.label}?</p>
-                <Button variant="ghost" size="sm" className="mt-1 h-8 rounded-lg text-xs text-[#8aa500] hover:bg-[#f5f8f2]"
-                  onClick={() => { onSelect("", "", "", ""); close(); }}>
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar serviço personalizado
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  </>;
-}
-
-function Services() {
-  const services = trpc.service.list.useQuery();
-  const profile = trpc.profile.get.useQuery();
-  const utils = trpc.useUtils();
-  const create = trpc.service.create.useMutation({ onSuccess: () => { toast.success("Serviço salvo."); utils.service.list.invalidate(); setOpen(false); reset(); } });
-  const update = trpc.service.update.useMutation({ onSuccess: () => { toast.success("Serviço atualizado."); utils.service.list.invalidate(); setOpen(false); reset(); } });
-  const [open, setOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
-  const empty = { name: "", description: "", durationMinutes: "60", price: "", modality: "presencial" as "presencial" | "endereco" | "online" | "hibrido", active: true };
-  const [form, setForm] = useState(empty);
-  const reset = () => { setForm(empty); setEditingId(null); };
-  const openAdd = () => { reset(); setOpen(true); };
-  const openEdit = (service: any) => { setEditingId(service.id); setForm({ name: service.name, description: service.description || "", durationMinutes: String(service.durationMinutes), price: formatBrlInput(service.priceCents), modality: service.modality, active: service.active }); setOpen(true); };
-  const submit = () => {
-    if (!form.name.trim()) return toast.error("Informe o nome do serviço.");
-    const spell = checkServiceSpelling(form.name);
-    const finalName = spell.hasCorrection ? spell.correctedText : form.name;
-    const payload = {
-      name: finalName,
-      description: form.description || undefined,
-      durationMinutes: Number(form.durationMinutes),
-      priceCents: parseBrlToCents(form.price),
-      modality: form.modality,
-    };
-    if (editingId) update.mutate({ id: editingId, ...payload, active: form.active });
-    else create.mutate(payload);
-  };
-  const toggle = (service: any) => update.mutate({ id: service.id, name: service.name, description: service.description || undefined, durationMinutes: service.durationMinutes, priceCents: service.priceCents, modality: service.modality, active: !service.active });
-  return <Page title="Meus serviços" eyebrow="O que você oferece" description="Mantenha seu catálogo pronto para a agenda e para a página pública." help={<HelpButton title="Como funciona Serviços?"><p><strong>Serviços</strong> é o catálogo do que você oferece. Cada serviço tem nome, preço, duração e modalidade.</p><p><strong>Modalidades:</strong> Presencial (no seu local), no endereço do cliente, online ou híbrido.</p><p><strong>Ativar/Desativar:</strong> Serviços desativados não aparecem para novos clientes, mas ficam preservados no histórico.</p><p>Os serviços cadastrados alimentam a <strong>Agenda</strong>, os <strong>Orçamentos</strong> e sua <strong>página pública</strong>.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><CatalogPicker onSelect={(name, desc, price, duration) => { setForm({ ...empty, name, description: desc, price: price || "", durationMinutes: duration || "60" }); setEditingId(null); setOpen(true); }} /><Button onClick={openAdd} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Novo serviço</Button></div>}>
-    <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) reset(); }}>
-      <ServiceDialog
-        form={form}
-        setForm={setForm}
-        submit={submit}
-        pending={create.isPending || update.isPending}
-        editing={Boolean(editingId)}
-        professionName={profile.data?.professionName}
-      />
-    </Dialog>
-    <div className="mb-5 max-w-md"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#9aa9a3]" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar por nome ou descrição..." className="h-11 rounded-xl border-[#dce5dc] bg-white pl-9" /></div></div>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{services.data?.filter(service => `${service.name} ${service.description || ""}`.toLowerCase().includes(search.toLowerCase())).map(service => <Card key={service.id} className="rounded-[22px] border-0 shadow-[0_8px_26px_rgba(19,42,39,0.04)]"><CardContent className="p-5"><div className="flex items-start justify-between gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#e8f1f5] text-[#3f738e]"><BriefcaseBusiness className="h-5 w-5" /></div><StatusBadge status={service.active ? "aceito" : "cancelado"} /></div><h3 className="mt-5 font-bold text-[#284b42]">{service.name}</h3><p className="mt-2 min-h-10 text-sm leading-5 text-[#82948e]">{service.description || "Sem descrição adicionada."}</p><div className="mt-5 flex items-center justify-between border-t border-[#edf1eb] pt-4"><span className="text-sm text-[#71867f]"><Clock3 className="mr-1 inline h-4 w-4" />{service.durationMinutes} min</span><strong className="text-lg text-[#173a34]">{money(service.priceCents)}</strong></div><p className="mt-2 text-xs text-[#9aa9a3]">{modalityLabel[service.modality]}</p><div className="mt-4 flex gap-2"><Button variant="outline" onClick={() => openEdit(service)} className="h-9 flex-1 rounded-lg border-[#dce5dc] bg-white text-xs"><Pencil className="mr-1 h-3.5 w-3.5" /> Editar</Button><Button variant="ghost" onClick={() => toggle(service)} className="h-9 rounded-lg text-xs text-[#71867f]">{service.active ? "Desativar" : "Ativar"}</Button></div></CardContent></Card>)}</div>
-    {!services.isLoading && !services.data?.length && <EmptyState icon={BriefcaseBusiness} title="Adicione seu primeiro serviço" description="Seu catálogo alimenta a página pública, os pedidos e os orçamentos." action={<div className="flex flex-wrap justify-center gap-2"><CatalogPicker onSelect={(name, desc, price, duration) => { setForm({ ...empty, name, description: desc, price: price || "", durationMinutes: duration || "60" }); setEditingId(null); setOpen(true); }} /><Button onClick={openAdd} className="rounded-xl bg-[#173a34] text-white"><Plus className="mr-2 h-4 w-4" /> Novo serviço</Button></div>} />}
-  </Page>;
-}
-function ServiceDialog({
-  form,
-  setForm,
-  submit,
-  pending,
-  editing,
-  professionName,
-}: {
-  form: any;
-  setForm: (form: any) => void;
-  submit: () => void;
-  pending: boolean;
-  editing: boolean;
-  professionName?: string;
-}) {
-  const dynamicPlaceholder = useMemo(() => getServicePlaceholderForProfession(professionName || ""), [professionName]);
-  const suggestions = useMemo(() => (!professionName ? [] : getRecommendedServicesForProfession(professionName)), [professionName]);
-
-  return (
-    <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]">
-      <DialogHeader>
-        <DialogTitle>{editing ? "Editar serviço" : "Novo serviço"}</DialogTitle>
-        <DialogDescription>
-          {professionName ? `Cadastrando para ${professionName}. As alterações refletem na agenda e na página pública.` : "As alterações refletem na agenda e na página pública."}
-        </DialogDescription>
-      </DialogHeader>
-
-      {!editing && suggestions.length > 0 && (
-        <div className="rounded-2xl border border-[#dce5dc] bg-[#fbfcf9] p-3.5 space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#173a34] flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-[#708818]" />
-              Sugestões para {professionName}
-            </span>
-            <span className="text-[11px] text-[#71867f]">Preenche tudo em 1 toque</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
-            {suggestions.map((sug) => {
-              const isSelected = form.name.trim().toLowerCase() === sug.name.trim().toLowerCase();
-              return (
-                <button
-                  key={sug.name}
-                  type="button"
-                  onClick={() => {
-                    setForm({
-                      ...form,
-                      name: sug.name,
-                      description: sug.description || form.description,
-                      price: sug.price || form.price,
-                      durationMinutes: sug.durationMinutes || form.durationMinutes,
-                    });
-                  }}
-                  className={cn(
-                    "rounded-lg border px-2.5 py-1 text-xs font-medium transition text-left cursor-pointer",
-                    isSelected
-                      ? "border-[#173a34] bg-[#173a34] text-[#d9f56a] shadow-xs"
-                      : "border-[#dce5dc] bg-white text-[#284b42] hover:border-[#173a34] hover:bg-[#f4f7f2]"
-                  )}
-                  title={sug.description}
-                >
-                  + {sug.name} {sug.price ? `(R$ ${sug.price})` : ""}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-4 py-3">
-        <ServiceNameField
-          label="Nome do serviço"
-          value={form.name}
-          onChange={value => setForm({ ...form, name: value })}
-          onSelectCatalog={(name, description, price, duration) =>
-            setForm({
-              ...form,
-              name,
-              description: description || form.description,
-              price: price || form.price,
-              durationMinutes: duration || form.durationMinutes,
-            })
-          }
-          professionName={professionName}
-          placeholder={dynamicPlaceholder}
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Preço" prefix="R$ " value={form.price} onChange={value => setForm({ ...form, price: value })} />
-          <Field label="Duração (min)" value={form.durationMinutes} onChange={value => setForm({ ...form, durationMinutes: value })} />
-        </div>
-        <FormSelect
-          label="Modalidade"
-          value={form.modality}
-          onChange={value => setForm({ ...form, modality: value })}
-          options={Object.entries(modalityLabel).map(([value, label]) => ({ value, label }))}
-        />
-        <div>
-          <Label className="mb-2 block">Descrição</Label>
-          <Textarea
-            value={form.description}
-            onChange={e => setForm({ ...form, description: e.target.value })}
-            placeholder="Detalhes ou observações sobre o serviço..."
-          />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button onClick={submit} disabled={pending} className="rounded-xl bg-[#173a34] text-white">
-          {editing ? "Salvar alterações" : "Salvar serviço"}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  );
-}
+const Services = ServicesPage;
 
 function Requests() {
   const requests = trpc.request.list.useQuery(undefined, { refetchInterval: 5000, refetchOnWindowFocus: true });

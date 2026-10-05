@@ -55,9 +55,11 @@ client/
     ├── main.tsx                # Ponto de entrada React (ReactDOM.createRoot)
     ├── pages/                  # Páginas principais da aplicação
     │   ├── Home.tsx            # Landing Page de apresentação e captação
-    │   ├── Workspace.tsx       # Painel do Profissional (Agenda, Clientes, Orçamentos, Faturamento)
+    │   ├── Workspace.tsx       # Painel do Profissional (Agenda, Orçamentos, Faturamento)
     │   ├── PublicProfile.tsx   # Cartão Profissional Público (/p/:slug e /:slug) — Isolado e ultra-estável
     │   ├── PublicQuote.tsx     # Proposta Comercial e Orçamento Digital (/orcamento/:token) — Isolado
+    │   ├── ClientsPage.tsx     # Gestão de Clientes & Histórico (/clientes) — Isolado e modular
+    │   ├── ServicesPage.tsx    # Catálogo de Serviços & Catálogo Sugerido (/servicos) — Isolado e modular
     │   ├── TeamPage.tsx        # Módulo de Equipe & Parceiros (/equipe) — Isolado e modular
     │   ├── Admin.tsx           # Painel Administrativo do MeuAutônomo (Vouchers, Métricas, Gestão)
     │   ├── PlansPage.tsx       # Página de Planos e Assinatura (Free, Pro, Equipe)
@@ -125,7 +127,8 @@ server/
 |---|---|---|---|
 | **Cartão Público / Perfil** | `PublicProfile.tsx` | `routers.ts` (`profile.getBySlug`) | `professionalProfiles` |
 | **Agenda e Horários** | `Workspace.tsx` (`AgendaPage`) | `routers.ts` (`appointments.*`) | `appointments` |
-| **Cadastro de Clientes** | `Workspace.tsx` (`ClientsPage`) | `routers.ts` (`clients.*`) | `clients` |
+| **Cadastro de Clientes** | `ClientsPage.tsx` | `routers.ts` (`clients.*`) | `clients` |
+| **Catálogo de Serviços** | `ServicesPage.tsx` | `routers.ts` (`services.*`) | `services` |
 | **Orçamentos / Propostas** | `PublicQuote.tsx` / `Workspace.tsx` | `routers.ts` (`quotes.*`) | `quotes` |
 | **Equipe & Parceiros** | `TeamPage.tsx` | `routers.ts` (`team.*`) | `teamMembers` |
 | **Emissão de Recibos** | `ReceiptModal.tsx` | `routers.ts` (`receipt.*`) | `appointments` / `quotes` |
