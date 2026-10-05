@@ -10,7 +10,9 @@ import AdminPage from "./pages/Admin";
 import VideoDemoPage from "./pages/VideoDemoPage";
 import PlansPage from "./pages/PlansPage";
 import ValidateReceiptPage from "./pages/ValidateReceipt";
-import { AppHome, PublicProfile, PublicQuote } from "./pages/Workspace";
+import { AppHome } from "./pages/Workspace";
+import { PublicProfile } from "./pages/PublicProfile";
+import { PublicQuote } from "./pages/PublicQuote";
 
 function AuthenticatedRoute() {
   return <AppHome />;
