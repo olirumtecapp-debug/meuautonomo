@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, ne, like } from "drizzle-orm";
+import { and, desc, eq, gte, lt, lte, ne, like } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -104,7 +104,12 @@ function dayEnd(date = new Date()) {
   return end;
 }
 
-export function isWithinAvailability(start: Date, durationMinutes: number, availabilityRow: { schedule: string; unavailableDays: string | null } | undefined) {
+export function isWithinAvailability(
+  start: Date,
+  durationMinutes: number,
+  availabilityRow: { schedule: string; unavailableDays: string | null } | undefined,
+  timeZone = "America/Sao_Paulo"
+) {
   if (!availabilityRow) return true;
   try {
     const config = JSON.parse(availabilityRow.schedule) as {
@@ -113,20 +118,39 @@ export function isWithinAvailability(start: Date, durationMinutes: number, avail
       end?: string;
       breaks?: Array<{ start: string; end: string }>;
     };
-    const dayNames = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
-    const day = dayNames[start.getDay()];
+
+    const dtf = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      weekday: "short",
+    });
+    const parts = Object.fromEntries(dtf.formatToParts(start).map(p => [p.type, p.value]));
+    const dayNames: Record<string, string> = {
+      Sun: "sun", Mon: "mon", Tue: "tue", Wed: "wed", Thu: "thu", Fri: "fri", Sat: "sat"
+    };
+    const day = dayNames[parts.weekday] || "mon";
+
     if (config.days?.length && !config.days.includes(day)) return false;
+
     const toMinutes = (value: string) => {
       const [hours, minutes] = value.split(":").map(Number);
       return hours * 60 + minutes;
     };
-    const startMinutes = start.getHours() * 60 + start.getMinutes();
+
+    const startMinutes = Number(parts.hour) * 60 + Number(parts.minute);
     const endMinutes = startMinutes + durationMinutes;
+
     if (config.start && startMinutes < toMinutes(config.start)) return false;
     if (config.end && endMinutes > toMinutes(config.end)) return false;
     if (config.breaks?.some(item => startMinutes < toMinutes(item.end) && endMinutes > toMinutes(item.start))) return false;
+
     const unavailable = availabilityRow.unavailableDays ? JSON.parse(availabilityRow.unavailableDays) as string[] : [];
-    const dateKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+    const dateKey = `${parts.year}-${parts.month}-${parts.day}`;
     return !unavailable.includes(dateKey);
   } catch {
     return true;
@@ -350,6 +374,12 @@ export const appRouter = router({
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível." });
         const current = await getProfileByUserId(ctx.user.id);
+        if (current && input.slug && input.slug !== current.slug) {
+          const slugOwner = await getProfileBySlug(input.slug);
+          if (slugOwner && slugOwner.userId !== ctx.user.id) {
+            throw new TRPCError({ code: "CONFLICT", message: "Esse endereço público já está em uso por outro profissional." });
+          }
+        }
         try {
           if (current) {
             await db.update(professionalProfiles).set({ ...input, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null }).where(eq(professionalProfiles.id, current.id));
@@ -1146,21 +1176,65 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions = [eq(payments.profileId, profile.id)];
-      if (input?.from) conditions.push(gte(payments.createdAt, new Date(input.from)));
-      if (input?.to) conditions.push(lt(payments.createdAt, new Date(input.to)));
-      const [rows, profileClients, profileServices] = await Promise.all([
-        db.select().from(payments).where(and(...conditions)).orderBy(desc(payments.createdAt)),
+
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+      const periodFrom = input?.from ? new Date(input.from) : monthStart;
+      const periodTo = input?.to ? new Date(input.to) : undefined;
+
+      const payConditions = [eq(payments.profileId, profile.id), gte(payments.createdAt, periodFrom)];
+      if (periodTo) payConditions.push(lte(payments.createdAt, periodTo));
+
+      const appConditions = [eq(appointments.profileId, profile.id), ne(appointments.status, "cancelado"), gte(appointments.startsAt, periodFrom)];
+      if (periodTo) appConditions.push(lte(appointments.startsAt, periodTo));
+
+      const [rawPayments, periodAppointments, profileClients, profileServices] = await Promise.all([
+        db.select().from(payments).where(and(...payConditions)).orderBy(desc(payments.createdAt)),
+        db.select().from(appointments).where(and(...appConditions)).orderBy(desc(appointments.startsAt)),
         db.select({ id: clients.id, name: clients.name }).from(clients).where(eq(clients.profileId, profile.id)),
         db.select({ id: services.id, name: services.name }).from(services).where(eq(services.profileId, profile.id)),
       ]);
+
       const clientMap = new Map(profileClients.map(c => [c.id, c.name]));
       const serviceMap = new Map(profileServices.map(s => [s.id, s.name]));
-      return rows.map(r => ({
+
+      const explicitlyLinkedAppIds = new Set(rawPayments.map(p => p.appointmentId).filter(Boolean));
+      const rows: any[] = rawPayments.map(r => ({
         ...r,
         clientName: r.clientId ? clientMap.get(r.clientId) || null : null,
         serviceName: r.serviceId ? serviceMap.get(r.serviceId) || null : null,
       }));
+
+      for (const app of periodAppointments) {
+        if (!isBillableAppointment(app.status)) continue;
+        if (explicitlyLinkedAppIds.has(app.id)) continue;
+
+        const hasUnlinkedMatch = rawPayments.some(p => !p.appointmentId && p.clientId === app.clientId && p.amountCents === app.amountCents);
+        if (hasUnlinkedMatch) continue;
+
+        rows.push({
+          id: -app.id,
+          profileId: app.profileId,
+          teamMemberId: app.teamMemberId,
+          appointmentId: app.id,
+          clientId: app.clientId,
+          serviceId: app.serviceId,
+          amountCents: app.amountCents,
+          commissionPercent: null,
+          commissionAmountCents: 0,
+          studioAmountCents: app.amountCents,
+          commissionPaid: false,
+          method: (app.paymentMethod as any) || "pix",
+          status: (app.paymentStatus === "pago" || app.status === "concluido") ? "pago" : "pendente",
+          note: app.notes || null,
+          paidAt: app.paymentStatus === "pago" ? app.startsAt : null,
+          createdAt: app.startsAt,
+          clientName: app.clientId ? clientMap.get(app.clientId) || null : null,
+          serviceName: app.serviceId ? serviceMap.get(app.serviceId) || null : null,
+        });
+      }
+
+      rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return rows;
     }),
     create: protectedProcedure.input(z.object({
       appointmentId: z.number().optional(),
@@ -1176,6 +1250,20 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Debounce contra duplo clique / submissão duplicada (BUG-001)
+      const twoSecondsAgo = new Date(Date.now() - 2500);
+      const recentDup = await db.select({ id: payments.id }).from(payments).where(and(
+        eq(payments.profileId, profile.id),
+        eq(payments.amountCents, input.amountCents),
+        eq(payments.method, input.method),
+        eq(payments.status, input.status),
+        gte(payments.createdAt, twoSecondsAgo)
+      )).limit(1);
+
+      if (recentDup.length > 0) {
+        return { success: true };
+      }
 
       if (input.clientId) await getOwnedClient(profile.id, input.clientId);
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
@@ -1404,15 +1492,30 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const conditions = [eq(expenses.profileId, profile.id)];
-      if (input?.from) conditions.push(gte(expenses.occurredAt, new Date(input.from)));
-      if (input?.to) conditions.push(lt(expenses.occurredAt, new Date(input.to)));
+      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+      const periodFrom = input?.from ? new Date(input.from) : monthStart;
+      const conditions = [eq(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom)];
+      if (input?.to) conditions.push(lte(expenses.occurredAt, new Date(input.to)));
       return db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.occurredAt));
     }),
     create: protectedProcedure.input(z.object({ description: z.string().min(2).max(180), category: z.string().max(100).optional(), amountCents: z.number().int().positive(), occurredAt: z.string().datetime().optional(), note: z.string().max(600).optional() })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Debounce contra duplo clique / submissão duplicada (BUG-002)
+      const twoSecondsAgo = new Date(Date.now() - 2500);
+      const recentDup = await db.select({ id: expenses.id }).from(expenses).where(and(
+        eq(expenses.profileId, profile.id),
+        eq(expenses.description, input.description),
+        eq(expenses.amountCents, input.amountCents),
+        gte(expenses.createdAt, twoSecondsAgo)
+      )).limit(1);
+
+      if (recentDup.length > 0) {
+        return { success: true };
+      }
+
       await db.insert(expenses).values({ profileId: profile.id, description: input.description, category: input.category ?? null, amountCents: input.amountCents, occurredAt: input.occurredAt ? new Date(input.occurredAt) : new Date(), note: input.note ?? null });
       return { success: true };
     }),
@@ -1465,9 +1568,9 @@ export const appRouter = router({
       const from = input?.from ? new Date(input.from) : defaultFrom;
       const to = input?.to ? new Date(input.to) : new Date(now.getTime() + 1);
       const [periodAppointments, periodPayments, periodClients, profileServices] = await Promise.all([
-        db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, from), lt(appointments.startsAt, to), ne(appointments.status, "cancelado"))),
-        db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, from), lt(payments.createdAt, to))),
-        db.select().from(clients).where(and(eq(clients.profileId, profile.id), gte(clients.createdAt, from), lt(clients.createdAt, to))),
+        db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, from), lte(appointments.startsAt, to), ne(appointments.status, "cancelado"))),
+        db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, from), lte(payments.createdAt, to))),
+        db.select().from(clients).where(and(eq(clients.profileId, profile.id), gte(clients.createdAt, from), lte(clients.createdAt, to))),
         db.select().from(services).where(eq(services.profileId, profile.id)),
       ]);
       const metrics = calculateDeduplicatedMetrics(periodAppointments as any, periodPayments as any);
@@ -1493,9 +1596,9 @@ export const appRouter = router({
       const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
       const periodFrom = input?.from ? new Date(input.from) : monthStart;
       const periodTo = input?.to ? new Date(input.to) : new Date();
-      const monthAppointments = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, periodFrom), lt(appointments.startsAt, periodTo), ne(appointments.status, "cancelado")));
-      const monthPayments = await db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lt(payments.createdAt, periodTo)));
-      const monthExpenses = await db.select().from(expenses).where(and(eq(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lt(expenses.occurredAt, periodTo)));
+      const monthAppointments = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, periodFrom), lte(appointments.startsAt, periodTo), ne(appointments.status, "cancelado")));
+      const monthPayments = await db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lte(payments.createdAt, periodTo)));
+      const monthExpenses = await db.select().from(expenses).where(and(eq(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lte(expenses.occurredAt, periodTo)));
 
       const metrics = calculateDeduplicatedMetrics(monthAppointments as any, monthPayments as any, monthExpenses as any);
       const projected = today.reduce((sum, item) => sum + (isBillableAppointment(item.status) ? item.amountCents : 0), 0);

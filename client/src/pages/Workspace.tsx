@@ -3766,8 +3766,26 @@ export function MeuDia() {
   return <Page title="Meu Dia" eyebrow="Comece por aqui" description="Sua rotina de hoje, sem distrações." help={<HelpButton title="Como funciona Meu Dia?"><p><strong>Meu Dia</strong> é um resumo focado no que importa agora — sem a distração de toda a plataforma.</p><p><strong>Métricas do topo:</strong></p><ul className="list-disc pl-5 space-y-1"><li><strong>Atendimentos</strong> — quantos estão na agenda de hoje.</li><li><strong>Previsto</strong> — valor total estimado dos atendimentos de hoje.</li><li><strong>Solicitações</strong> — pedidos novos que precisam de atenção.</li><li><strong>Orçamentos</strong> — propostas enviadas aguardando resposta do cliente.</li></ul><p><strong>O que precisa de atenção:</strong> Lista as solicitações novas e os orçamentos pendentes para você agir rapidamente sem precisar navegar pela plataforma.</p></HelpButton>}><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric title="Atendimentos" value={String(data.metrics.todayCount)} hint="na agenda de hoje" icon={CalendarDays} accent="lime" /><Metric title="Previsto" value={money(data.metrics.todayProjectedCents)} hint="em atendimentos" icon={WalletCards} accent="blue" /><Metric title="Solicitações" value={String(data.recentRequests.filter(item => item.status === "nova").length)} hint="aguardando atenção" icon={ClipboardList} accent="orange" /><Metric title="Orçamentos" value={String(data.pendingQuotes.length)} hint="aguardando resposta" icon={FileText} accent="green" /></div><div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Agenda de hoje</CardTitle></CardHeader><CardContent className="p-0">{data.today.length ? <div className="divide-y divide-[#edf1eb]">{data.today.map(item => { const client = clients.data?.find(c => c.id === item.clientId); const service = services.data?.find(s => s.id === item.serviceId); return <div key={item.id} className="flex items-center gap-4 p-5"><div className="grid h-12 w-16 place-items-center rounded-xl bg-[#f1f7dd] text-sm font-bold text-[#718600]">{timeLabel(item.startsAt)}</div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-[#284b42]">{client?.name || (item.clientId ? `Cliente #${item.clientId}` : "Cliente a confirmar")}</p>{service && <span className="inline-flex items-center gap-1 rounded-md bg-[#eef5d2] px-2 py-0.5 text-xs font-semibold text-[#667700]"><BriefcaseBusiness className="h-3 w-3" />{service.name}</span>}</div><p className="mt-1 truncate text-sm text-[#82948e]">{item.location ? `${item.location} · ` : ""}{money(item.amountCents)}</p></div><StatusBadge status={item.status} /></div>; })}</div> : <div className="p-8"><EmptyState icon={CalendarDays} title="Nenhum atendimento hoje" description="Seu dia está livre. Você pode usar o tempo para organizar clientes e propostas." /></div>}</CardContent></Card><div className="grid gap-6"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">O que precisa de atenção</CardTitle></CardHeader><CardContent className="space-y-3">{data.recentRequests.filter(item => item.status === "nova").map(item => <div key={`r-${item.id}`} className="rounded-xl bg-[#f1f7dd] p-4"><p className="text-sm font-semibold text-[#526b4d]">Nova solicitação de {item.requesterName}</p><p className="mt-1 text-xs text-[#82948e]">{item.description}</p></div>)}{data.pendingQuotes.map(item => <div key={`q-${item.id}`} className="rounded-xl bg-[#e8eef8] p-4"><p className="text-sm font-semibold text-[#496b98]">Orçamento aguardando resposta</p><p className="mt-1 text-xs text-[#82948e]">{item.description || `Orçamento #${item.id}`} · {money(item.totalCents)}</p></div>)}{!data.recentRequests.some(item => item.status === "nova") && !data.pendingQuotes.length && <p className="py-4 text-sm text-[#82948e]">Tudo em dia por enquanto.</p>}</CardContent></Card></div></div></Page>;
 }
 
+function safeIsoStart(dateStr: string): string | undefined {
+  if (!dateStr || dateStr.trim().length < 10) return undefined;
+  const d = new Date(`${dateStr}T00:00:00`);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+function safeIsoEnd(dateStr: string): string | undefined {
+  if (!dateStr || dateStr.trim().length < 10) return undefined;
+  const d = new Date(`${dateStr}T23:59:59.999`);
+  return isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
 export function Reports() {
-  const [from, setFrom] = useState(""); const [to, setTo] = useState(""); const range = useMemo(() => ({ from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined, to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined }), [from, to]); const report = trpc.reports.summary.useQuery(range);
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const range = useMemo(() => ({
+    from: safeIsoStart(from),
+    to: safeIsoEnd(to),
+  }), [from, to]);
+  const report = trpc.reports.summary.useQuery(range);
   return <Page title="Relatórios" eyebrow="Entenda seu negócio" description="Indicadores simples para acompanhar o período escolhido." help={<HelpButton title="Como funciona Relatórios?"><p><strong>Relatórios</strong> mostra um resumo do seu negócio para o período selecionado.</p><p><strong>Métricas:</strong></p><ul className="list-disc pl-5 space-y-1"><li><strong>Faturamento</strong> — soma de todos os pagamentos registrados.</li><li><strong>Recebido</strong> — apenas os pagamentos com status "Pago".</li><li><strong>Pendente</strong> — valor ainda a receber.</li><li><strong>Atendimentos</strong> — quantidade de atendimentos não cancelados.</li><li><strong>Novos clientes</strong> — clientes cadastrados no período.</li></ul><p><strong>Filtro de período:</strong> Defina uma data inicial e final para ver os dados de qualquer intervalo. Sem filtro, exibe todos os registros.</p><p><strong>Clientes recorrentes:</strong> Clientes com mais de um atendimento registrado — um sinal de fidelização.</p></HelpButton>} action={<RangeFilter from={from} to={to} setFrom={setFrom} setTo={setTo} />}>
     {report.isLoading ? <LoadingScreen /> : report.error ? <EmptyState icon={BarChart3} title="Não foi possível carregar o relatório" description="Tente novamente em alguns instantes." action={<Button onClick={() => report.refetch()} className="rounded-xl bg-[#173a34] text-white">Tentar novamente</Button>} /> : <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric title="Faturamento" value={money(report.data?.revenueCents)} hint="no período" icon={CircleDollarSign} accent="green" /><Metric title="Recebido" value={money(report.data?.receivedCents)} hint="pagamentos pagos" icon={WalletCards} accent="blue" /><Metric title="Pendente" value={money(report.data?.pendingCents)} hint="a receber" icon={ClipboardList} accent="orange" /><Metric title="Atendimentos" value={String(report.data?.appointmentCount || 0)} hint="não cancelados" icon={CalendarDays} accent="lime" /><Metric title="Novos clientes" value={String(report.data?.newClients || 0)} hint="no período" icon={Users} accent="green" /></div><div className="mt-6 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Serviços mais realizados</CardTitle></CardHeader><CardContent>{report.data?.topServices.length ? <div className="space-y-4">{report.data.topServices.map((item, index) => <div key={item.serviceId}><div className="mb-2 flex items-center justify-between text-sm"><span className="font-semibold text-[#526d64]">{index + 1}. {item.name}</span><span className="text-[#82948e]">{item.count} atendimento(s)</span></div><div className="h-2 overflow-hidden rounded-full bg-[#edf1eb]"><div className="h-full rounded-full bg-[#8aa500]" style={{ width: `${Math.max(12, (item.count / report.data!.topServices[0].count) * 100)}%` }} /></div></div>)}</div> : <EmptyState icon={BarChart3} title="Sem atendimentos no período" description="Quando houver atendimentos, eles aparecerão neste resumo." />}</CardContent></Card><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Clientes recorrentes</CardTitle></CardHeader><CardContent><p className="text-4xl font-bold text-[#173a34]">{report.data?.recurringClients || 0}</p><p className="mt-2 text-sm leading-6 text-[#82948e]">Clientes com pelo menos um atendimento registrado no histórico.</p></CardContent></Card></div></>}
   </Page>;
@@ -3777,21 +3795,64 @@ function RangeFilter({ from, to, setFrom, setTo }: { from: string; to: string; s
 
 function Finance() {
   const [from, setFrom] = useState(""); const [to, setTo] = useState("");
-  const range = useMemo(() => ({ from: from ? new Date(`${from}T00:00:00`).toISOString() : undefined, to: to ? new Date(`${to}T23:59:59.999`).toISOString() : undefined }), [from, to]);
+  const range = useMemo(() => ({
+    from: safeIsoStart(from),
+    to: safeIsoEnd(to),
+  }), [from, to]);
   const profile = trpc.profile.get.useQuery();
   const isTeamMode = profile.data?.accountType === "equipe";
   const payments = trpc.payment.list.useQuery(range); const expenses = trpc.expense.list.useQuery(range); const summary = trpc.dashboard.summary.useQuery(range); const clients = trpc.customer.list.useQuery(); const services = trpc.service.list.useQuery(); const teamMembers = trpc.team.list.useQuery(); const utils = trpc.useUtils();
-  const createPayment = trpc.payment.create.useMutation({ onSuccess: () => { toast.success("Pagamento registrado."); utils.payment.list.invalidate(); setPaymentOpen(false); } });
-  const createExpense = trpc.expense.create.useMutation({ onSuccess: () => { toast.success("Despesa registrada."); utils.expense.list.invalidate(); setExpenseOpen(false); } });
+  const createPayment = trpc.payment.create.useMutation({
+    onSuccess: () => {
+      toast.success("Pagamento registrado.");
+      utils.payment.list.invalidate();
+      utils.dashboard.summary.invalidate();
+      utils.reports.summary.invalidate();
+      utils.appointment.list.invalidate();
+      setPaymentOpen(false);
+    }
+  });
+  const createExpense = trpc.expense.create.useMutation({
+    onSuccess: () => {
+      toast.success("Despesa registrada.");
+      utils.expense.list.invalidate();
+      utils.dashboard.summary.invalidate();
+      utils.reports.summary.invalidate();
+      setExpenseOpen(false);
+    }
+  });
   const [paymentOpen, setPaymentOpen] = useState(false); const [expenseOpen, setExpenseOpen] = useState(false);
   const [payment, setPayment] = useState({ clientId: "", serviceId: "", teamMemberId: "", amount: "", method: "pix" as "pix" | "dinheiro" | "cartao" | "transferencia" | "outro", status: "pago" as "pago" | "pendente" | "parcial", note: "" });
   const [expense, setExpense] = useState({ description: "", category: "", amount: "", note: "" });
-  const submitPayment = () => { const cents = parseBrlToCents(payment.amount); if (cents <= 0) return toast.error("Informe um valor válido."); createPayment.mutate({ clientId: payment.clientId ? Number(payment.clientId) : undefined, serviceId: payment.serviceId ? Number(payment.serviceId) : undefined, teamMemberId: payment.teamMemberId ? Number(payment.teamMemberId) : undefined, amountCents: cents, method: payment.method, status: payment.status, note: payment.note || undefined }); };
-  const submitExpense = () => { const cents = parseBrlToCents(expense.amount); if (!expense.description || cents <= 0) return toast.error("Informe descrição e valor."); createExpense.mutate({ description: expense.description, category: expense.category || undefined, amountCents: cents, note: expense.note || undefined }); };
+  const submitPayment = () => {
+    if (createPayment.isPending) return;
+    const cents = parseBrlToCents(payment.amount);
+    if (cents <= 0) return toast.error("Informe um valor válido.");
+    createPayment.mutate({
+      clientId: payment.clientId ? Number(payment.clientId) : undefined,
+      serviceId: payment.serviceId ? Number(payment.serviceId) : undefined,
+      teamMemberId: payment.teamMemberId ? Number(payment.teamMemberId) : undefined,
+      amountCents: cents,
+      method: payment.method,
+      status: payment.status,
+      note: payment.note || undefined
+    });
+  };
+  const submitExpense = () => {
+    if (createExpense.isPending) return;
+    const cents = parseBrlToCents(expense.amount);
+    if (!expense.description || cents <= 0) return toast.error("Informe descrição e valor.");
+    createExpense.mutate({
+      description: expense.description,
+      category: expense.category || undefined,
+      amountCents: cents,
+      note: expense.note || undefined
+    });
+  };
   const received = (payments.data || []).filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0); const pending = (payments.data || []).filter(p => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0); const spent = (expenses.data || []).reduce((sum, item) => sum + item.amountCents, 0);
   return <Page title="Financeiro" eyebrow="Dinheiro sem complicação" description="Registre receitas e despesas. Sem números inventados: tudo vem dos seus lançamentos." help={<HelpButton title="Como funciona Financeiro?"><p><strong>Financeiro</strong> registra todas as movimentações do seu negócio — receitas e despesas.</p><p><strong>Receitas (entradas):</strong></p><ul className="list-disc pl-5 space-y-1"><li><strong>Pago</strong> — dinheiro já recebido, conta no saldo.</li><li><strong>Pendente</strong> — combinado mas ainda não pago.</li><li><strong>Parcial</strong> — parte foi paga, o resto está pendente.</li></ul><p><strong>Despesas (saídas):</strong> Custos do seu trabalho — materiais, deslocamento, ferramentas etc.</p><p><strong>Saldo:</strong> Receitas pagas menos despesas registradas no período.</p><p><strong>Filtro de período:</strong> Selecione um intervalo de datas para ver só o que aconteceu naquele período.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><RangeFilter from={from} to={to} setFrom={setFrom} setTo={setTo} /><Button onClick={() => setExpenseOpen(true)} variant="outline" className="h-11 rounded-xl border-[#dce5dc] bg-white text-[#4c6960]"><Plus className="mr-2 h-4 w-4" /> Nova despesa</Button><Button onClick={() => setPaymentOpen(true)} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Registrar receita</Button></div>}>
-    <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Registrar receita</DialogTitle><DialogDescription>Pagamento recebido ou a receber.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><FormSelect label="Cliente" value={payment.clientId} onChange={value => setPayment({ ...payment, clientId: value })} placeholder="Selecionar cliente" options={(clients.data || []).map(c => ({ value: String(c.id), label: c.name }))} /><FormSelect label="Serviço" value={payment.serviceId} onChange={value => { const svc = services.data?.find(s => String(s.id) === value); setPayment({ ...payment, serviceId: value, amount: svc && (!payment.amount || payment.amount === "0" || payment.amount === "0,00") ? formatBrlInput(svc.priceCents) : payment.amount }); }} placeholder="Selecionar serviço" options={(services.data || []).filter(service => service.active).map(service => ({ value: String(service.id), label: service.name }))} />{isTeamMode && Boolean(teamMembers.data?.length) && <FormSelect label="Profissional / Parceiro(a)" value={payment.teamMemberId} onChange={value => setPayment({ ...payment, teamMemberId: value })} placeholder="Receita própria (sem comissão)" options={[{ value: "", label: "Receita própria (sem comissão)" }, ...(teamMembers.data || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role || "Parceiro"} - ${m.commissionPercent}% comissão)` }))]} />}<Field label="Valor" prefix="R$ " value={payment.amount} onChange={value => setPayment({ ...payment, amount: value })} /><div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Forma" value={payment.method} onChange={value => setPayment({ ...payment, method: value as typeof payment.method })} options={[["pix","Pix"],["dinheiro","Dinheiro"],["cartao","Cartão"],["transferencia","Transferência"],["outro","Outro"]].map(([value,label]) => ({ value, label }))} /><FormSelect label="Situação" value={payment.status} onChange={value => setPayment({ ...payment, status: value as typeof payment.status })} options={[["pago","Pago"],["pendente","Pendente"],["parcial","Parcial"]].map(([value,label]) => ({ value, label }))} /></div><Field label="Observação" value={payment.note} onChange={value => setPayment({ ...payment, note: value })} /></div><DialogFooter><Button onClick={submitPayment} className="rounded-xl bg-[#173a34] text-white">Salvar receita</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Nova despesa</DialogTitle><DialogDescription>Registre um custo real do seu trabalho.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><Field label="Descrição" value={expense.description} onChange={value => setExpense({ ...expense, description: value })} placeholder="Ex.: Material elétrico" /><div className="grid gap-4 sm:grid-cols-2"><Field label="Categoria" value={expense.category} onChange={value => setExpense({ ...expense, category: value })} placeholder="Ex.: Materiais" /><Field label="Valor" prefix="R$ " value={expense.amount} onChange={value => setExpense({ ...expense, amount: value })} /></div><Field label="Observação" value={expense.note} onChange={value => setExpense({ ...expense, note: value })} /></div><DialogFooter><Button onClick={submitExpense} className="rounded-xl bg-[#173a34] text-white">Salvar despesa</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Registrar receita</DialogTitle><DialogDescription>Pagamento recebido ou a receber.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><FormSelect label="Cliente" value={payment.clientId} onChange={value => setPayment({ ...payment, clientId: value })} placeholder="Selecionar cliente" options={(clients.data || []).map(c => ({ value: String(c.id), label: c.name }))} /><FormSelect label="Serviço" value={payment.serviceId} onChange={value => { const svc = services.data?.find(s => String(s.id) === value); setPayment({ ...payment, serviceId: value, amount: svc && (!payment.amount || payment.amount === "0" || payment.amount === "0,00") ? formatBrlInput(svc.priceCents) : payment.amount }); }} placeholder="Selecionar serviço" options={(services.data || []).filter(service => service.active).map(service => ({ value: String(service.id), label: service.name }))} />{isTeamMode && Boolean(teamMembers.data?.length) && <FormSelect label="Profissional / Parceiro(a)" value={payment.teamMemberId} onChange={value => setPayment({ ...payment, teamMemberId: value })} placeholder="Receita própria (sem comissão)" options={[{ value: "", label: "Receita própria (sem comissão)" }, ...(teamMembers.data || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role || "Parceiro"} - ${m.commissionPercent}% comissão)` }))]} />}<Field label="Valor" prefix="R$ " value={payment.amount} onChange={value => setPayment({ ...payment, amount: value })} /><div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Forma" value={payment.method} onChange={value => setPayment({ ...payment, method: value as typeof payment.method })} options={[["pix","Pix"],["dinheiro","Dinheiro"],["cartao","Cartão"],["transferencia","Transferência"],["outro","Outro"]].map(([value,label]) => ({ value, label }))} /><FormSelect label="Situação" value={payment.status} onChange={value => setPayment({ ...payment, status: value as typeof payment.status })} options={[["pago","Pago"],["pendente","Pendente"],["parcial","Parcial"]].map(([value,label]) => ({ value, label }))} /></div><Field label="Observação" value={payment.note} onChange={value => setPayment({ ...payment, note: value })} /></div><DialogFooter><Button onClick={submitPayment} disabled={createPayment.isPending} className="rounded-xl bg-[#173a34] text-white">{createPayment.isPending ? "Salvando..." : "Salvar receita"}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Nova despesa</DialogTitle><DialogDescription>Registre um custo real do seu trabalho.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><Field label="Descrição" value={expense.description} onChange={value => setExpense({ ...expense, description: value })} placeholder="Ex.: Material elétrico" /><div className="grid gap-4 sm:grid-cols-2"><Field label="Categoria" value={expense.category} onChange={value => setExpense({ ...expense, category: value })} placeholder="Ex.: Materiais" /><Field label="Valor" prefix="R$ " value={expense.amount} onChange={value => setExpense({ ...expense, amount: value })} /></div><Field label="Observação" value={expense.note} onChange={value => setExpense({ ...expense, note: value })} /></div><DialogFooter><Button onClick={submitExpense} disabled={createExpense.isPending} className="rounded-xl bg-[#173a34] text-white">{createExpense.isPending ? "Salvando..." : "Salvar despesa"}</Button></DialogFooter></DialogContent></Dialog>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric title="Recebido" value={money(received)} hint="receitas pagas" icon={CircleDollarSign} accent="green" /><Metric title="Pendente" value={money(pending)} hint="a receber" icon={ClipboardList} accent="orange" /><Metric title="Despesas" value={money(spent)} hint="custos registrados" icon={WalletCards} accent="blue" /><Metric title="Saldo" value={money(received - spent)} hint="recebido menos despesas" icon={CircleDollarSign} accent="lime" /></div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
       <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-lg text-[#173a34]">Resumo do período</CardTitle><p className="mt-1 text-sm text-[#82948e]">Receitas pagas, valores pendentes e despesas por dia.</p></div><BarChart3 className="h-5 w-5 text-[#8aa500]" /></div></CardHeader><CardContent className="pt-0">{summary.isLoading ? <div className="grid h-[250px] place-items-center text-sm text-[#82948e]">Carregando gráfico…</div> : summary.data?.monthlySeries.length ? <div className="h-[280px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={summary.data.monthlySeries} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} /><XAxis dataKey="date" tickFormatter={value => String(value).slice(8, 10)} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} /><YAxis tickFormatter={value => `R$ ${Math.round(Number(value) / 100)}`} tickLine={false} axisLine={false} width={58} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} /><Tooltip formatter={(value, name) => [money(Number(value)), name === "receitas" ? "Receitas" : name === "pendentes" ? "Pendentes" : "Despesas"]} labelFormatter={value => `Dia ${String(value).slice(8, 10)}`} contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)" }} /><Legend formatter={value => value === "receitas" ? "Receitas" : value === "pendentes" ? "Pendentes" : "Despesas"} iconType="circle" /><Line type="monotone" dataKey="receitas" stroke="var(--chart-1)" strokeWidth={3} dot={false} /><Line type="monotone" dataKey="pendentes" stroke="var(--chart-3)" strokeWidth={2} strokeDasharray="5 5" dot={false} /><Line type="monotone" dataKey="despesas" stroke="var(--destructive)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div> : <div className="grid h-[250px] place-items-center rounded-2xl bg-[#f5f8f2] text-center"><div><BarChart3 className="mx-auto h-7 w-7 text-[#9bad9a]" /><p className="mt-3 text-sm font-semibold text-[#526d64]">Nenhuma movimentação no período</p><p className="mt-1 text-xs text-[#82948e]">O gráfico aparecerá quando você registrar receitas ou despesas.</p></div></div>}</CardContent></Card>
@@ -4094,7 +4155,10 @@ function SettingsPage() {
     }
   });
   const saveAvailability = trpc.profile.saveAvailability.useMutation({
-    onSuccess: () => toast.success("Horários salvos.")
+    onSuccess: () => {
+      toast.success("Horários salvos.");
+      availability.refetch();
+    }
   });
   const setAccountTypeMutation = trpc.profile.setAccountType.useMutation({
     onSuccess: (res) => {
@@ -4114,6 +4178,23 @@ function SettingsPage() {
 
   const [form, setForm] = useState<any>(null);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [availabilityTimes, setAvailabilityTimes] = useState<{ start: string; end: string } | null>(null);
+
+  useEffect(() => {
+    if (availability.data?.schedule) {
+      try {
+        const parsed = JSON.parse(availability.data.schedule);
+        setAvailabilityTimes({
+          start: parsed.start || "08:00",
+          end: parsed.end || "18:00"
+        });
+      } catch {
+        setAvailabilityTimes({ start: "08:00", end: "18:00" });
+      }
+    } else if (!availability.isLoading && !availabilityTimes) {
+      setAvailabilityTimes({ start: "08:00", end: "18:00" });
+    }
+  }, [availability.data, availability.isLoading]);
 
   if (!profile.data) return null;
 
@@ -4406,17 +4487,30 @@ function SettingsPage() {
                 <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 w-full min-w-0">
                   <div className="min-w-0">
                     <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Começo</Label>
-                    <Input id="availability-start" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).start : "08:00"} className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm" />
+                    <Input
+                      id="availability-start"
+                      type="time"
+                      value={availabilityTimes?.start ?? "08:00"}
+                      onChange={e => setAvailabilityTimes(prev => ({ start: e.target.value, end: prev?.end ?? "18:00" }))}
+                      className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm"
+                    />
                   </div>
                   <div className="min-w-0">
                     <Label className="mb-2 block text-xs font-semibold text-[#38584f]">Fim</Label>
-                    <Input id="availability-end" type="time" defaultValue={availability.data ? JSON.parse(availability.data.schedule).end : "18:00"} className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm" />
+                    <Input
+                      id="availability-end"
+                      type="time"
+                      value={availabilityTimes?.end ?? "18:00"}
+                      onChange={e => setAvailabilityTimes(prev => ({ start: prev?.start ?? "08:00", end: e.target.value }))}
+                      className="h-10 rounded-xl border-[#dce5dc] bg-white text-xs sm:text-sm"
+                    />
                   </div>
                 </div>
                 <Button
+                  disabled={saveAvailability.isPending}
                   onClick={() => {
-                    const start = (document.getElementById("availability-start") as HTMLInputElement)?.value || "08:00";
-                    const end = (document.getElementById("availability-end") as HTMLInputElement)?.value || "18:00";
+                    const start = availabilityTimes?.start || "08:00";
+                    const end = availabilityTimes?.end || "18:00";
                     saveAvailability.mutate({
                       schedule: JSON.stringify({ days: ["mon","tue","wed","thu","fri"], start, end }),
                       unavailableDays: JSON.stringify([])
@@ -4424,7 +4518,7 @@ function SettingsPage() {
                   }}
                   className="rounded-xl bg-[#173a34] text-white"
                 >
-                  Salvar horários
+                  {saveAvailability.isPending ? "Salvando..." : "Salvar horários"}
                 </Button>
               </CardContent>
             </Card>
