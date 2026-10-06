@@ -445,7 +445,7 @@ export function ServiceNameField({
   label?: string;
 }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
-  const [autoFixed, setAutoFixed] = useState<{ from: string; to: string } | null>(null);
+  const [autoFixed, setAutoFixed] = useState<{ from: string; to: string; explanation?: string } | null>(null);
 
   const dynamicPlaceholder = useMemo(() => {
     return placeholder || getServicePlaceholderForProfession(professionName || "");
@@ -470,10 +470,11 @@ export function ServiceNameField({
     if (spellcheck.hasCorrection && spellcheck.correctedText !== value.trim()) {
       const orig = value;
       const fixed = spellcheck.correctedText;
+      const explanation = spellcheck.explanation || "Ortografia ajustada";
       onChange(fixed);
-      setAutoFixed({ from: orig, to: fixed });
-      toast.info(`Ortografia ajustada: "${fixed}"`, {
-        description: `Corrigido automaticamente de "${orig}".`,
+      setAutoFixed({ from: orig, to: fixed, explanation });
+      toast.info(explanation, {
+        description: `Ajustado de "${orig}" para "${fixed}".`,
         action: {
           label: "Desfazer",
           onClick: () => {
@@ -528,7 +529,8 @@ export function ServiceNameField({
         />
         {showCorrection && (
           <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 animate-in fade-in">
-            <AlertTriangle className="h-3 w-3 text-amber-700" /> Falta acento
+            <AlertTriangle className="h-3 w-3 text-amber-700" />
+            {spellcheck.correctionType === "spelling" ? "Ortografia" : spellcheck.correctionType === "capitalization" ? "Formatação" : "Falta acento"}
           </span>
         )}
       </div>
@@ -538,7 +540,7 @@ export function ServiceNameField({
         <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900 transition animate-in fade-in">
           <div className="flex items-center gap-2">
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-200 text-xs font-bold text-emerald-800">✓</span>
-            <span>Acentuação corrigida automaticamente de <span className="line-through text-emerald-700">"{autoFixed.from}"</span> para <strong className="font-bold text-emerald-950">"{autoFixed.to}"</strong></span>
+            <span>{autoFixed.explanation || "Ajuste aplicado"}: de <span className="line-through text-emerald-700">"{autoFixed.from}"</span> para <strong className="font-bold text-emerald-950">"{autoFixed.to}"</strong></span>
           </div>
           <button
             type="button"
@@ -563,10 +565,14 @@ export function ServiceNameField({
             </div>
             <div>
               <p className="text-xs sm:text-sm font-bold text-amber-950 flex items-center gap-1.5">
-                Erro de ortografia detectado: palavra sem acento!
+                {spellcheck.correctionType === "spelling"
+                  ? "Ajuste de ortografia sugerido"
+                  : spellcheck.correctionType === "capitalization"
+                  ? "Ajuste de formatação sugerido"
+                  : "Acentuação recomendada"}
               </p>
               <p className="text-amber-900 text-xs mt-0.5">
-                Você digitou <span className="line-through font-semibold text-amber-800">"{value}"</span>. Em português, o correto é com acento: <strong className="font-bold underline text-amber-950 decoration-amber-600 decoration-2">"{spellcheck.correctedText}"</strong>.
+                Você digitou <span className="line-through font-semibold text-amber-800">"{value}"</span>. Sugestão recomendada: <strong className="font-bold underline text-amber-950 decoration-amber-600 decoration-2">"{spellcheck.correctedText}"</strong>.
               </p>
             </div>
           </div>
@@ -1912,6 +1918,8 @@ function Agenda() {
   };
 
   const submit = async () => {
+    if (!form.clientId) return toast.error("Selecione o cliente do atendimento.");
+    if (!form.serviceId) return toast.error("Selecione o serviço do atendimento.");
     if (!form.startsAt || isNaN(new Date(form.startsAt).getTime())) return toast.error("Escolha data e horário válidos.");
     try {
       await create.mutateAsync({
@@ -3443,7 +3451,7 @@ function Quotes() {
           </div>
           <DialogFooter>
             <Button onClick={submit} disabled={create.isPending || update.isPending} className="rounded-xl bg-[#173a34] text-white">
-              {editingQuoteId ? "Reenviar proposta revisada" : "Salvar orçamento"}
+              {editingQuoteId ? (form.sendNow ? "Reenviar proposta revisada" : "Salvar alterações") : "Salvar orçamento"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3855,7 +3863,7 @@ export function Reports() {
   }), [from, to]);
   const report = trpc.reports.summary.useQuery(range);
   return <Page title="Relatórios" eyebrow="Entenda seu negócio" description="Indicadores simples para acompanhar o período escolhido." help={<HelpButton title="Como funciona Relatórios?"><p><strong>Relatórios</strong> mostra um resumo do seu negócio para o período selecionado.</p><p><strong>Métricas:</strong></p><ul className="list-disc pl-5 space-y-1"><li><strong>Faturamento</strong> — soma de todos os pagamentos registrados.</li><li><strong>Recebido</strong> — apenas os pagamentos com status "Pago".</li><li><strong>Pendente</strong> — valor ainda a receber.</li><li><strong>Atendimentos</strong> — quantidade de atendimentos não cancelados.</li><li><strong>Novos clientes</strong> — clientes cadastrados no período.</li></ul><p><strong>Filtro de período:</strong> Defina uma data inicial e final para ver os dados de qualquer intervalo. Sem filtro, exibe todos os registros.</p><p><strong>Clientes recorrentes:</strong> Clientes com mais de um atendimento registrado — um sinal de fidelização.</p></HelpButton>} action={<RangeFilter from={from} to={to} setFrom={setFrom} setTo={setTo} />}>
-    {report.isLoading ? <LoadingScreen /> : report.error ? <EmptyState icon={BarChart3} title="Não foi possível carregar o relatório" description="Tente novamente em alguns instantes." action={<Button onClick={() => report.refetch()} className="rounded-xl bg-[#173a34] text-white">Tentar novamente</Button>} /> : <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric title="Faturamento" value={money(report.data?.revenueCents)} hint="no período" icon={CircleDollarSign} accent="green" /><Metric title="Recebido" value={money(report.data?.receivedCents)} hint="pagamentos pagos" icon={WalletCards} accent="blue" /><Metric title="Pendente" value={money(report.data?.pendingCents)} hint="a receber" icon={ClipboardList} accent="orange" /><Metric title="Atendimentos" value={String(report.data?.appointmentCount || 0)} hint="não cancelados" icon={CalendarDays} accent="lime" /><Metric title="Novos clientes" value={String(report.data?.newClients || 0)} hint="no período" icon={Users} accent="green" /></div><div className="mt-6 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Serviços mais realizados</CardTitle></CardHeader><CardContent>{report.data?.topServices.length ? <div className="space-y-4">{report.data.topServices.map((item, index) => <div key={item.serviceId}><div className="mb-2 flex items-center justify-between text-sm"><span className="font-semibold text-[#526d64]">{index + 1}. {item.name}</span><span className="text-[#82948e]">{item.count} atendimento(s)</span></div><div className="h-2 overflow-hidden rounded-full bg-[#edf1eb]"><div className="h-full rounded-full bg-[#8aa500]" style={{ width: `${Math.max(12, (item.count / report.data!.topServices[0].count) * 100)}%` }} /></div></div>)}</div> : <EmptyState icon={BarChart3} title="Sem atendimentos no período" description="Quando houver atendimentos, eles aparecerão neste resumo." />}</CardContent></Card><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Clientes recorrentes</CardTitle></CardHeader><CardContent><p className="text-4xl font-bold text-[#173a34]">{report.data?.recurringClients || 0}</p><p className="mt-2 text-sm leading-6 text-[#82948e]">Clientes com pelo menos um atendimento registrado no histórico.</p></CardContent></Card></div></>}
+    {report.isLoading ? <LoadingScreen /> : report.error ? <EmptyState icon={BarChart3} title="Não foi possível carregar o relatório" description="Tente novamente em alguns instantes." action={<Button onClick={() => report.refetch()} className="rounded-xl bg-[#173a34] text-white">Tentar novamente</Button>} /> : <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><Metric title="Faturamento" value={money(report.data?.revenueCents)} hint="no período" icon={CircleDollarSign} accent="green" /><Metric title="Recebido" value={money(report.data?.receivedCents)} hint="pagamentos pagos" icon={WalletCards} accent="blue" /><Metric title="Pendente" value={money(report.data?.pendingCents)} hint="a receber" icon={ClipboardList} accent="orange" /><Metric title="Atendimentos" value={String(report.data?.appointmentCount || 0)} hint="não cancelados" icon={CalendarDays} accent="lime" /><Metric title="Novos clientes" value={String(report.data?.newClients || 0)} hint="no período" icon={Users} accent="green" /></div><div className="mt-6 grid gap-6 lg:grid-cols-[1.25fr_0.75fr]"><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Serviços mais realizados</CardTitle></CardHeader><CardContent>{report.data?.topServices.length ? <div className="space-y-4">{report.data.topServices.map((item, index) => <div key={item.serviceId}><div className="mb-2 flex items-center justify-between text-sm"><span className="font-semibold text-[#526d64]">{index + 1}. {item.name}</span><span className="text-[#82948e]">{item.count} atendimento(s)</span></div><div className="h-2 overflow-hidden rounded-full bg-[#edf1eb]"><div className="h-full rounded-full bg-[#8aa500]" style={{ width: `${Math.max(12, (item.count / report.data!.topServices[0].count) * 100)}%` }} /></div></div>)}</div> : <EmptyState icon={BarChart3} title="Sem atendimentos no período" description="Quando houver atendimentos, eles aparecerão neste resumo." />}</CardContent></Card><Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><CardTitle className="text-lg text-[#173a34]">Clientes recorrentes</CardTitle></CardHeader><CardContent><p className="text-4xl font-bold text-[#173a34]">{report.data?.recurringClients || 0}</p><p className="mt-2 text-sm leading-6 text-[#82948e]">Clientes com 2 ou mais atendimentos no histórico.</p></CardContent></Card></div></>}
   </Page>;
 }
 
@@ -3918,7 +3926,8 @@ function Finance() {
     if (createExpense.isPending) return;
     if (expense.amount.includes("-")) return toast.error("O valor da despesa não pode ser negativo.");
     const cents = parseBrlToCents(expense.amount);
-    if (!expense.description || cents <= 0) return toast.error("Informe descrição e um valor positivo.");
+    if (!expense.description || !expense.description.trim()) return toast.error("Informe a descrição da despesa.");
+    if (cents <= 0) return toast.error("Informe um valor válido e positivo para a despesa.");
     if (cents > 100_000_000) return toast.error("O valor máximo permitido para uma despesa é de R$ 1.000.000,00.");
     createExpense.mutate({
       description: expense.description,
@@ -4350,10 +4359,10 @@ function SettingsPage() {
       city: current.city || undefined,
       serviceRegion: current.serviceRegion || undefined,
       bio: finalBio || undefined,
-      phone: current.phone || undefined,
-      whatsapp: current.whatsapp || undefined,
+      phone: current.phone ? current.phone.trim() : "",
+      whatsapp: current.whatsapp ? current.whatsapp.trim() : "",
       avatarUrl: current.avatarUrl || undefined,
-      pixKey: current.pixKey || undefined,
+      pixKey: current.pixKey ? current.pixKey.trim() : "",
       pixKeyType: current.pixKeyType || undefined,
     });
   };
@@ -4494,7 +4503,11 @@ function SettingsPage() {
                     accept="image/jpeg,image/png,image/webp"
                     onChange={event => {
                       const file = event.target.files?.[0];
-                      if (!file || file.size > 5_000_000) return toast.error("Escolha uma imagem de até 5 MB.");
+                      if (!file) return;
+                      if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+                        return toast.error("Formato não suportado. Escolha uma imagem JPEG, PNG ou WebP.");
+                      }
+                      if (file.size > 5_000_000) return toast.error("Escolha uma imagem de até 5 MB.");
                       const reader = new FileReader();
                       reader.onload = () => uploadAvatar.mutate({
                         fileName: file.name,
@@ -4865,17 +4878,17 @@ export function TutorialPage() {
           : "Tudo o que você precisa saber para gerenciar seus serviços, fechar orçamentos no WhatsApp e receber 100% no PIX sem taxas."
       }
       action={
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Button
             onClick={() => openTour("passos")}
-            className="h-11 rounded-xl bg-[#173a34] px-4 font-bold text-white shadow-sm hover:bg-[#28564d]"
+            className="w-full sm:w-auto min-h-[44px] h-auto py-2.5 px-3 sm:px-4 rounded-xl bg-[#173a34] font-bold text-white shadow-sm hover:bg-[#28564d] text-xs sm:text-sm whitespace-normal sm:whitespace-nowrap text-center cursor-pointer"
           >
-            <Sparkles className="mr-2 h-4 w-4 text-[#d9f56a]" /> Iniciar Tour Interativo
+            <Sparkles className="mr-2 h-4 w-4 text-[#d9f56a] shrink-0" /> Iniciar Tour Interativo
           </Button>
           <Button
             variant="outline"
             onClick={() => setLocation("/app")}
-            className="h-11 rounded-xl border-[#ccdccc] bg-white text-[#34564d]"
+            className="w-full sm:w-auto min-h-[44px] h-auto py-2.5 px-3 sm:px-4 rounded-xl border-[#ccdccc] bg-white text-[#34564d] text-xs sm:text-sm cursor-pointer"
           >
             Ir para o Painel
           </Button>
@@ -5289,13 +5302,13 @@ export function FormSelect({ label, value, onChange, options, placeholder = "Sel
     <div>
       <Label className="mb-2 block">{label}</Label>
       <Select value={internalValue} onValueChange={val => onChange(val === "__empty__" ? "" : val)}>
-        <SelectTrigger className="h-10 w-full min-w-0 max-w-full rounded-xl border-[#dce5dc] bg-white overflow-hidden truncate">
+        <SelectTrigger className="h-10 w-full min-w-0 max-w-full rounded-xl border-[#dce5dc] bg-white overflow-hidden text-left [&>span]:truncate [&>span]:block [&>span]:max-w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
           {normalizedOptions.length ? (
             normalizedOptions.map(option => (
-              <SelectItem key={option.radixValue} value={option.radixValue}>
+              <SelectItem key={option.radixValue} value={option.radixValue} className="truncate max-w-full block">
                 {option.label}
               </SelectItem>
             ))

@@ -364,16 +364,28 @@ export const ALL_CATALOG_SERVICES = SERVICE_CATALOG.flatMap((cat) =>
   }))
 );
 
+export type ServiceCorrectionType = "accent" | "spelling" | "capitalization";
+
 export interface SpellcheckResult {
   hasCorrection: boolean;
   correctedText: string;
   originalText: string;
   explanation?: string;
+  correctionType?: ServiceCorrectionType;
   catalogSuggestion?: {
     name: string;
     description: string;
     profession: string;
   };
+}
+
+// Verifica se uma palavra é um identificador/código (contém hífens, sublinhados, dígitos)
+function isIdentifierOrCode(token: string): boolean {
+  return /^[a-z0-9]+[-_]/i.test(token) || /[a-z]+[0-9]/i.test(token) || /[0-9]+[a-z]/i.test(token) || /^[a-z]+-[a-z]/i.test(token);
+}
+
+function stripAccents(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 export function checkServiceSpelling(input: string): SpellcheckResult {
@@ -393,6 +405,9 @@ export function checkServiceSpelling(input: string): SpellcheckResult {
   const correctedWords = words.map((w) => {
     // Se for espaço em branco, mantém
     if (/^\s+$/.test(w)) return w;
+
+    // Se for um identificador técnico ou slug (ex: bb-quotes-edit-clean-repro-QA7K4M), preserva
+    if (isIdentifierOrCode(w)) return w;
 
     const match = w.match(/^([^a-zA-ZÀ-ÿ0-9]*)(.*?)([^a-zA-ZÀ-ÿ0-9]*)$/);
     const prefix = match ? match[1] : "";
@@ -431,8 +446,11 @@ export function checkServiceSpelling(input: string): SpellcheckResult {
 
   let wordCorrected = correctedWords.join("");
 
-  // Ajusta primeira letra para maiúscula
-  if (wordCorrected.length > 0 && wordCorrected.charAt(0) !== wordCorrected.charAt(0).toUpperCase()) {
+  // Ajusta primeira letra para maiúscula apenas se não for identificador/código
+  const firstWord = words.find((w) => !/^\s+$/.test(w)) || "";
+  const shouldCapitalizeFirst = !isIdentifierOrCode(firstWord);
+
+  if (shouldCapitalizeFirst && wordCorrected.length > 0 && wordCorrected.charAt(0) !== wordCorrected.charAt(0).toUpperCase()) {
     wordCorrected = wordCorrected.charAt(0).toUpperCase() + wordCorrected.slice(1);
     if (wordCorrected !== trimmed) {
       changed = true;
@@ -466,9 +484,25 @@ export function checkServiceSpelling(input: string): SpellcheckResult {
 
   const hasCorrection = changed && wordCorrected !== trimmed;
 
+  let correctionType: ServiceCorrectionType | undefined = undefined;
   let explanation = "";
+
   if (hasCorrection) {
-    explanation = "Correção ortográfica e acentuação detectadas";
+    const strippedOrig = stripAccents(trimmed).toLowerCase();
+    const strippedCorr = stripAccents(wordCorrected).toLowerCase();
+
+    if (strippedOrig === strippedCorr) {
+      if (trimmed.toLowerCase() !== wordCorrected.toLowerCase()) {
+        correctionType = "accent";
+        explanation = "Acentuação corrigida automaticamente";
+      } else {
+        correctionType = "capitalization";
+        explanation = "Capitalização ajustada automaticamente";
+      }
+    } else {
+      correctionType = "spelling";
+      explanation = "Correção ortográfica aplicada";
+    }
   }
 
   return {
@@ -476,6 +510,7 @@ export function checkServiceSpelling(input: string): SpellcheckResult {
     correctedText: wordCorrected,
     originalText: input,
     explanation,
+    correctionType,
     catalogSuggestion: bestCatalogMatch
       ? {
           name: bestCatalogMatch.name,

@@ -63,6 +63,8 @@ export function SimulatorTour() {
   const [teamSubTab, setTeamSubTab] = useState<"owner" | "member-view">("owner");
   const [actionSimulated, setActionSimulated] = useState<"idle" | "approved" | "rejected" | "adjusted">("idle");
   const [rejectReason, setRejectReason] = useState("");
+  const [simulatedWeekOffset, setSimulatedWeekOffset] = useState(0);
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
 
   const resetSimulation = () => {
     setActionSimulated("idle");
@@ -70,8 +72,12 @@ export function SimulatorTour() {
   };
 
   const nextStep = () => {
-    resetSimulation();
-    if (step < 6) setStep((step + 1) as SimulatorStep);
+    if (step === 5 && (rejectReason || actionSimulated === "adjusted")) {
+      setStep(6);
+    } else {
+      resetSimulation();
+      if (step < 6) setStep((step + 1) as SimulatorStep);
+    }
   };
 
   const prevStep = () => {
@@ -241,7 +247,7 @@ export function SimulatorTour() {
         {/* NAVEGAÇÃO DE BOTÕES RÁPIDOS SEGUNDO A SEÇÃO ESCOLHIDA */}
         {section === "screens" ? (
           /* RÉGUA DAS 8 TELAS DO MENU DO APP */
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 pt-2">
             {appScreens.map((scr) => {
               const Icon = scr.icon;
               const isSelected = activeScreen === scr.id;
@@ -258,11 +264,11 @@ export function SimulatorTour() {
                 >
                   <div className="flex items-center justify-between">
                     <Icon className={`h-4 w-4 ${isSelected ? "text-[#173a34]" : "text-[#8ea099]"}`} />
-                    <span className="text-[9px] font-bold text-[#556b10] bg-[#eef5d2] px-1 rounded">
+                    <span className="text-[9px] font-bold text-[#556b10] bg-[#eef5d2] px-1 rounded shrink-0">
                       {scr.badge}
                     </span>
                   </div>
-                  <span className={`mt-1 text-xs font-bold truncate ${isSelected ? "text-[#173a34]" : "text-[#556963]"}`}>
+                  <span className={`mt-1 text-xs font-bold leading-tight ${isSelected ? "text-[#173a34]" : "text-[#556963]"}`}>
                     {scr.title}
                   </span>
                 </button>
@@ -535,15 +541,34 @@ export function SimulatorTour() {
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-[#f0f4ef] text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 border-t border-[#f0f4ef] text-xs gap-2.5">
                         <span className="font-mono font-bold text-[#173a34]">
                           Valor: {isSolo ? "R$ 545,00" : "R$ 420,00"} (PIX na conclusão)
                         </span>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="h-8 rounded-xl text-xs text-[#25D366] border-[#25D366]/40 hover:bg-[#25D366]/10">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {isSolo && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => alert("Abrindo rota no Google Maps...")}
+                              className="h-8 rounded-xl text-xs text-blue-600 border-blue-200 hover:bg-blue-50 px-2.5 cursor-pointer"
+                            >
+                              <MapPin className="h-3.5 w-3.5 mr-1 text-blue-600" /> Maps
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => alert("Chamando cliente no WhatsApp...")}
+                            className="h-8 rounded-xl text-xs text-[#25D366] border-[#25D366]/40 hover:bg-[#25D366]/10 px-2.5 cursor-pointer"
+                          >
                             <MessageSquare className="h-3.5 w-3.5 mr-1" /> WhatsApp
                           </Button>
-                          <Button size="sm" className="h-8 rounded-xl bg-[#173a34] text-[#d9f56a] text-xs font-bold">
+                          <Button
+                            size="sm"
+                            onClick={() => alert("Atendimento concluído e recibo PIX gerado!")}
+                            className="h-8 rounded-xl bg-[#173a34] text-[#d9f56a] text-xs font-bold px-3 cursor-pointer"
+                          >
                             Concluir & Recibo
                           </Button>
                         </div>
@@ -580,43 +605,101 @@ export function SimulatorTour() {
                 {activeScreen === "agenda" && (
                   <div className="space-y-4 max-w-2xl mx-auto">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-base font-bold text-[#173a34]">Grade Semanal de Atendimentos</h4>
-                      <div className="flex gap-1.5">
-                        <Button size="sm" variant="outline" className="h-8 rounded-xl text-xs">Hoje</Button>
-                        <Button size="sm" variant="outline" className="h-8 rounded-xl text-xs">&lt;</Button>
-                        <Button size="sm" variant="outline" className="h-8 rounded-xl text-xs">&gt;</Button>
+                      <div>
+                        <h4 className="text-base font-bold text-[#173a34]">Grade Semanal de Atendimentos</h4>
+                        <span className="text-[11px] font-semibold text-[#6d840d]">
+                          {simulatedWeekOffset === 0
+                            ? "Semana Atual (Hoje)"
+                            : simulatedWeekOffset === 1
+                            ? "Próxima Semana (+1 semana)"
+                            : `Semana Futura (+${simulatedWeekOffset} semanas)`}
+                        </span>
+                      </div>
+                      <div className="flex gap-1.5 items-center">
+                        <Button
+                          size="sm"
+                          variant={simulatedWeekOffset === 0 ? "default" : "outline"}
+                          onClick={() => setSimulatedWeekOffset(0)}
+                          className={`h-8 rounded-xl text-xs cursor-pointer ${simulatedWeekOffset === 0 ? "bg-[#173a34] text-[#d9f56a]" : ""}`}
+                        >
+                          Hoje
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSimulatedWeekOffset((prev) => Math.max(0, prev - 1))}
+                          className="h-8 rounded-xl text-xs cursor-pointer"
+                          disabled={simulatedWeekOffset === 0}
+                        >
+                          &lt;
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSimulatedWeekOffset((prev) => prev + 1)}
+                          className="h-8 rounded-xl text-xs cursor-pointer"
+                        >
+                          &gt;
+                        </Button>
                       </div>
                     </div>
 
                     {/* GRADE DE HORÁRIOS */}
                     <div className="rounded-2xl border border-[#e5ece4] bg-white p-4 divide-y divide-[#f0f4ef] text-xs">
-                      <div className="py-2.5 flex items-center justify-between">
-                        <span className="font-mono font-bold text-[#173a34] w-20">09:00</span>
-                        <div className="flex-1 bg-emerald-50 text-emerald-800 p-2 rounded-xl border border-emerald-200 font-semibold">
-                          {isSolo ? "Visita Técnica e Orçamento - Sr. Paulo" : "Beatriz: Manicure - Juliana Prado"}
-                        </div>
-                      </div>
+                      {simulatedWeekOffset === 0 ? (
+                        <>
+                          <div className="py-2.5 flex items-center justify-between">
+                            <span className="font-mono font-bold text-[#173a34] w-20">09:00</span>
+                            <div className="flex-1 bg-emerald-50 text-emerald-800 p-2 rounded-xl border border-emerald-200 font-semibold">
+                              {isSolo ? "Visita Técnica e Orçamento - Sr. Paulo" : "Beatriz: Manicure - Juliana Prado"}
+                            </div>
+                          </div>
 
-                      <div className="py-2.5 flex items-center justify-between">
-                        <span className="font-mono font-bold text-[#173a34] w-20">12:00 - 13:00</span>
-                        <div className="flex-1 bg-amber-50 text-amber-800 p-2 rounded-xl border border-amber-200 font-semibold flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5" /> Horário de Almoço Protegido (Bloqueio Automático)
-                        </div>
-                      </div>
+                          <div className="py-2.5 flex items-center justify-between">
+                            <span className="font-mono font-bold text-[#173a34] w-20">12:00 - 13:00</span>
+                            <div className="flex-1 bg-amber-50 text-amber-800 p-2 rounded-xl border border-amber-200 font-semibold flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" /> Horário de Almoço Protegido (Bloqueio Automático)
+                            </div>
+                          </div>
 
-                      <div className="py-2.5 flex items-center justify-between">
-                        <span className="font-mono font-bold text-[#173a34] w-20">14:00</span>
-                        <div className="flex-1 bg-[#173a34] text-[#d9f56a] p-2.5 rounded-xl font-bold">
-                          {isSolo ? "Dona Maria - Troca de Quadro + Chuveiro (R$ 545,00)" : "Carla: Mechas Morena Iluminada (R$ 420,00)"}
-                        </div>
-                      </div>
+                          <div className="py-2.5 flex items-center justify-between">
+                            <span className="font-mono font-bold text-[#173a34] w-20">14:00</span>
+                            <div className="flex-1 bg-[#173a34] text-[#d9f56a] p-2.5 rounded-xl font-bold">
+                              {isSolo ? "Dona Maria - Troca de Quadro + Chuveiro (R$ 545,00)" : "Carla: Mechas Morena Iluminada (R$ 420,00)"}
+                            </div>
+                          </div>
 
-                      <div className="py-2.5 flex items-center justify-between">
-                        <span className="font-mono font-bold text-[#173a34] w-20">17:00</span>
-                        <div className="flex-1 bg-slate-50 text-slate-500 p-2 rounded-xl border border-dashed border-slate-200">
-                          Horário Livre para Encaixe
-                        </div>
-                      </div>
+                          <div className="py-2.5 flex items-center justify-between">
+                            <span className="font-mono font-bold text-[#173a34] w-20">17:00</span>
+                            <div className="flex-1 bg-slate-50 text-slate-500 p-2 rounded-xl border border-dashed border-slate-200">
+                              Horário Livre para Encaixe
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="py-2.5 flex items-center justify-between">
+                            <span className="font-mono font-bold text-[#173a34] w-20">10:00</span>
+                            <div className="flex-1 bg-blue-50 text-blue-900 p-2 rounded-xl border border-blue-200 font-semibold">
+                              {isSolo ? "Pré-Agendamento: Instalação de Ar-Condicionado - Marina" : "Carla: Corte + Botox Capilar - Fernanda Alves"}
+                            </div>
+                          </div>
+
+                          <div className="py-2.5 flex items-center justify-between">
+                            <span className="font-mono font-bold text-[#173a34] w-20">14:00</span>
+                            <div className="flex-1 bg-emerald-50 text-emerald-800 p-2 rounded-xl border border-emerald-200 font-semibold">
+                              {isSolo ? "Revisão Elétrica Predial - Condomínio Solar" : "Beatriz: Alongamento de Unhas - Patrícia Lima"}
+                            </div>
+                          </div>
+
+                          <div className="py-2.5 flex items-center justify-between">
+                            <span className="font-mono font-bold text-[#173a34] w-20">16:30</span>
+                            <div className="flex-1 bg-slate-50 text-slate-500 p-2 rounded-xl border border-dashed border-slate-200">
+                              3 Horários Livres Disponíveis nesta Semana
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -630,7 +713,8 @@ export function SimulatorTour() {
                         <input
                           type="text"
                           placeholder="Buscar cliente por nome ou WhatsApp..."
-                          defaultValue=""
+                          value={clientSearchQuery}
+                          onChange={(e) => setClientSearchQuery(e.target.value)}
                           className="w-full h-10 pl-9 pr-3 rounded-xl border border-[#dce5dc] text-xs bg-white focus:outline-none"
                         />
                       </div>
@@ -645,12 +729,18 @@ export function SimulatorTour() {
                         { name: "Roberto Santos", phone: "(11) 98776-5544", totalSpent: "R$ 680,00", servicesCount: 2, lastDate: "Há 2 semanas" },
                         { name: "Camila Ribeiro", phone: "(19) 98112-3344", totalSpent: "R$ 840,00", servicesCount: 4, lastDate: "Ontem" },
                         { name: "Lucas Andrade", phone: "(11) 97654-3210", totalSpent: "R$ 350,00", servicesCount: 1, lastDate: "Mês passado" },
-                      ].map((cli, i) => (
+                      ]
+                        .filter((cli) => {
+                          if (!clientSearchQuery.trim()) return true;
+                          const q = clientSearchQuery.toLowerCase();
+                          return cli.name.toLowerCase().includes(q) || cli.phone.includes(q);
+                        })
+                        .map((cli, i) => (
                         <div key={i} className="p-3.5 flex items-center justify-between hover:bg-[#fbfdfa] transition">
                           <div>
                             <span className="font-bold text-[#173a34] text-sm block">{cli.name}</span>
                             <span className="text-[11px] text-[#71867f] flex items-center gap-1 mt-0.5">
-                              <Phone className="h-3 w-3" /> {cli.phone} • {cli.servicesCount} atendimentos
+                              <Phone className="h-3 w-3" /> {cli.phone} • {cli.servicesCount} {cli.servicesCount === 1 ? "atendimento" : "atendimentos"}
                             </span>
                           </div>
                           <div className="text-right">
@@ -861,7 +951,7 @@ export function SimulatorTour() {
                               <div className="space-y-2">
                                 <div className="flex justify-between items-center text-xs font-bold text-[#173a34]">
                                   <span>Sua Agenda de Hoje:</span>
-                                  <span className="text-purple-700">4 Clientes Marcados</span>
+                                  <span className="text-purple-700">2 Clientes Marcados Hoje</span>
                                 </div>
 
                                 <div className="rounded-xl border border-[#edf3ec] bg-[#fbfdfa] p-2.5 space-y-1 text-xs">
@@ -987,11 +1077,11 @@ export function SimulatorTour() {
                         <span className="text-xs font-bold text-[#44580b] block">Divisão de Faturamento do Estúdio:</span>
                         <div className="flex justify-between text-xs text-[#3c5047] py-1 border-b border-[#e8efe0]">
                           <span>Repasse para profissionais da equipe:</span>
-                          <strong className="font-mono">R$ 10.950,00 (60%)</strong>
+                          <strong className="font-mono">R$ 10.200,50 (55,9%)</strong>
                         </div>
                         <div className="flex justify-between text-xs text-[#173a34] pt-1 font-bold">
                           <span>Lucro Líquido da Casa:</span>
-                          <strong className="font-mono text-emerald-700">R$ 7.300,00 (40%)</strong>
+                          <strong className="font-mono text-emerald-700">R$ 8.049,50 (44,1%)</strong>
                         </div>
                       </div>
                     )}
@@ -1089,7 +1179,7 @@ export function SimulatorTour() {
                             commissionPct: 55,
                             payout: "R$ 1.666,50",
                             studioProfit: "R$ 1.363,50",
-                            ticket: "R$ 72,00",
+                            ticket: "R$ 72,14",
                             color: "border-amber-200 bg-amber-50/20",
                             badge: "bg-amber-100 text-amber-800",
                           },
@@ -1637,10 +1727,13 @@ export function SimulatorTour() {
                       <button
                         type="button"
                         onClick={() => {
+                          const chosen = rejectReason || "Gostaria de agendar para outro dia ou horário";
+                          setRejectReason(chosen);
+                          setActionSimulated("adjusted");
                           alert("Ajuste simulado enviado ao profissional!");
                           setStep(6);
                         }}
-                        className="w-full py-3 rounded-2xl bg-[#173a34] text-[#d9f56a] font-bold text-xs"
+                        className="w-full py-3 rounded-2xl bg-[#173a34] text-[#d9f56a] font-bold text-xs cursor-pointer"
                       >
                         Enviar Solicitação de Ajuste
                       </button>
@@ -1651,35 +1744,101 @@ export function SimulatorTour() {
                 {/* PASSO 6 */}
                 {step === 6 && (
                   <div className="space-y-4 max-w-2xl mx-auto">
-                    <div className="rounded-2xl bg-white border border-[#e5ece4] p-5 shadow-xs space-y-4">
-                      <div className="flex items-center gap-2">
-                        <span className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-100 text-emerald-800">
-                          <Bell className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <h4 className="text-sm font-bold text-[#173a34]">Notificação Recebida</h4>
-                          <span className="text-[11px] text-[#71867f]">Há instantes</span>
+                    {actionSimulated === "adjusted" || rejectReason ? (
+                      <div className="rounded-2xl bg-white border border-amber-200 p-5 shadow-xs space-y-4">
+                        <div className="flex items-center gap-2">
+                          <span className="grid h-8 w-8 place-items-center rounded-xl bg-amber-100 text-amber-800">
+                            <Bell className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold text-[#173a34]">Pedido de Alteração Recebido</h4>
+                              <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-[10px]">
+                                Em Negociação
+                              </Badge>
+                            </div>
+                            <span className="text-[11px] text-[#71867f]">Há instantes no WhatsApp / Vitrine</span>
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="rounded-2xl border-2 border-emerald-400/40 bg-emerald-50/30 p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                            <Calendar className="h-4 w-4 text-emerald-600" />
-                            {isSolo ? soloData.date : teamData.date}
-                          </span>
-                          <span className="font-mono font-bold text-sm text-[#173a34]">
-                            R$ {currentTotal},00
-                          </span>
+                        <div className="rounded-2xl border-2 border-amber-400/50 bg-amber-50/40 p-4 space-y-3">
+                          <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
+                            <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                              <Calendar className="h-4 w-4 text-amber-700" />
+                              Data inicial proposta: {isSolo ? soloData.date : teamData.date}
+                            </span>
+                            <span className="font-mono font-bold text-sm text-[#173a34]">
+                              R$ {currentTotal},00
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-amber-800 block">
+                              Motivo informado pelo cliente:
+                            </span>
+                            <p className="mt-1 text-xs font-bold text-amber-950 bg-white p-2.5 rounded-xl border border-amber-200">
+                              "{rejectReason || "Gostaria de agendar para outro dia ou horário"}"
+                            </p>
+                          </div>
+
+                          <div className="text-xs text-[#556b64] pt-1">
+                            <p><strong>Cliente:</strong> {isSolo ? soloData.clientName : teamData.clientName}</p>
+                            <p className="mt-0.5"><strong>Serviço:</strong> {isSolo ? soloData.serviceTitle : teamData.serviceTitle}</p>
+                          </div>
+
+                          <div className="pt-2 flex flex-wrap items-center gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => alert(`Iniciando negociação com ${isSolo ? soloData.clientName : teamData.clientName} no WhatsApp para combinar novo horário...`)}
+                              className="h-8 rounded-xl bg-[#25D366] text-white hover:bg-[#1faa4a] text-xs font-bold cursor-pointer"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5 mr-1" /> Combinar Novo Horário no Zap
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setActionSimulated("idle");
+                                setRejectReason("");
+                              }}
+                              className="h-8 rounded-xl text-xs border-[#dce5dc] cursor-pointer"
+                            >
+                              Ver Proposta Aprovada Padrão
+                            </Button>
+                          </div>
                         </div>
-                        <h5 className="font-bold text-sm text-[#173a34]">
-                          Cliente: {isSolo ? soloData.clientName : teamData.clientName}
-                        </h5>
-                        <p className="text-xs text-[#556b64]">
-                          Serviço: {isSolo ? soloData.serviceTitle : teamData.serviceTitle}
-                        </p>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="rounded-2xl bg-white border border-[#e5ece4] p-5 shadow-xs space-y-4">
+                        <div className="flex items-center gap-2">
+                          <span className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-100 text-emerald-800">
+                            <Bell className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <h4 className="text-sm font-bold text-[#173a34]">Notificação Recebida</h4>
+                            <span className="text-[11px] text-[#71867f]">Há instantes</span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-2xl border-2 border-emerald-400/40 bg-emerald-50/30 p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                              <Calendar className="h-4 w-4 text-emerald-600" />
+                              {isSolo ? soloData.date : teamData.date}
+                            </span>
+                            <span className="font-mono font-bold text-sm text-[#173a34]">
+                              R$ {currentTotal},00
+                            </span>
+                          </div>
+                          <h5 className="font-bold text-sm text-[#173a34]">
+                            Cliente: {isSolo ? soloData.clientName : teamData.clientName}
+                          </h5>
+                          <p className="text-xs text-[#556b64]">
+                            Serviço: {isSolo ? soloData.serviceTitle : teamData.serviceTitle}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

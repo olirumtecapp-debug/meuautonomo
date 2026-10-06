@@ -47,7 +47,10 @@ export function ClientsPage() {
       reset();
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao cadastrar cliente.");
+      const msg = err.message || "";
+      if (msg.includes("email") || msg.includes("Invalid email")) toast.error("E-mail do cliente inválido.");
+      else if (msg.includes("name") || msg.includes("character")) toast.error("O nome do cliente deve ter pelo menos 2 caracteres.");
+      else toast.error(msg || "Erro ao cadastrar cliente.");
     },
   });
   const update = trpc.customer.update.useMutation({
@@ -58,7 +61,10 @@ export function ClientsPage() {
       reset();
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao atualizar cliente.");
+      const msg = err.message || "";
+      if (msg.includes("email") || msg.includes("Invalid email")) toast.error("E-mail do cliente inválido.");
+      else if (msg.includes("name") || msg.includes("character")) toast.error("O nome do cliente deve ter pelo menos 2 caracteres.");
+      else toast.error(msg || "Erro ao atualizar cliente.");
     },
   });
   const remove = trpc.customer.remove.useMutation({
@@ -140,7 +146,15 @@ export function ClientsPage() {
   };
 
   const submit = () => {
-    if (!form.name.trim()) return toast.error("Informe o nome do cliente.");
+    if (!form.name.trim() || form.name.trim().length < 2) {
+      return toast.error("O nome do cliente deve ter pelo menos 2 caracteres.");
+    }
+    if (form.email && form.email.trim()) {
+      const emailTrim = form.email.trim();
+      if (!emailTrim.includes("@") || !emailTrim.includes(".")) {
+        return toast.error("Informe um e-mail válido para o cliente.");
+      }
+    }
     if (form.phone && form.phone.trim()) {
       const clean = form.phone.replace(/\D/g, "");
       if (clean.length < 10 || clean.length > 11) {

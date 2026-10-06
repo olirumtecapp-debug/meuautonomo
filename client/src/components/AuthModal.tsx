@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,13 @@ interface AuthModalProps {
 export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthModalProps) {
   const [tab, setTab] = useState<"register" | "login">(defaultTab);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setTab(defaultTab);
+      setErrorMessage(null);
+    }
+  }, [open, defaultTab]);
 
   // Formulário de Cadastro
   const [regName, setRegName] = useState("");

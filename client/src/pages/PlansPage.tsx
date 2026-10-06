@@ -286,7 +286,7 @@ export default function PlansPage() {
           {/* VIEW MODE: INDIVIDUAL */}
           {viewMode === "individual" && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto items-stretch">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto items-stretch">
 
                 {/* PLANO INDIVIDUAL 1: GRÁTIS */}
                 <Card className="rounded-[28px] border-2 border-[#dce5dc] bg-white p-6 shadow-sm flex flex-col justify-between relative">
@@ -426,7 +426,7 @@ export default function PlansPage() {
                   <div className="mt-8">
                     <Button
                       onClick={() => handleOpenCheckout("solo")}
-                      className="w-full min-h-[48px] py-2.5 px-3 rounded-xl bg-[#173a34] hover:bg-[#28564d] font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full min-h-[48px] py-2.5 px-2 sm:px-3 rounded-xl bg-[#173a34] hover:bg-[#28564d] font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex flex-wrap items-center justify-center gap-1.5 cursor-pointer leading-tight"
                     >
                       <span>Garantir Acesso Vitalício ({PRICE_SOLO})</span>
                       <ArrowRight className="w-4 h-4 shrink-0" />
@@ -464,7 +464,7 @@ export default function PlansPage() {
           {/* VIEW MODE: EQUIPE */}
           {viewMode === "equipe" && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto items-stretch">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto items-stretch">
 
                 {/* PLANO EQUIPE 1: GRÁTIS */}
                 <Card className="rounded-[28px] border-2 border-[#dce5dc] bg-white p-6 shadow-sm flex flex-col justify-between relative">
@@ -600,7 +600,7 @@ export default function PlansPage() {
                   <div className="mt-8">
                     <Button
                       onClick={() => handleOpenCheckout("team")}
-                      className="w-full min-h-[48px] py-2.5 px-3 rounded-xl bg-purple-700 hover:bg-purple-800 font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="w-full min-h-[48px] py-2.5 px-2 sm:px-3 rounded-xl bg-purple-700 hover:bg-purple-800 font-black text-xs sm:text-sm text-white shadow-lg active:scale-95 transition whitespace-normal text-center flex flex-wrap items-center justify-center gap-1.5 cursor-pointer leading-tight"
                     >
                       <span>Desbloquear Modo Equipe ({PRICE_TEAM})</span>
                       <ArrowRight className="w-4 h-4 shrink-0" />

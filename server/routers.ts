@@ -382,7 +382,17 @@ export const appRouter = router({
         }
         try {
           if (current) {
-            await db.update(professionalProfiles).set({ ...input, professionCategory: input.professionCategory ?? null, bio: input.bio ?? null, city: input.city ?? null, serviceRegion: input.serviceRegion ?? null, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, pixKey: input.pixKey ?? null, pixKeyType: input.pixKeyType ?? null }).where(eq(professionalProfiles.id, current.id));
+            await db.update(professionalProfiles).set({
+              ...input,
+              professionCategory: input.professionCategory ?? null,
+              bio: input.bio ?? null,
+              city: input.city ?? null,
+              serviceRegion: input.serviceRegion ?? null,
+              phone: input.phone && input.phone.trim() ? input.phone.trim() : null,
+              whatsapp: input.whatsapp && input.whatsapp.trim() ? input.whatsapp.trim() : null,
+              pixKey: input.pixKey && input.pixKey.trim() ? input.pixKey.trim() : null,
+              pixKeyType: input.pixKeyType ?? null,
+            }).where(eq(professionalProfiles.id, current.id));
           } else {
             const slugOwner = await getProfileBySlug(input.slug);
             const slug = slugOwner && slugOwner.userId !== ctx.user.id
@@ -1207,15 +1217,13 @@ export const appRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-      const periodFrom = input?.from ? new Date(input.from) : monthStart;
-      const periodTo = input?.to ? new Date(input.to) : undefined;
+      const payConditions = [eq(payments.profileId, profile.id)];
+      if (input?.from) payConditions.push(gte(payments.createdAt, new Date(input.from)));
+      if (input?.to) payConditions.push(lte(payments.createdAt, new Date(input.to)));
 
-      const payConditions = [eq(payments.profileId, profile.id), gte(payments.createdAt, periodFrom)];
-      if (periodTo) payConditions.push(lte(payments.createdAt, periodTo));
-
-      const appConditions = [eq(appointments.profileId, profile.id), ne(appointments.status, "cancelado"), gte(appointments.startsAt, periodFrom)];
-      if (periodTo) appConditions.push(lte(appointments.startsAt, periodTo));
+      const appConditions = [eq(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
+      if (input?.from) appConditions.push(gte(appointments.startsAt, new Date(input.from)));
+      if (input?.to) appConditions.push(lte(appointments.startsAt, new Date(input.to)));
 
       const [rawPayments, periodAppointments, profileClients, profileServices] = await Promise.all([
         db.select().from(payments).where(and(...payConditions)).orderBy(desc(payments.createdAt)),
@@ -1528,9 +1536,8 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-      const periodFrom = input?.from ? new Date(input.from) : monthStart;
-      const conditions = [eq(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom)];
+      const conditions = [eq(expenses.profileId, profile.id)];
+      if (input?.from) conditions.push(gte(expenses.occurredAt, new Date(input.from)));
       if (input?.to) conditions.push(lte(expenses.occurredAt, new Date(input.to)));
       return db.select().from(expenses).where(and(...conditions)).orderBy(desc(expenses.occurredAt));
     }),
@@ -1643,12 +1650,26 @@ export const appRouter = router({
       const today = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, dayStart()), lt(appointments.startsAt, dayEnd()))).orderBy(appointments.startsAt);
       const recentRequests = await db.select().from(requests).where(and(eq(requests.profileId, profile.id), ne(requests.status, "arquivada"))).orderBy(desc(requests.createdAt)).limit(4);
       const pendingQuotes = await db.select().from(quotes).where(and(eq(quotes.profileId, profile.id), eq(quotes.status, "enviado"))).orderBy(desc(quotes.createdAt)).limit(4);
-      const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
-      const periodFrom = input?.from ? new Date(input.from) : monthStart;
-      const periodTo = input?.to ? new Date(input.to) : new Date();
-      const monthAppointments = await db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, periodFrom), lte(appointments.startsAt, periodTo), ne(appointments.status, "cancelado")));
-      const monthPayments = await db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, periodFrom), lte(payments.createdAt, periodTo)));
-      const monthExpenses = await db.select().from(expenses).where(and(eq(expenses.profileId, profile.id), gte(expenses.occurredAt, periodFrom), lte(expenses.occurredAt, periodTo)));
+      const appConditions = [eq(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
+      const payConditions = [eq(payments.profileId, profile.id)];
+      const expConditions = [eq(expenses.profileId, profile.id)];
+
+      if (input?.from) {
+        const fromDate = new Date(input.from);
+        appConditions.push(gte(appointments.startsAt, fromDate));
+        payConditions.push(gte(payments.createdAt, fromDate));
+        expConditions.push(gte(expenses.occurredAt, fromDate));
+      }
+      if (input?.to) {
+        const toDate = new Date(input.to);
+        appConditions.push(lte(appointments.startsAt, toDate));
+        payConditions.push(lte(payments.createdAt, toDate));
+        expConditions.push(lte(expenses.occurredAt, toDate));
+      }
+
+      const monthAppointments = await db.select().from(appointments).where(and(...appConditions));
+      const monthPayments = await db.select().from(payments).where(and(...payConditions));
+      const monthExpenses = await db.select().from(expenses).where(and(...expConditions));
 
       const metrics = calculateDeduplicatedMetrics(monthAppointments as any, monthPayments as any, monthExpenses as any);
       const projected = today.reduce((sum, item) => sum + (isBillableAppointment(item.status) ? item.amountCents : 0), 0);

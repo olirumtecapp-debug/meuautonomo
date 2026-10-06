@@ -231,7 +231,14 @@ export function TeamPage() {
       setModalOpen(false);
       setEditingMember(null);
     },
-    onError: (err) => toast.error(err.message || "Erro ao cadastrar parceiro."),
+    onError: (err) => {
+      const msg = err.message || "";
+      if (msg.includes("email") || msg.includes("Invalid email") || msg.includes("invalid_string")) {
+        toast.error("E-mail do parceiro inválido.");
+      } else {
+        toast.error(msg || "Erro ao cadastrar parceiro.");
+      }
+    },
   });
 
   const updateMember = trpc.team.update.useMutation({
@@ -242,7 +249,14 @@ export function TeamPage() {
       setModalOpen(false);
       setEditingMember(null);
     },
-    onError: (err) => toast.error(err.message || "Erro ao atualizar parceiro."),
+    onError: (err) => {
+      const msg = err.message || "";
+      if (msg.includes("email") || msg.includes("Invalid email") || msg.includes("invalid_string")) {
+        toast.error("E-mail do parceiro inválido.");
+      } else {
+        toast.error(msg || "Erro ao atualizar parceiro.");
+      }
+    },
   });
 
   const toggleActive = trpc.team.toggleActive.useMutation({
@@ -284,6 +298,12 @@ export function TeamPage() {
       const cleanPhone = form.phone.replace(/\D/g, "");
       if (cleanPhone.length < 10 || cleanPhone.length > 11) {
         return toast.error("Telefone/WhatsApp do parceiro deve conter DDD e 8 ou 9 dígitos.");
+      }
+    }
+    if (form.email && form.email.trim()) {
+      const emailTrim = form.email.trim();
+      if (!emailTrim.includes("@") || !emailTrim.includes(".")) {
+        return toast.error("Informe um e-mail válido para o parceiro.");
       }
     }
     const comm = Number(form.commissionPercent);

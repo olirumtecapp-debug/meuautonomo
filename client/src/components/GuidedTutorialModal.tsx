@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +42,13 @@ export function GuidedTutorialModal({
 }: GuidedTutorialModalProps) {
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
+
+  useEffect(() => {
+    if (open) {
+      setActiveTab(defaultTab);
+    }
+  }, [open, defaultTab]);
 
   const handleGoTo = (path: string) => {
     onOpenChange(false);
@@ -306,10 +313,12 @@ export function GuidedTutorialModal({
               </span>
             </div>
             <h2 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl text-white">
-              {isTeamMode ? "Como Funciona o Modo Equipe & Estúdio?" : "Como Funciona o Modo Individual?"}
+              {activeTab === "estudio" || isTeamMode
+                ? "Como Funciona o Modo Equipe & Estúdio?"
+                : "Como Funciona o Modo Individual?"}
             </h2>
             <p className="mt-1 text-sm text-white/70">
-              {isTeamMode
+              {activeTab === "estudio" || isTeamMode
                 ? "Criado sob medida para estúdios, salões e oficinas gerenciarem parceiras, comissões (Lei 13.352) e atendimentos simultâneos."
                 : "Criado sob medida para o profissional autônomo individual atender melhor, fechar mais orçamentos no WhatsApp e controlar seus ganhos sem taxas."}
             </p>
@@ -318,7 +327,7 @@ export function GuidedTutorialModal({
 
         {/* Content Tabs */}
         <div className="p-6">
-          <Tabs defaultValue={defaultTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 rounded-2xl bg-[#edf2ec] p-1 text-xs">
               <TabsTrigger value="passos" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[#173a34] font-semibold">
                 🚀 Tour Passo a Passo

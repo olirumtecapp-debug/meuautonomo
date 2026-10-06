@@ -406,10 +406,15 @@ export function getRecommendedServicesForProfession(
     ];
   }
 
-  // 6. Marido de Aluguel / Reparos e Manutenção Multisserviços / Faz-Tudo
+  // 6. Marido de Aluguel / Reparos e Manutenção Multisserviços / Faz-Tudo / Casa e Manutenção
   if (
     combined.includes("marido de aluguel") ||
     combined.includes("pequenos reparos") ||
+    combined.includes("casa e manutencao") ||
+    combined.includes("casa e reforma") ||
+    combined.includes("manutencao residencial") ||
+    combined.includes("reparos e manutencao") ||
+    (combined.includes("casa") && combined.includes("manutenc")) ||
     (combined.includes("reparo") && combined.includes("manutencao")) ||
     (combined.includes("multis") && (combined.includes("casa") || combined.includes("reparo") || combined.includes("instalac") || combined.includes("manutencao"))) ||
     combined.includes("faz-tudo") ||
@@ -514,8 +519,16 @@ export function getRecommendedServicesForProfession(
     ];
   }
 
-  // 15. Pet / Veterinário
-  if (combined.includes("pet") || combined.includes("veterinar") || combined.includes("cao") || combined.includes("gato")) {
+  if (
+    combined.includes("pet") ||
+    combined.includes("veterinar") ||
+    /\bca[oe]s?\b/.test(combined) ||
+    combined.includes("cachorr") ||
+    combined.includes("canin") ||
+    combined.includes("felin") ||
+    combined.includes("gato") ||
+    combined.includes("banho e tosa")
+  ) {
     return [
       { name: "Banho e Tosa Higiênica Completa", description: "Banho com hidratação, tosa, corte de unhas e limpeza de ouvidos.", price: "75,00", durationMinutes: "75" },
       { name: "Consulta Veterinária em Domicílio", description: "Atendimento no conforto de casa sem estresse para o pet.", price: "150,00", durationMinutes: "60" },

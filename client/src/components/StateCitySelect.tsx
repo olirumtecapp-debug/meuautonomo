@@ -33,9 +33,15 @@ export function StateCitySelect({
   useEffect(() => {
     const next = parseLocation(value);
     if (next.uf) setSelectedUf(next.uf);
-    if (next.city) setSelectedCity(next.city);
+    if (!isManualCity) {
+      if (next.city) setSelectedCity(next.city);
+    } else {
+      if (next.city && next.city.trim() !== selectedCity.trim()) {
+        setSelectedCity(next.city);
+      }
+    }
     if (next.isCustom) setIsManualCity(true);
-  }, [value]);
+  }, [value, isManualCity, selectedCity]);
 
   const currentStateObj = BRAZILIAN_STATES.find((s) => s.uf === selectedUf);
   const cityList = currentStateObj?.cities || [];

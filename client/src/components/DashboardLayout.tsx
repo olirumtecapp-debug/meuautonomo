@@ -271,13 +271,16 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
         <div className={`absolute right-0 top-0 z-50 h-full w-1 cursor-col-resize transition hover:bg-[#d9f56a]/40 ${isCollapsed ? "hidden" : ""}`} onMouseDown={() => setIsResizing(true)} />
       </div>
       <SidebarInset className="bg-[#f5f8f2] min-w-0 max-w-full overflow-x-hidden">
-        <div className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#dce5dc] bg-[#f5f7f2]/90 px-4 backdrop-blur md:px-8">
-          <div className="flex items-center gap-3"><SidebarTrigger className="h-9 w-9 rounded-xl bg-white md:hidden" /><span className="text-sm font-medium text-[#58716b]">{activeMenuItem?.label || "Visão geral"}</span></div>
-          <div className="flex items-center gap-3">
+        <div className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#dce5dc] bg-[#f5f7f2]/90 px-3 sm:px-4 backdrop-blur md:px-8">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 mr-2">
+            <SidebarTrigger className="h-9 w-9 shrink-0 rounded-xl bg-white md:hidden" />
+            <span className="text-sm font-semibold text-[#58716b] truncate">{activeMenuItem?.label || "Visão geral"}</span>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={() => setTutorialOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#cbe4d1] bg-[#eef7f0] hover:bg-[#e2f0e6] text-xs font-bold text-[#173a34] transition shadow-2xs hover:shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-[#cbe4d1] bg-[#eef7f0] hover:bg-[#e2f0e6] text-xs font-bold text-[#173a34] transition shadow-2xs hover:shadow-xs cursor-pointer shrink-0"
               title="Abrir o Guia Passo a Passo do MeuAutônomo"
             >
               <BookOpen className="h-3.5 w-3.5 text-[#2d7d54]" />
@@ -314,19 +317,20 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
             <button
               type="button"
               onClick={() => setVoucherModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f0f4ef] text-xs font-semibold text-[#173a34] transition shadow-2xs cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[#dce5dc] bg-white hover:bg-[#f0f4ef] text-xs font-semibold text-[#173a34] transition shadow-2xs cursor-pointer"
               title="Resgatar cupom de teste ou voucher"
             >
               <Ticket className="h-3.5 w-3.5 text-[#8aa500]" />
-              <span className="hidden sm:inline">Cupom / Voucher</span>
-              <span className="sm:hidden">Cupom</span>
+              <span>Cupom / Voucher</span>
             </button>
             <span className="hidden text-right text-xs text-[#58716b] sm:block">
               {new Date().getHours() < 12 ? "Bom dia" : new Date().getHours() < 18 ? "Boa tarde" : "Boa noite"},{" "}
               <strong className="text-[#173a34]">{firstName}</strong>
             </span>
-            <NotificationsBell />
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-[#d9f56a] text-sm font-bold text-[#173a34]">{firstName.charAt(0).toUpperCase()}</div>
+            <div className="shrink-0">
+              <NotificationsBell />
+            </div>
+            <div className="grid h-8 w-8 sm:h-9 sm:w-9 shrink-0 place-items-center rounded-full bg-[#d9f56a] text-xs sm:text-sm font-bold text-[#173a34] shadow-2xs mr-0.5 sm:mr-0">{firstName.charAt(0).toUpperCase()}</div>
           </div>
         </div>
 
