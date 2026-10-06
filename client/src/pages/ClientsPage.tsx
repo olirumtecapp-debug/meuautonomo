@@ -46,6 +46,9 @@ export function ClientsPage() {
       setOpen(false);
       reset();
     },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao cadastrar cliente.");
+    },
   });
   const update = trpc.customer.update.useMutation({
     onSuccess: () => {
@@ -54,6 +57,9 @@ export function ClientsPage() {
       setOpen(false);
       reset();
     },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao atualizar cliente.");
+    },
   });
   const remove = trpc.customer.remove.useMutation({
     onSuccess: () => {
@@ -61,6 +67,9 @@ export function ClientsPage() {
       utils.customer.list.invalidate();
       setSelectedId(null);
       setDeleteClientId(null);
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao remover cliente.");
     },
   });
 
@@ -98,6 +107,8 @@ export function ClientsPage() {
 
   const openEdit = (client: any) => {
     setEditingId(client.id);
+    const cepMatch = client.address?.match(/CEP:?\s*(\d{5}-?\d{3})/i);
+    const extractedCep = cepMatch ? formatCep(cepMatch[1]) : "";
     setForm({
       name: client.name,
       phone: client.phone || "",
@@ -105,7 +116,7 @@ export function ClientsPage() {
       email: client.email || "",
       address: client.address || "",
       notes: client.notes || "",
-      cep: "",
+      cep: extractedCep,
       archived: client.archived,
     });
     setOpen(true);
@@ -130,8 +141,38 @@ export function ClientsPage() {
 
   const submit = () => {
     if (!form.name.trim()) return toast.error("Informe o nome do cliente.");
-    if (editingId) update.mutate({ id: editingId, ...form });
-    else create.mutate(form);
+    if (form.phone && form.phone.trim()) {
+      const clean = form.phone.replace(/\D/g, "");
+      if (clean.length < 10 || clean.length > 11) {
+        return toast.error("Telefone do cliente deve conter DDD e 8 ou 9 dígitos.");
+      }
+    }
+    if (form.whatsapp && form.whatsapp.trim()) {
+      const clean = form.whatsapp.replace(/\D/g, "");
+      if (clean.length < 10 || clean.length > 11) {
+        return toast.error("WhatsApp do cliente deve conter DDD e 8 ou 9 dígitos.");
+      }
+    }
+
+    let finalAddress = form.address?.trim() || "";
+    if (form.cep && form.cep.trim()) {
+      const formattedCep = formatCep(form.cep.trim());
+      if (formattedCep && !finalAddress.includes(formattedCep)) {
+        finalAddress = finalAddress ? `${finalAddress} - CEP: ${formattedCep}` : `CEP: ${formattedCep}`;
+      }
+    }
+
+    const payload = {
+      name: form.name.trim(),
+      phone: form.phone.trim() || undefined,
+      whatsapp: form.whatsapp.trim() || undefined,
+      email: form.email.trim() || undefined,
+      address: finalAddress || undefined,
+      notes: form.notes.trim() || undefined,
+    };
+
+    if (editingId) update.mutate({ id: editingId, ...payload, archived: form.archived });
+    else create.mutate(payload);
   };
 
   return (

@@ -21,7 +21,14 @@ async function ensureSchema(db: any) {
           ALTER TABLE \`professionalProfiles\`
           ADD COLUMN \`accountType\` ENUM('individual', 'equipe') NOT NULL DEFAULT 'individual'
         `);
-        console.log("[Database] Migração: Coluna 'accountType' adicionada a professionalProfiles.");
+        try {
+          await db.execute(sql`
+            ALTER TABLE \`requests\`
+            MODIFY COLUMN \`status\` ENUM('nova', 'em_analise', 'orcamento_enviado', 'proposta_aceita', 'agendada', 'arquivada') NOT NULL DEFAULT 'nova'
+          `);
+        } catch (statusErr: any) {
+          // ignore if already modified
+        }
       } catch (err: any) {
         if (
           err?.code === "ER_DUP_FIELDNAME" ||

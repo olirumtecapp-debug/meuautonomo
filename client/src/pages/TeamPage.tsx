@@ -280,6 +280,12 @@ export function TeamPage() {
   const submitMember = () => {
     if (!form.name.trim())
       return toast.error("Informe o nome do profissional parceiro.");
+    if (form.phone && form.phone.trim()) {
+      const cleanPhone = form.phone.replace(/\D/g, "");
+      if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+        return toast.error("Telefone/WhatsApp do parceiro deve conter DDD e 8 ou 9 dígitos.");
+      }
+    }
     const comm = Number(form.commissionPercent);
     if (isNaN(comm) || comm < 0 || comm > 100)
       return toast.error("A comissão deve ser uma porcentagem entre 0% e 100%.");
@@ -864,6 +870,16 @@ export function TeamPage() {
                     onChange={(e) =>
                       setForm({ ...form, commissionPercent: e.target.value })
                     }
+                    onBlur={(e) => {
+                      const num = Number(e.target.value);
+                      if (isNaN(num) || num < 0) {
+                        setForm({ ...form, commissionPercent: "0" });
+                        toast.error("Comissão mínima é 0%.");
+                      } else if (num > 100) {
+                        setForm({ ...form, commissionPercent: "100" });
+                        toast.error("Comissão máxima é 100%.");
+                      }
+                    }}
                     className="h-11 rounded-xl bg-white pr-9 text-sm font-bold text-[#173a34] border-[#dce5dc] focus:border-[#173a34]"
                     placeholder="Ex.: 45"
                   />

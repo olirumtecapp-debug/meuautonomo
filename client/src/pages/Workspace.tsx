@@ -106,8 +106,18 @@ export const formatPhone = (val: string = "") => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
-const statusLabel: Record<string, string> = { agendado: "Agendado", confirmado: "Confirmado", andamento: "Em andamento", concluido: "Concluído", cancelado: "Cancelado", faltou: "Não compareceu", nova: "Nova", em_analise: "Em análise", orcamento_enviado: "Orçamento enviado", agendada: "Agendada", arquivada: "Arquivada", rascunho: "Rascunho", enviado: "Enviado", aceito: "Aceito", recusado: "Recusado", alteracao_solicitada: "Alteração solicitada" };
-const statusClass: Record<string, string> = { concluido: "bg-[#e3f5e3] text-[#2c7a45]", confirmado: "bg-[#e1effa] text-[#23638e]", agendado: "bg-[#fff4d7] text-[#906815]", nova: "bg-[#eef5c8] text-[#667700]", enviado: "bg-[#e8eef8] text-[#496b98]", aceito: "bg-[#e3f5e3] text-[#2c7a45]", pendente: "bg-[#fff4d7] text-[#906815]", pago: "bg-[#e3f5e3] text-[#2c7a45]", parcial: "bg-[#e8eef8] text-[#496b98]", cancelado: "bg-[#f9e5e3] text-[#9c4d43]" };
+export const formatIsoToDateInput = (val: string | Date | null | undefined): string => {
+  if (!val) return "";
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const statusLabel: Record<string, string> = { agendado: "Agendado", confirmado: "Confirmado", andamento: "Em andamento", concluido: "Concluído", cancelado: "Cancelado", faltou: "Não compareceu", nova: "Nova", em_analise: "Em análise", orcamento_enviado: "Orçamento enviado", proposta_aceita: "Proposta aceita", agendada: "Agendada", arquivada: "Arquivada", rascunho: "Rascunho", enviado: "Enviado", aceito: "Aceito", recusado: "Recusado", alteracao_solicitada: "Alteração solicitada" };
+const statusClass: Record<string, string> = { concluido: "bg-[#e3f5e3] text-[#2c7a45]", confirmado: "bg-[#e1effa] text-[#23638e]", agendado: "bg-[#fff4d7] text-[#906815]", nova: "bg-[#eef5c8] text-[#667700]", enviado: "bg-[#e8eef8] text-[#496b98]", aceito: "bg-[#e3f5e3] text-[#2c7a45]", proposta_aceita: "bg-[#e3f5e3] text-[#2c7a45]", pendente: "bg-[#fff4d7] text-[#906815]", pago: "bg-[#e3f5e3] text-[#2c7a45]", parcial: "bg-[#e8eef8] text-[#496b98]", cancelado: "bg-[#f9e5e3] text-[#9c4d43]" };
 export const modalityLabel: Record<string, string> = { presencial: "No seu espaço", endereco: "No endereço do cliente", online: "Online", hibrido: "Híbrido" };
 
 export function AppHome() {
@@ -1397,6 +1407,13 @@ export function Field({
     if (isPhone) {
       onChange(formatPhone(e.target.value));
     } else if (isCurrency) {
+      if (e.target.value.includes("-")) {
+        toast.error("Valores monetários não podem ser negativos.");
+        return;
+      }
+      if (/[a-zA-Z]/.test(e.target.value)) {
+        toast.error("Digite apenas números para valores em reais.");
+      }
       const raw = e.target.value.replace(/[^\d.,]/g, "");
       onChange(raw);
     } else {
@@ -1406,6 +1423,12 @@ export function Field({
 
   const handleBlur = () => {
     if (isCurrency && value) {
+      const cents = parseBrlToCents(value);
+      if (cents > 100_000_000) {
+        toast.error("O valor máximo permitido é de R$ 1.000.000,00.");
+        onChange("1.000.000,00");
+        return;
+      }
       const formatted = formatBrlInput(value);
       if (formatted && formatted !== value) {
         onChange(formatted);
@@ -1487,7 +1510,7 @@ export function HelpButton({ title, children }: { title: string; children: React
   </>;
 }
 
-export function Page({ title, eyebrow, description, action, help, children }: { title: string; eyebrow?: string; description?: string; action?: React.ReactNode; help?: React.ReactNode; children: React.ReactNode }) { return <div className="container mx-auto px-3.5 sm:px-6 py-5 sm:py-6 md:py-10 max-w-7xl w-full min-w-0"><div className="mb-6 sm:mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div className="min-w-0"><p className="mb-1.5 sm:mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">{eyebrow || "MeuAutônomo"}</p><div className="flex items-center gap-2 flex-wrap"><h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-[#173a34] break-words">{title}</h1>{help}</div>{description && <p className="mt-1.5 sm:mt-2 max-w-2xl text-xs sm:text-sm text-[#6d837c]">{description}</p>}</div>{action && <div className="flex flex-wrap items-center gap-2">{action}</div>}</div>{children}</div>; }
+export function Page({ title, eyebrow, description, action, help, children }: { title: string; eyebrow?: string; description?: string; action?: React.ReactNode; help?: React.ReactNode; children: React.ReactNode }) { return <div className="container mx-auto px-3.5 sm:px-6 py-5 sm:py-6 md:py-10 max-w-7xl w-full min-w-0 overflow-x-hidden"><div className="mb-6 sm:mb-8 flex flex-col justify-between gap-4 lg:flex-row lg:items-end"><div className="min-w-0"><p className="mb-1.5 sm:mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#8aa500]">{eyebrow || "MeuAutônomo"}</p><div className="flex items-center gap-2 flex-wrap"><h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-[#173a34] break-words">{title}</h1>{help}</div>{description && <p className="mt-1.5 sm:mt-2 max-w-2xl text-xs sm:text-sm text-[#6d837c]">{description}</p>}</div>{action && <div className="flex flex-wrap items-center gap-2 shrink-0 max-w-full">{action}</div>}</div>{children}</div>; }
 export function EmptyState({ icon: Icon, title, description, action }: { icon: typeof CalendarDays; title: string; description: string; action?: React.ReactNode }) { return <div className="grid place-items-center rounded-[24px] border border-dashed border-[#cddbcf] bg-white/60 px-6 py-16 text-center"><div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-[#eef5d2] text-[#829a14]"><Icon className="h-6 w-6" /></div><h3 className="text-lg font-bold text-[#173a34]">{title}</h3><p className="mt-2 max-w-sm text-sm text-[#78908a]">{description}</p>{action && <div className="mt-5">{action}</div>}</div>; }
 export function StatusBadge({ status }: { status: string }) { return <Badge className={cn("border-0 font-semibold", statusClass[status] || "bg-[#edf2ec] text-[#5d746d]")}>{statusLabel[status] || status}</Badge>; }
 
@@ -2180,17 +2203,17 @@ function Agenda() {
 
       <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]">
         <CardHeader className="border-b border-[#edf1eb] pb-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-lg text-[#173a34] capitalize">{viewTitle}</CardTitle>
+          <div className="flex items-center justify-between">
+            <div className="w-full min-w-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-base sm:text-lg text-[#173a34] capitalize break-words">{viewTitle}</CardTitle>
                 {view !== "all" && (
-                  <div className="flex items-center gap-1 ml-2">
+                  <div className="flex items-center gap-1 shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleNavigate(-1)}
-                      className="h-8 w-8 p-0 rounded-lg border-[#dce5dc]"
+                      className="h-8 w-8 p-0 rounded-lg border-[#dce5dc] shrink-0"
                       title="Período anterior"
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -2199,7 +2222,7 @@ function Agenda() {
                       variant="outline"
                       size="sm"
                       onClick={() => setCurrentDate(new Date())}
-                      className="h-8 px-2.5 rounded-lg text-xs border-[#dce5dc]"
+                      className="h-8 px-2.5 rounded-lg text-xs border-[#dce5dc] shrink-0"
                     >
                       Hoje
                     </Button>
@@ -2207,7 +2230,7 @@ function Agenda() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleNavigate(1)}
-                      className="h-8 w-8 p-0 rounded-lg border-[#dce5dc]"
+                      className="h-8 w-8 p-0 rounded-lg border-[#dce5dc] shrink-0"
                       title="Próximo período"
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -2426,22 +2449,34 @@ function Requests() {
 
   const submitQuote = () => {
     if (!selectedRequestForQuote) return;
-    if (!quoteForm.items.every(it => it.description.trim() && Number(it.quantity) > 0)) {
-      return toast.error("Preencha a descrição e valor de cada item do orçamento.");
+    const reqSubtotal = quoteForm.items.reduce((sum, it) => {
+      const q = parseFloat(String(it.quantity).replace(",", ".")) || 0;
+      const p = parseBrlToCents(it.unitPrice);
+      return sum + (q > 0 && p > 0 ? Math.round(q * p) : 0);
+    }, 0);
+    const reqDiscount = parseBrlToCents(quoteForm.discount);
+    if (quoteForm.discount.includes("-") || reqDiscount < 0) {
+      return toast.error("O desconto não pode ser negativo.");
+    }
+    if (reqSubtotal > 0 && reqDiscount > reqSubtotal) {
+      return toast.error("O desconto não pode ser maior que o subtotal da proposta.");
+    }
+    if (!quoteForm.items.every(it => it.description.trim() && (parseFloat(String(it.quantity).replace(",", ".")) || 0) > 0)) {
+      return toast.error("Preencha a descrição e quantidade válida (maior que zero) de cada item do orçamento.");
     }
     createQuote.mutate({
       requestId: selectedRequestForQuote.id,
       clientId: selectedRequestForQuote.clientId || undefined,
       serviceId: quoteForm.serviceId ? Number(quoteForm.serviceId) : undefined,
       description: quoteForm.description || undefined,
-      discountCents: parseBrlToCents(quoteForm.discount),
+      discountCents: reqDiscount,
       notes: quoteForm.notes || undefined,
       paymentTerms: quoteForm.paymentTerms || undefined,
-      validUntil: quoteForm.validUntil ? new Date(`${quoteForm.validUntil}T23:59:59`).toISOString() : undefined,
+      validUntil: quoteForm.validUntil ? `${quoteForm.validUntil}T12:00:00.000Z` : undefined,
       sendNow: true,
       items: quoteForm.items.map(it => ({
         description: it.description,
-        quantity: Number(it.quantity),
+        quantity: Math.max(0.01, parseFloat(String(it.quantity).replace(",", ".")) || 1),
         unitPriceCents: parseBrlToCents(it.unitPrice)
       }))
     });
@@ -2825,6 +2860,11 @@ function Requests() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-bold text-[#284b42]">{request.requesterName}</h3>
                       <StatusBadge status={request.status} />
+                      {((request as any).quoteStatus === "aceito" || request.status === "proposta_aceita") && request.status !== "proposta_aceita" && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                          🎉 Proposta aprovada pelo cliente
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-sm text-[#82948e]">
                       {formatPhone(request.requesterPhone)}
@@ -2900,9 +2940,9 @@ function Requests() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {["nova", "em_analise", "orcamento_enviado", "agendada", "arquivada"].map(value => (
+                      {["nova", "em_analise", "orcamento_enviado", "proposta_aceita", "agendada", "arquivada"].map(value => (
                         <SelectItem key={value} value={value}>
-                          {statusLabel[value]}
+                          {statusLabel[value] || value}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -3130,6 +3170,13 @@ function Quotes() {
     setOpen(true);
   };
 
+  const parseQuantity = (val: any): number => {
+    if (val === undefined || val === null || val === "") return 0;
+    const clean = String(val).trim().replace(",", ".");
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
+  };
+
   const openEditQuote = (quote: any) => {
     setEditingQuoteId(quote.id);
     setForm({
@@ -3139,12 +3186,12 @@ function Quotes() {
       discount: quote.discountCents ? formatBrlInput(quote.discountCents) : "",
       paymentTerms: quote.paymentTerms || "",
       notes: quote.notes || "",
-      validUntil: quote.validUntil ? new Date(quote.validUntil).toISOString().split("T")[0] : "",
+      validUntil: quote.validUntil ? formatIsoToDateInput(quote.validUntil) : "",
       sendNow: true,
       items: quote.items?.length
         ? quote.items.map((it: any) => ({
             description: it.description,
-            quantity: String(it.quantity),
+            quantity: String(it.quantity).replace(".", ","),
             unitPrice: formatBrlInput(it.unitPriceCents)
           }))
         : [{ description: quote.description || "Serviço", quantity: "1", unitPrice: formatBrlInput(quote.subtotalCents) }]
@@ -3152,19 +3199,39 @@ function Quotes() {
     setOpen(true);
   };
 
-  const subtotal = form.items.reduce((sum, item) => sum + Number(item.quantity || 0) * parseBrlToCents(item.unitPrice), 0);
-  const total = Math.max(0, subtotal - parseBrlToCents(form.discount));
+  const subtotal = form.items.reduce((sum, item) => {
+    const q = parseQuantity(item.quantity);
+    const p = parseBrlToCents(item.unitPrice);
+    return sum + (q > 0 && p > 0 ? Math.round(q * p) : 0);
+  }, 0);
+  const discountCents = parseBrlToCents(form.discount);
+  const total = Math.max(0, subtotal - discountCents);
 
   const submit = () => {
-    if (!form.items.every(item => item.description.trim() && Number(item.quantity) > 0)) {
-      return toast.error("Preencha a descrição e quantidade de todos os itens.");
+    for (const item of form.items) {
+      if (!item.description.trim()) {
+        return toast.error("Preencha a descrição de todos os itens.");
+      }
+      const q = parseQuantity(item.quantity);
+      if (q <= 0) {
+        return toast.error("A quantidade de cada item deve ser um número positivo maior que zero.");
+      }
+      if (item.unitPrice.includes("-") || parseBrlToCents(item.unitPrice) < 0) {
+        return toast.error("O preço unitário não pode ser negativo.");
+      }
+    }
+    if (form.discount.includes("-") || discountCents < 0) {
+      return toast.error("O desconto não pode ser negativo.");
+    }
+    if (subtotal > 0 && discountCents > subtotal) {
+      return toast.error("O desconto não pode ser maior que o subtotal da proposta.");
     }
     const payloadItems = form.items.map(item => {
       const spell = checkServiceSpelling(item.description);
       const cleanDesc = spell.hasCorrection ? spell.correctedText : item.description;
       return {
         description: cleanDesc,
-        quantity: Number(item.quantity),
+        quantity: Math.max(0.01, parseQuantity(item.quantity)),
         unitPriceCents: parseBrlToCents(item.unitPrice)
       };
     });
@@ -3176,10 +3243,10 @@ function Quotes() {
       update.mutate({
         id: editingQuoteId,
         description: finalQuoteDesc,
-        discountCents: parseBrlToCents(form.discount),
+        discountCents,
         notes: form.notes || undefined,
         paymentTerms: form.paymentTerms || undefined,
-        validUntil: form.validUntil ? new Date(`${form.validUntil}T23:59:59`).toISOString() : undefined,
+        validUntil: form.validUntil ? `${form.validUntil}T12:00:00.000Z` : undefined,
         sendNow: form.sendNow,
         items: payloadItems
       });
@@ -3188,10 +3255,10 @@ function Quotes() {
         clientId: form.clientId ? Number(form.clientId) : undefined,
         serviceId: form.serviceId ? Number(form.serviceId) : undefined,
         description: finalQuoteDesc,
-        discountCents: parseBrlToCents(form.discount),
+        discountCents,
         notes: form.notes || undefined,
         paymentTerms: form.paymentTerms || undefined,
-        validUntil: form.validUntil ? new Date(`${form.validUntil}T23:59:59`).toISOString() : undefined,
+        validUntil: form.validUntil ? `${form.validUntil}T12:00:00.000Z` : undefined,
         sendNow: form.sendNow,
         items: payloadItems
       });
@@ -3542,7 +3609,8 @@ function Quotes() {
                 }
                 if (!search.trim()) return true;
                 const cName = clients.data?.find(c => c.id === q.clientId)?.name || q.clientName || "";
-                return `${q.description || ""} ${cName} ${q.paymentTerms || ""} ${q.notes || ""}`.toLowerCase().includes(search.toLowerCase());
+                const itemsDesc = (q.items || []).map((it: any) => it.description).join(" ");
+                return `${q.description || ""} ${cName} ${itemsDesc} ${q.paymentTerms || ""} ${q.notes || ""}`.toLowerCase().includes(search.toLowerCase());
               }).map(quote => {
                 const clientObj = clients.data?.find(client => client.id === quote.clientId);
                 const clientDisplayName = quote.clientName || clientObj?.name || "Cliente";
@@ -3810,6 +3878,9 @@ function Finance() {
       utils.reports.summary.invalidate();
       utils.appointment.list.invalidate();
       setPaymentOpen(false);
+    },
+    onError: err => {
+      toast.error(err.message || "Não foi possível registrar o pagamento.");
     }
   });
   const createExpense = trpc.expense.create.useMutation({
@@ -3819,6 +3890,9 @@ function Finance() {
       utils.dashboard.summary.invalidate();
       utils.reports.summary.invalidate();
       setExpenseOpen(false);
+    },
+    onError: err => {
+      toast.error(err.message || "Não foi possível registrar a despesa.");
     }
   });
   const [paymentOpen, setPaymentOpen] = useState(false); const [expenseOpen, setExpenseOpen] = useState(false);
@@ -3826,8 +3900,10 @@ function Finance() {
   const [expense, setExpense] = useState({ description: "", category: "", amount: "", note: "" });
   const submitPayment = () => {
     if (createPayment.isPending) return;
+    if (payment.amount.includes("-")) return toast.error("O valor da receita não pode ser negativo.");
     const cents = parseBrlToCents(payment.amount);
-    if (cents <= 0) return toast.error("Informe um valor válido.");
+    if (cents <= 0) return toast.error("Informe um valor válido e positivo para a receita.");
+    if (cents > 100_000_000) return toast.error("O valor máximo permitido para uma movimentação é de R$ 1.000.000,00.");
     createPayment.mutate({
       clientId: payment.clientId ? Number(payment.clientId) : undefined,
       serviceId: payment.serviceId ? Number(payment.serviceId) : undefined,
@@ -3840,8 +3916,10 @@ function Finance() {
   };
   const submitExpense = () => {
     if (createExpense.isPending) return;
+    if (expense.amount.includes("-")) return toast.error("O valor da despesa não pode ser negativo.");
     const cents = parseBrlToCents(expense.amount);
-    if (!expense.description || cents <= 0) return toast.error("Informe descrição e valor.");
+    if (!expense.description || cents <= 0) return toast.error("Informe descrição e um valor positivo.");
+    if (cents > 100_000_000) return toast.error("O valor máximo permitido para uma despesa é de R$ 1.000.000,00.");
     createExpense.mutate({
       description: expense.description,
       category: expense.category || undefined,
@@ -3851,8 +3929,8 @@ function Finance() {
   };
   const received = (payments.data || []).filter(p => p.status === "pago").reduce((sum, p) => sum + p.amountCents, 0); const pending = (payments.data || []).filter(p => p.status !== "pago").reduce((sum, p) => sum + p.amountCents, 0); const spent = (expenses.data || []).reduce((sum, item) => sum + item.amountCents, 0);
   return <Page title="Financeiro" eyebrow="Dinheiro sem complicação" description="Registre receitas e despesas. Sem números inventados: tudo vem dos seus lançamentos." help={<HelpButton title="Como funciona Financeiro?"><p><strong>Financeiro</strong> registra todas as movimentações do seu negócio — receitas e despesas.</p><p><strong>Receitas (entradas):</strong></p><ul className="list-disc pl-5 space-y-1"><li><strong>Pago</strong> — dinheiro já recebido, conta no saldo.</li><li><strong>Pendente</strong> — combinado mas ainda não pago.</li><li><strong>Parcial</strong> — parte foi paga, o resto está pendente.</li></ul><p><strong>Despesas (saídas):</strong> Custos do seu trabalho — materiais, deslocamento, ferramentas etc.</p><p><strong>Saldo:</strong> Receitas pagas menos despesas registradas no período.</p><p><strong>Filtro de período:</strong> Selecione um intervalo de datas para ver só o que aconteceu naquele período.</p></HelpButton>} action={<div className="flex flex-wrap items-center gap-2"><RangeFilter from={from} to={to} setFrom={setFrom} setTo={setTo} /><Button onClick={() => setExpenseOpen(true)} variant="outline" className="h-11 rounded-xl border-[#dce5dc] bg-white text-[#4c6960]"><Plus className="mr-2 h-4 w-4" /> Nova despesa</Button><Button onClick={() => setPaymentOpen(true)} className="h-11 rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]"><Plus className="mr-2 h-4 w-4" /> Registrar receita</Button></div>}>
-    <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Registrar receita</DialogTitle><DialogDescription>Pagamento recebido ou a receber.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><FormSelect label="Cliente" value={payment.clientId} onChange={value => setPayment({ ...payment, clientId: value })} placeholder="Selecionar cliente" options={(clients.data || []).map(c => ({ value: String(c.id), label: c.name }))} /><FormSelect label="Serviço" value={payment.serviceId} onChange={value => { const svc = services.data?.find(s => String(s.id) === value); setPayment({ ...payment, serviceId: value, amount: svc && (!payment.amount || payment.amount === "0" || payment.amount === "0,00") ? formatBrlInput(svc.priceCents) : payment.amount }); }} placeholder="Selecionar serviço" options={(services.data || []).filter(service => service.active).map(service => ({ value: String(service.id), label: service.name }))} />{isTeamMode && Boolean(teamMembers.data?.length) && <FormSelect label="Profissional / Parceiro(a)" value={payment.teamMemberId} onChange={value => setPayment({ ...payment, teamMemberId: value })} placeholder="Receita própria (sem comissão)" options={[{ value: "", label: "Receita própria (sem comissão)" }, ...(teamMembers.data || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role || "Parceiro"} - ${m.commissionPercent}% comissão)` }))]} />}<Field label="Valor" prefix="R$ " value={payment.amount} onChange={value => setPayment({ ...payment, amount: value })} /><div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Forma" value={payment.method} onChange={value => setPayment({ ...payment, method: value as typeof payment.method })} options={[["pix","Pix"],["dinheiro","Dinheiro"],["cartao","Cartão"],["transferencia","Transferência"],["outro","Outro"]].map(([value,label]) => ({ value, label }))} /><FormSelect label="Situação" value={payment.status} onChange={value => setPayment({ ...payment, status: value as typeof payment.status })} options={[["pago","Pago"],["pendente","Pendente"],["parcial","Parcial"]].map(([value,label]) => ({ value, label }))} /></div><Field label="Observação" value={payment.note} onChange={value => setPayment({ ...payment, note: value })} /></div><DialogFooter><Button onClick={submitPayment} disabled={createPayment.isPending} className="rounded-xl bg-[#173a34] text-white">{createPayment.isPending ? "Salvando..." : "Salvar receita"}</Button></DialogFooter></DialogContent></Dialog>
-    <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px]"><DialogHeader><DialogTitle>Nova despesa</DialogTitle><DialogDescription>Registre um custo real do seu trabalho.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><Field label="Descrição" value={expense.description} onChange={value => setExpense({ ...expense, description: value })} placeholder="Ex.: Material elétrico" /><div className="grid gap-4 sm:grid-cols-2"><Field label="Categoria" value={expense.category} onChange={value => setExpense({ ...expense, category: value })} placeholder="Ex.: Materiais" /><Field label="Valor" prefix="R$ " value={expense.amount} onChange={value => setExpense({ ...expense, amount: value })} /></div><Field label="Observação" value={expense.note} onChange={value => setExpense({ ...expense, note: value })} /></div><DialogFooter><Button onClick={submitExpense} disabled={createExpense.isPending} className="rounded-xl bg-[#173a34] text-white">{createExpense.isPending ? "Salvando..." : "Salvar despesa"}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px] w-full max-w-lg min-w-0"><DialogHeader><DialogTitle>Registrar receita</DialogTitle><DialogDescription>Pagamento recebido ou a receber.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><FormSelect label="Cliente" value={payment.clientId} onChange={value => setPayment({ ...payment, clientId: value })} placeholder="Selecionar cliente" options={(clients.data || []).map(c => ({ value: String(c.id), label: c.name }))} /><FormSelect label="Serviço" value={payment.serviceId} onChange={value => { const svc = services.data?.find(s => String(s.id) === value); setPayment({ ...payment, serviceId: value, amount: svc && (!payment.amount || payment.amount === "0" || payment.amount === "0,00") ? formatBrlInput(svc.priceCents) : payment.amount }); }} placeholder="Selecionar serviço" options={(services.data || []).filter(service => service.active).map(service => ({ value: String(service.id), label: service.name }))} />{isTeamMode && Boolean(teamMembers.data?.length) && <FormSelect label="Profissional / Parceiro(a)" value={payment.teamMemberId} onChange={value => setPayment({ ...payment, teamMemberId: value })} placeholder="Receita própria (sem comissão)" options={[{ value: "", label: "Receita própria (sem comissão)" }, ...(teamMembers.data || []).filter(m => m.active).map(m => ({ value: String(m.id), label: `${m.name} (${m.role || "Parceiro"} - ${m.commissionPercent}% comissão)` }))]} />}<Field label="Valor" prefix="R$ " value={payment.amount} onChange={value => setPayment({ ...payment, amount: value })} /><div className="grid gap-4 sm:grid-cols-2"><FormSelect label="Forma" value={payment.method} onChange={value => setPayment({ ...payment, method: value as typeof payment.method })} options={[["pix","Pix"],["dinheiro","Dinheiro"],["cartao","Cartão"],["transferencia","Transferência"],["outro","Outro"]].map(([value,label]) => ({ value, label }))} /><FormSelect label="Situação" value={payment.status} onChange={value => setPayment({ ...payment, status: value as typeof payment.status })} options={[["pago","Pago"],["pendente","Pendente"],["parcial","Parcial"]].map(([value,label]) => ({ value, label }))} /></div><Field label="Observação" value={payment.note} onChange={value => setPayment({ ...payment, note: value })} /></div><DialogFooter><Button onClick={submitPayment} disabled={createPayment.isPending} className="rounded-xl bg-[#173a34] text-white">{createPayment.isPending ? "Salvando..." : "Salvar receita"}</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}><DialogContent className="max-h-[90vh] overflow-y-auto rounded-[24px] w-full max-w-lg min-w-0"><DialogHeader><DialogTitle>Nova despesa</DialogTitle><DialogDescription>Registre um custo real do seu trabalho.</DialogDescription></DialogHeader><div className="grid gap-4 py-3"><Field label="Descrição" value={expense.description} onChange={value => setExpense({ ...expense, description: value })} placeholder="Ex.: Material elétrico" /><div className="grid gap-4 sm:grid-cols-2"><Field label="Categoria" value={expense.category} onChange={value => setExpense({ ...expense, category: value })} placeholder="Ex.: Materiais" /><Field label="Valor" prefix="R$ " value={expense.amount} onChange={value => setExpense({ ...expense, amount: value })} /></div><Field label="Observação" value={expense.note} onChange={value => setExpense({ ...expense, note: value })} /></div><DialogFooter><Button onClick={submitExpense} disabled={createExpense.isPending} className="rounded-xl bg-[#173a34] text-white">{createExpense.isPending ? "Salvando..." : "Salvar despesa"}</Button></DialogFooter></DialogContent></Dialog>
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric title="Recebido" value={money(received)} hint="receitas pagas" icon={CircleDollarSign} accent="green" /><Metric title="Pendente" value={money(pending)} hint="a receber" icon={ClipboardList} accent="orange" /><Metric title="Despesas" value={money(spent)} hint="custos registrados" icon={WalletCards} accent="blue" /><Metric title="Saldo" value={money(received - spent)} hint="recebido menos despesas" icon={CircleDollarSign} accent="lime" /></div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_0.9fr]">
       <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)]"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-lg text-[#173a34]">Resumo do período</CardTitle><p className="mt-1 text-sm text-[#82948e]">Receitas pagas, valores pendentes e despesas por dia.</p></div><BarChart3 className="h-5 w-5 text-[#8aa500]" /></div></CardHeader><CardContent className="pt-0">{summary.isLoading ? <div className="grid h-[250px] place-items-center text-sm text-[#82948e]">Carregando gráfico…</div> : summary.data?.monthlySeries.length ? <div className="h-[280px] w-full"><ResponsiveContainer width="100%" height="100%"><LineChart data={summary.data.monthlySeries} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} /><XAxis dataKey="date" tickFormatter={value => String(value).slice(8, 10)} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} /><YAxis tickFormatter={value => `R$ ${Math.round(Number(value) / 100)}`} tickLine={false} axisLine={false} width={58} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} /><Tooltip formatter={(value, name) => [money(Number(value)), name === "receitas" ? "Receitas" : name === "pendentes" ? "Pendentes" : "Despesas"]} labelFormatter={value => `Dia ${String(value).slice(8, 10)}`} contentStyle={{ borderRadius: 12, border: "1px solid var(--border)", background: "var(--popover)", color: "var(--popover-foreground)" }} /><Legend formatter={value => value === "receitas" ? "Receitas" : value === "pendentes" ? "Pendentes" : "Despesas"} iconType="circle" /><Line type="monotone" dataKey="receitas" stroke="var(--chart-1)" strokeWidth={3} dot={false} /><Line type="monotone" dataKey="pendentes" stroke="var(--chart-3)" strokeWidth={2} strokeDasharray="5 5" dot={false} /><Line type="monotone" dataKey="despesas" stroke="var(--destructive)" strokeWidth={2} dot={false} /></LineChart></ResponsiveContainer></div> : <div className="grid h-[250px] place-items-center rounded-2xl bg-[#f5f8f2] text-center"><div><BarChart3 className="mx-auto h-7 w-7 text-[#9bad9a]" /><p className="mt-3 text-sm font-semibold text-[#526d64]">Nenhuma movimentação no período</p><p className="mt-1 text-xs text-[#82948e]">O gráfico aparecerá quando você registrar receitas ou despesas.</p></div></div>}</CardContent></Card>
@@ -4146,18 +4224,30 @@ function SettingsPage() {
     onSuccess: () => {
       toast.success("Configurações salvas.");
       profile.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao salvar configurações.");
     }
   });
   const uploadAvatar = trpc.profile.uploadAvatar.useMutation({
-    onSuccess: () => {
+    onSuccess: (res: any) => {
       toast.success("Foto atualizada.");
+      if (res?.avatarUrl) {
+        setForm((prev: any) => ({ ...(prev || profile.data), avatarUrl: res.avatarUrl }));
+      }
       profile.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao atualizar foto de perfil.");
     }
   });
   const saveAvailability = trpc.profile.saveAvailability.useMutation({
     onSuccess: () => {
       toast.success("Horários salvos.");
       availability.refetch();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao salvar horários de disponibilidade.");
     }
   });
   const setAccountTypeMutation = trpc.profile.setAccountType.useMutation({
@@ -4216,6 +4306,42 @@ function SettingsPage() {
   };
 
   const save = () => {
+    if (!current.displayName || !current.displayName.trim()) {
+      return toast.error("Nome do perfil é obrigatório.");
+    }
+    if (current.displayName.trim().length > 120) {
+      return toast.error("Nome do perfil deve ter no máximo 120 caracteres.");
+    }
+    if (current.whatsapp && current.whatsapp.trim()) {
+      const cleanWa = current.whatsapp.replace(/\D/g, "");
+      if (cleanWa.length < 10 || cleanWa.length > 11) {
+        return toast.error("WhatsApp deve conter DDD e 8 ou 9 dígitos.");
+      }
+    }
+    if (current.phone && current.phone.trim()) {
+      const cleanPh = current.phone.replace(/\D/g, "");
+      if (cleanPh.length < 10 || cleanPh.length > 11) {
+        return toast.error("Telefone deve conter DDD e 8 ou 9 dígitos.");
+      }
+    }
+    if (current.pixKey && current.pixKey.trim()) {
+      const pKey = current.pixKey.trim();
+      const pType = current.pixKeyType || "cpf";
+      const cleanDigits = pKey.replace(/\D/g, "");
+      if (pType === "cpf" && cleanDigits.length !== 11) {
+        return toast.error("Chave PIX do tipo CPF deve conter 11 dígitos.");
+      }
+      if (pType === "cnpj" && cleanDigits.length !== 14) {
+        return toast.error("Chave PIX do tipo CNPJ deve conter 14 dígitos.");
+      }
+      if (pType === "telefone" && (cleanDigits.length < 10 || cleanDigits.length > 11)) {
+        return toast.error("Chave PIX do tipo telefone deve conter DDD + número (10 ou 11 dígitos).");
+      }
+      if (pType === "email" && (!pKey.includes("@") || !pKey.includes("."))) {
+        return toast.error("Chave PIX do tipo e-mail inválida.");
+      }
+    }
+
     const spellBio = current.bio ? checkServiceSpelling(current.bio) : null;
     const finalBio = spellBio?.hasCorrection ? spellBio.correctedText : current.bio;
     update.mutate({
@@ -4250,7 +4376,7 @@ function SettingsPage() {
       <div className="space-y-6 w-full min-w-0">
         {/* CARD MODO DE OPERAÇÃO (INDIVIDUAL VS EQUIPE) */}
         <Card className="rounded-[24px] border-0 shadow-[0_10px_35px_rgba(19,42,39,0.05)] w-full min-w-0">
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6 pb-2 sm:pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <CardTitle className="text-lg text-[#173a34] flex items-center gap-2">
@@ -4275,8 +4401,8 @@ function SettingsPage() {
               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2 w-full min-w-0">
+          <CardContent className="space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
+            <div className="grid gap-4 md:grid-cols-2 w-full min-w-0">
               <div
                 className={cn(
                   "rounded-2xl border-2 p-4 transition-all flex flex-col justify-between min-w-0",
@@ -4511,6 +4637,9 @@ function SettingsPage() {
                   onClick={() => {
                     const start = availabilityTimes?.start || "08:00";
                     const end = availabilityTimes?.end || "18:00";
+                    if (start >= end) {
+                      return toast.error("O horário de início deve ser anterior ao horário de fim.");
+                    }
                     saveAvailability.mutate({
                       schedule: JSON.stringify({ days: ["mon","tue","wed","thu","fri"], start, end }),
                       unavailableDays: JSON.stringify([])
@@ -5160,7 +5289,7 @@ export function FormSelect({ label, value, onChange, options, placeholder = "Sel
     <div>
       <Label className="mb-2 block">{label}</Label>
       <Select value={internalValue} onValueChange={val => onChange(val === "__empty__" ? "" : val)}>
-        <SelectTrigger className="h-10 rounded-xl border-[#dce5dc] bg-white">
+        <SelectTrigger className="h-10 w-full min-w-0 max-w-full rounded-xl border-[#dce5dc] bg-white overflow-hidden truncate">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

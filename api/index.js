@@ -164,7 +164,7 @@ var init_schema = __esm({
       address: text("address"),
       desiredAt: timestamp("desiredAt"),
       preferredTime: varchar("preferredTime", { length: 80 }),
-      status: mysqlEnum("status", ["nova", "em_analise", "orcamento_enviado", "agendada", "arquivada"]).default("nova").notNull(),
+      status: mysqlEnum("status", ["nova", "em_analise", "orcamento_enviado", "proposta_aceita", "agendada", "arquivada"]).default("nova").notNull(),
       secureToken: varchar("secureToken", { length: 80 }).notNull().unique(),
       createdAt: timestamp("createdAt").defaultNow().notNull()
     });
@@ -695,7 +695,13 @@ async function ensureSchema(db) {
           ALTER TABLE \`professionalProfiles\`
           ADD COLUMN \`accountType\` ENUM('individual', 'equipe') NOT NULL DEFAULT 'individual'
         `);
-        console.log("[Database] Migra\xE7\xE3o: Coluna 'accountType' adicionada a professionalProfiles.");
+        try {
+          await db.execute(sql`
+            ALTER TABLE \`requests\`
+            MODIFY COLUMN \`status\` ENUM('nova', 'em_analise', 'orcamento_enviado', 'proposta_aceita', 'agendada', 'arquivada') NOT NULL DEFAULT 'nova'
+          `);
+        } catch (statusErr) {
+        }
       } catch (err) {
         if (err?.code === "ER_DUP_FIELDNAME" || err?.code === "1060" || String(err?.message || "").includes("Duplicate column") || String(err?.message || "").includes("already exists")) {
         } else {
@@ -2706,11 +2712,17 @@ var appRouter = router({
       if (!encoded) throw new TRPCError3({ code: "BAD_REQUEST", message: "Arquivo inv\xE1lido." });
       const buffer = Buffer.from(encoded, "base64");
       if (buffer.length > 5e6) throw new TRPCError3({ code: "BAD_REQUEST", message: "A foto deve ter no m\xE1ximo 5 MB." });
-      const stored = await storagePut(`profiles/${profile.id}/avatar-${input.fileName}`, buffer, input.mimeType);
+      let avatarUrl = input.dataUrl;
+      try {
+        const stored = await storagePut(`profiles/${profile.id}/avatar-${input.fileName}`, buffer, input.mimeType);
+        if (stored?.url) avatarUrl = stored.url;
+      } catch (err) {
+        console.warn("[uploadAvatar] Storage put failed, using dataUrl fallback:", err);
+      }
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(professionalProfiles).set({ avatarUrl: stored.url }).where(eq4(professionalProfiles.id, profile.id));
-      return { success: true, avatarUrl: stored.url };
+      await db.update(professionalProfiles).set({ avatarUrl }).where(eq4(professionalProfiles.id, profile.id));
+      return { success: true, avatarUrl };
     })
   }),
   service: router({
@@ -2928,8 +2940,21 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const rows = await db.select().from(requests).where(eq4(requests.profileId, profile.id)).orderBy(desc2(requests.createdAt));
-      return Promise.all(rows.map(async (request) => ({ ...request, attachments: await db.select().from(requestAttachments).where(eq4(requestAttachments.requestId, request.id)) })));
+      const [rows, allQuotes] = await Promise.all([
+        db.select().from(requests).where(eq4(requests.profileId, profile.id)).orderBy(desc2(requests.createdAt)),
+        db.select().from(quotes).where(eq4(quotes.profileId, profile.id))
+      ]);
+      const quoteByRequestId = new Map(allQuotes.filter((q) => q.requestId).map((q) => [q.requestId, q]));
+      return Promise.all(rows.map(async (request) => {
+        const linkedQuote = quoteByRequestId.get(request.id);
+        const attachments = await db.select().from(requestAttachments).where(eq4(requestAttachments.requestId, request.id));
+        return {
+          ...request,
+          attachments,
+          linkedQuote: linkedQuote ? { id: linkedQuote.id, status: linkedQuote.status, totalCents: linkedQuote.totalCents } : null,
+          quoteStatus: linkedQuote?.status || null
+        };
+      }));
     }),
     createPublic: publicProcedure.input(z2.object({
       slug: z2.string(),
@@ -3006,7 +3031,7 @@ var appRouter = router({
             fileUrl = stored.url;
           } catch (storageErr) {
             console.warn("[createPublic] Storage put failed, saving fallback:", storageErr);
-            fileUrl = `/api/attachments/temp/${attachment.name}`;
+            fileUrl = attachment.dataUrl;
           }
           await db.insert(requestAttachments).values({
             requestId,
@@ -3197,32 +3222,32 @@ var appRouter = router({
       }
       return { success: true };
     }),
-    create: protectedProcedure.input(z2.object({ clientId: z2.number().optional(), requestId: z2.number().optional(), serviceId: z2.number().optional(), description: z2.string().max(1800).optional(), discountCents: z2.number().int().min(0).default(0), notes: z2.string().max(1800).optional(), paymentTerms: z2.string().max(1e3).optional(), validUntil: z2.string().datetime().optional(), sendNow: z2.boolean().default(false), items: z2.array(z2.object({ description: z2.string().min(1).max(180), quantity: z2.number().int().min(1).max(100), unitPriceCents: z2.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(z2.object({ clientId: z2.number().optional(), requestId: z2.number().optional(), serviceId: z2.number().optional(), description: z2.string().max(1800).optional(), discountCents: z2.number().int().min(0).default(0), notes: z2.string().max(1800).optional(), paymentTerms: z2.string().max(1e3).optional(), validUntil: z2.string().datetime().optional(), sendNow: z2.boolean().default(false), items: z2.array(z2.object({ description: z2.string().min(1).max(180), quantity: z2.number().min(0.01).max(1e3), unitPriceCents: z2.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       if (input.clientId) await getOwnedClient(profile.id, input.clientId);
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const subtotalCents = input.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
+      const subtotalCents = input.items.reduce((sum, item) => sum + Math.round(item.quantity * item.unitPriceCents), 0);
       const totalCents = Math.max(0, subtotalCents - input.discountCents);
       const secureToken = nanoid(32);
       const insert = await db.insert(quotes).values({ profileId: profile.id, clientId: input.clientId ?? null, requestId: input.requestId ?? null, serviceId: input.serviceId ?? null, description: input.description ?? null, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? null, paymentTerms: input.paymentTerms ?? null, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : null, secureToken, status: input.sendNow ? "enviado" : "rascunho" });
       const quoteId = Number(insert[0].insertId);
-      await db.insert(quoteItems).values(input.items.map((item) => ({ quoteId, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
+      await db.insert(quoteItems).values(input.items.map((item) => ({ quoteId, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: Math.round(item.quantity * item.unitPriceCents) })));
       if (input.requestId) await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(and2(eq4(requests.id, input.requestId), eq4(requests.profileId, profile.id)));
       if (input.sendNow) await createNotification(profile.id, "Or\xE7amento enviado", "Seu or\xE7amento est\xE1 dispon\xEDvel por um link p\xFAblico.", "quote");
       return { success: true, quoteId, token: input.sendNow ? secureToken : null };
     }),
-    update: protectedProcedure.input(z2.object({ id: z2.number(), description: z2.string().max(1800).optional(), discountCents: z2.number().int().min(0).default(0), notes: z2.string().max(1800).optional(), paymentTerms: z2.string().max(1e3).optional(), validUntil: z2.string().datetime().optional(), sendNow: z2.boolean().default(true), items: z2.array(z2.object({ description: z2.string().min(1).max(180), quantity: z2.number().int().min(1).max(100), unitPriceCents: z2.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(z2.object({ id: z2.number(), description: z2.string().max(1800).optional(), discountCents: z2.number().int().min(0).default(0), notes: z2.string().max(1800).optional(), paymentTerms: z2.string().max(1e3).optional(), validUntil: z2.string().datetime().optional(), sendNow: z2.boolean().default(true), items: z2.array(z2.object({ description: z2.string().min(1).max(180), quantity: z2.number().min(0.01).max(1e3), unitPriceCents: z2.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const existing = (await db.select().from(quotes).where(and2(eq4(quotes.id, input.id), eq4(quotes.profileId, profile.id))).limit(1))[0];
       if (!existing) throw new TRPCError3({ code: "NOT_FOUND", message: "Or\xE7amento n\xE3o encontrado." });
-      const subtotalCents = input.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
+      const subtotalCents = input.items.reduce((sum, item) => sum + Math.round(item.quantity * item.unitPriceCents), 0);
       const totalCents = Math.max(0, subtotalCents - input.discountCents);
       await db.delete(quoteItems).where(eq4(quoteItems.quoteId, input.id));
-      await db.insert(quoteItems).values(input.items.map((item) => ({ quoteId: input.id, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
+      await db.insert(quoteItems).values(input.items.map((item) => ({ quoteId: input.id, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: Math.round(item.quantity * item.unitPriceCents) })));
       await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : "rascunho", respondedAt: null }).where(eq4(quotes.id, input.id));
       if (input.sendNow) await createNotification(profile.id, "Or\xE7amento revisado e reenviado", "A proposta atualizada est\xE1 dispon\xEDvel no link do cliente.", "quote");
       return { success: true, token: input.sendNow ? existing.secureToken : null };
@@ -3317,6 +3342,17 @@ var appRouter = router({
         }
       } else {
         await createNotification(quote.profileId, "Or\xE7amento recusado", "O cliente recusou a proposta.", "quote_response");
+      }
+      if (quote.requestId) {
+        try {
+          if (input.action === "aceito") {
+            await db.update(requests).set({ status: "proposta_aceita" }).where(eq4(requests.id, quote.requestId));
+          } else if (input.action === "alteracao_solicitada") {
+            await db.update(requests).set({ status: "em_analise" }).where(eq4(requests.id, quote.requestId));
+          }
+        } catch (reqUpdateErr) {
+          console.warn("[respondPublic] Erro ao sincronizar status da solicita\xE7\xE3o:", reqUpdateErr);
+        }
       }
       await db.update(quotes).set(updateData).where(eq4(quotes.id, quote.id));
       return { success: true };
@@ -3625,8 +3661,14 @@ var appRouter = router({
       const buffer = Buffer.from(encoded, "base64");
       if (buffer.length > 5e6) throw new TRPCError3({ code: "BAD_REQUEST", message: "A foto deve ter no m\xE1ximo 5 MB." });
       const sanitizedName = input.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
-      const stored = await storagePut(`profiles/${profile.id}/team-avatar-${Date.now()}-${sanitizedName}`, buffer, input.mimeType);
-      return { success: true, avatarUrl: stored.url };
+      let avatarUrl = input.dataUrl;
+      try {
+        const stored = await storagePut(`profiles/${profile.id}/team-avatar-${Date.now()}-${sanitizedName}`, buffer, input.mimeType);
+        if (stored?.url) avatarUrl = stored.url;
+      } catch (err) {
+        console.warn("[team.uploadAvatar] Storage put failed, using dataUrl fallback:", err);
+      }
+      return { success: true, avatarUrl };
     }),
     report: protectedProcedure.input(z2.object({
       from: z2.string().datetime().optional(),
@@ -3732,14 +3774,25 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      const now = /* @__PURE__ */ new Date();
-      const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-      const from = input?.from ? new Date(input.from) : defaultFrom;
-      const to = input?.to ? new Date(input.to) : new Date(now.getTime() + 1);
+      const appConditions = [eq4(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
+      const payConditions = [eq4(payments.profileId, profile.id)];
+      const clientConditions = [eq4(clients.profileId, profile.id)];
+      if (input?.from) {
+        const fromDate = new Date(input.from);
+        appConditions.push(gte(appointments.startsAt, fromDate));
+        payConditions.push(gte(payments.createdAt, fromDate));
+        clientConditions.push(gte(clients.createdAt, fromDate));
+      }
+      if (input?.to) {
+        const toDate = new Date(input.to);
+        appConditions.push(lte(appointments.startsAt, toDate));
+        payConditions.push(lte(payments.createdAt, toDate));
+        clientConditions.push(lte(clients.createdAt, toDate));
+      }
       const [periodAppointments, periodPayments, periodClients, profileServices] = await Promise.all([
-        db.select().from(appointments).where(and2(eq4(appointments.profileId, profile.id), gte(appointments.startsAt, from), lte(appointments.startsAt, to), ne(appointments.status, "cancelado"))),
-        db.select().from(payments).where(and2(eq4(payments.profileId, profile.id), gte(payments.createdAt, from), lte(payments.createdAt, to))),
-        db.select().from(clients).where(and2(eq4(clients.profileId, profile.id), gte(clients.createdAt, from), lte(clients.createdAt, to))),
+        db.select().from(appointments).where(and2(...appConditions)),
+        db.select().from(payments).where(and2(...payConditions)),
+        db.select().from(clients).where(and2(...clientConditions)),
         db.select().from(services).where(eq4(services.profileId, profile.id))
       ]);
       const metrics = calculateDeduplicatedMetrics(periodAppointments, periodPayments);
@@ -3750,7 +3803,7 @@ var appRouter = router({
       const clientVisitCounts = /* @__PURE__ */ new Map();
       for (const item of allClientAppointments) if (item.clientId) clientVisitCounts.set(item.clientId, (clientVisitCounts.get(item.clientId) || 0) + 1);
       const recurringClientIds = Array.from(clientVisitCounts.values()).filter((count) => count > 1).length;
-      return { from, to, revenueCents: metrics.faturamentoCents, receivedCents: metrics.recebidoCents, pendingCents: metrics.pendenteCents, appointmentCount: metrics.appointmentCount, newClients: periodClients.length, recurringClients: recurringClientIds, topServices };
+      return { from: input?.from ? new Date(input.from) : null, to: input?.to ? new Date(input.to) : null, revenueCents: metrics.faturamentoCents, receivedCents: metrics.recebidoCents, pendingCents: metrics.pendenteCents, appointmentCount: metrics.appointmentCount, newClients: periodClients.length, recurringClients: recurringClientIds, topServices };
     })
   }),
   dashboard: router({

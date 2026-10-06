@@ -408,6 +408,9 @@ export function ServicesPage() {
       setOpen(false);
       reset();
     },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao criar serviço.");
+    },
   });
   const update = trpc.service.update.useMutation({
     onSuccess: () => {
@@ -415,6 +418,9 @@ export function ServicesPage() {
       utils.service.list.invalidate();
       setOpen(false);
       reset();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao atualizar serviço.");
     },
   });
   const [open, setOpen] = useState(false);
@@ -451,13 +457,31 @@ export function ServicesPage() {
   };
   const submit = () => {
     if (!form.name.trim()) return toast.error("Informe o nome do serviço.");
+    const dur = Number(form.durationMinutes);
+    if (isNaN(dur) || !Number.isInteger(dur) || dur < 15) {
+      return toast.error("Duração deve ser um número inteiro de no mínimo 15 minutos.");
+    }
+    if (dur > 1440) {
+      return toast.error("Duração máxima permitida é de 1440 minutos (24 horas).");
+    }
+    if (form.price && /[a-zA-Z]/.test(form.price)) {
+      return toast.error("Preço do serviço contém caracteres inválidos.");
+    }
+    const priceCents = parseBrlToCents(form.price);
+    if (priceCents < 0) {
+      return toast.error("Preço do serviço não pode ser negativo.");
+    }
+    if (priceCents > 100_000_000) {
+      return toast.error("Preço máximo permitido é de R$ 1.000.000,00.");
+    }
+
     const spell = checkServiceSpelling(form.name);
     const finalName = spell.hasCorrection ? spell.correctedText : form.name;
     const payload = {
       name: finalName,
       description: form.description || undefined,
-      durationMinutes: Number(form.durationMinutes),
-      priceCents: parseBrlToCents(form.price),
+      durationMinutes: dur,
+      priceCents,
       modality: form.modality,
     };
     if (editingId) update.mutate({ id: editingId, ...payload, active: form.active });

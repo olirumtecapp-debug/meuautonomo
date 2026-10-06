@@ -179,7 +179,7 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
         }
       }}
     >
-      <DialogContent className="max-h-[95vh] w-[95vw] max-w-lg overflow-y-auto rounded-[28px] border-0 bg-white p-6 shadow-[0_25px_70px_rgba(19,42,39,0.18)] sm:p-8">
+      <DialogContent className="max-h-[95vh] w-[95vw] max-w-lg overflow-y-auto rounded-[28px] border-0 bg-white p-4 shadow-[0_25px_70px_rgba(19,42,39,0.18)] sm:p-8">
         <DialogHeader className="text-center sm:text-left">
           <div className="flex items-center justify-between">
             <img src="/logo.png" alt="MeuAutônomo" className="h-10 w-auto object-contain" />
@@ -198,24 +198,24 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
         </DialogHeader>
 
         {/* Abas Alternáveis */}
-        <div className="mt-4 grid grid-cols-2 rounded-2xl bg-[#f5f7f2] p-1.5 text-sm font-semibold">
+        <div className="mt-4 grid grid-cols-2 rounded-2xl bg-[#f5f7f2] p-1.5 text-xs sm:text-sm font-semibold">
           <button
             type="button"
             onClick={() => handleTabChange("register")}
             className={cn(
-              "flex items-center justify-center gap-2 rounded-xl py-2.5 transition",
+              "flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 transition truncate",
               tab === "register"
                 ? "bg-[#173a34] text-white shadow-sm"
                 : "text-[#5b736b] hover:text-[#173a34]"
             )}
           >
-            <UserPlus className="h-4 w-4" /> Criar Conta
+            <UserPlus className="h-4 w-4 shrink-0" /> <span className="truncate">Criar Conta</span>
           </button>
           <button
             type="button"
             onClick={() => handleTabChange("login")}
             className={cn(
-              "flex items-center justify-center gap-2 rounded-xl py-2.5 transition",
+              "flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 transition truncate",
               tab === "login"
                 ? "bg-[#173a34] text-white shadow-sm"
                 : "text-[#5b736b] hover:text-[#173a34]"

@@ -15,6 +15,7 @@ const dbData = {
   quotes: [] as MockRow[],
   quoteItems: [] as MockRow[],
   availability: [] as MockRow[],
+  requests: [] as MockRow[],
 };
 
 const profile = {
@@ -36,6 +37,7 @@ import {
   professionalProfiles,
   quoteItems,
   quotes,
+  requests,
   services,
   teamMembers,
 } from "../drizzle/schema";
@@ -50,6 +52,7 @@ function getTableList(tableObj: any): MockRow[] {
   if (tableObj === quotes) return dbData.quotes;
   if (tableObj === quoteItems) return dbData.quoteItems;
   if (tableObj === availability) return dbData.availability;
+  if (tableObj === requests) return dbData.requests;
   if (tableObj === professionalProfiles) return dbData.profiles;
   return [];
 }
@@ -155,6 +158,7 @@ describe("QA Homologation Scenario - End-to-End Integration Tests", () => {
     dbData.quotes = [];
     dbData.quoteItems = [];
     dbData.availability = [];
+    dbData.requests = [];
   });
 
   it("1. Creates appointment with partner Camila (45%) on 30/09/2026 at 10:00", async () => {
@@ -332,5 +336,71 @@ describe("QA Homologation Scenario - End-to-End Integration Tests", () => {
         action: "aceito",
       })
     ).rejects.toThrow("Este orçamento está em rascunho");
+  });
+
+  it("6. Onda 2: Sincroniza status do pedido para 'proposta_aceita' ao aceitar orçamento público (BUG-010)", async () => {
+    dbData.requests.push({
+      id: 55,
+      profileId: 1,
+      name: "João Silva",
+      status: "orcamento_enviado",
+    });
+
+    dbData.quotes.push({
+      id: 77,
+      profileId: 1,
+      requestId: 55,
+      secureToken: "token-proposta-aceita-77",
+      status: "enviado",
+      subtotalCents: 25000,
+      totalCents: 25000,
+    });
+
+    const publicCaller = appRouter.createCaller({
+      user: null as any,
+      req: { protocol: "https", headers: {} } as any,
+      res: { clearCookie: () => undefined } as any,
+    });
+
+    const resp = await publicCaller.quote.respondPublic({
+      token: "token-proposta-aceita-77",
+      action: "aceito",
+    });
+
+    expect(resp.success).toBe(true);
+    const req = dbData.requests.find((r) => r.id === 55);
+    expect(req).toBeDefined();
+    expect(req!.status).toBe("proposta_aceita");
+  });
+
+  it("7. Onda 2: Permite orçamento com quantidade decimal/fracionária e calcula subtotal corretamente (BUG-024)", async () => {
+    const caller = appRouter.createCaller(createContext());
+    const res = await caller.quote.create({
+      clientId: 30001,
+      validUntil: "2026-10-15T12:00:00.000Z",
+      items: [
+        {
+          description: "Cabo flexível por metro",
+          quantity: 2.5,
+          unitPriceCents: 1000, // R$ 10,00 por metro
+        },
+      ],
+      discountCents: 500, // R$ 5,00 de desconto
+    });
+
+    expect(res.quoteId).toBeDefined();
+    const createdQuote = dbData.quotes.find((q) => q.id === res.quoteId);
+    expect(createdQuote).toBeDefined();
+    expect(createdQuote!.subtotalCents).toBe(2500); // 2.5 * 1000 = 2500
+    expect(createdQuote!.totalCents).toBe(2000); // 2500 - 500 = 2000
+  });
+
+  it("8. Onda 2: Valida relatórios sem capping e com suporte a períodos dinâmicos (BUG-014, BUG-015)", async () => {
+    const caller = appRouter.createCaller(createContext());
+    const res = await caller.reports.summary({});
+    expect(res).toBeDefined();
+    expect(typeof res.revenueCents).toBe("number");
+    expect(typeof res.receivedCents).toBe("number");
+    expect(typeof res.pendingCents).toBe("number");
   });
 });

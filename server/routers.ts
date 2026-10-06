@@ -429,11 +429,17 @@ export const appRouter = router({
       if (!encoded) throw new TRPCError({ code: "BAD_REQUEST", message: "Arquivo inválido." });
       const buffer = Buffer.from(encoded, "base64");
       if (buffer.length > 5_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "A foto deve ter no máximo 5 MB." });
-      const stored = await storagePut(`profiles/${profile.id}/avatar-${input.fileName}`, buffer, input.mimeType);
+      let avatarUrl = input.dataUrl;
+      try {
+        const stored = await storagePut(`profiles/${profile.id}/avatar-${input.fileName}`, buffer, input.mimeType);
+        if (stored?.url) avatarUrl = stored.url;
+      } catch (err) {
+        console.warn("[uploadAvatar] Storage put failed, using dataUrl fallback:", err);
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(professionalProfiles).set({ avatarUrl: stored.url }).where(eq(professionalProfiles.id, profile.id));
-      return { success: true, avatarUrl: stored.url };
+      await db.update(professionalProfiles).set({ avatarUrl }).where(eq(professionalProfiles.id, profile.id));
+      return { success: true, avatarUrl };
     }),
   }),
 
@@ -661,8 +667,21 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const rows = await db.select().from(requests).where(eq(requests.profileId, profile.id)).orderBy(desc(requests.createdAt));
-      return Promise.all(rows.map(async request => ({ ...request, attachments: await db.select().from(requestAttachments).where(eq(requestAttachments.requestId, request.id)) })));
+      const [rows, allQuotes] = await Promise.all([
+        db.select().from(requests).where(eq(requests.profileId, profile.id)).orderBy(desc(requests.createdAt)),
+        db.select().from(quotes).where(eq(quotes.profileId, profile.id)),
+      ]);
+      const quoteByRequestId = new Map(allQuotes.filter(q => q.requestId).map(q => [q.requestId!, q]));
+      return Promise.all(rows.map(async request => {
+        const linkedQuote = quoteByRequestId.get(request.id);
+        const attachments = await db.select().from(requestAttachments).where(eq(requestAttachments.requestId, request.id));
+        return {
+          ...request,
+          attachments,
+          linkedQuote: linkedQuote ? { id: linkedQuote.id, status: linkedQuote.status, totalCents: linkedQuote.totalCents } : null,
+          quoteStatus: linkedQuote?.status || null
+        };
+      }));
     }),
     createPublic: publicProcedure.input(z.object({
       slug: z.string(),
@@ -744,7 +763,7 @@ export const appRouter = router({
             fileUrl = stored.url;
           } catch (storageErr) {
             console.warn("[createPublic] Storage put failed, saving fallback:", storageErr);
-            fileUrl = `/api/attachments/temp/${attachment.name}`;
+            fileUrl = attachment.dataUrl;
           }
           await db.insert(requestAttachments).values({
             requestId,
@@ -965,32 +984,32 @@ export const appRouter = router({
         }
         return { success: true };
       }),
-    create: protectedProcedure.input(z.object({ clientId: z.number().optional(), requestId: z.number().optional(), serviceId: z.number().optional(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(false), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().int().min(1).max(100), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
+    create: protectedProcedure.input(z.object({ clientId: z.number().optional(), requestId: z.number().optional(), serviceId: z.number().optional(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(false), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().min(0.01).max(1000), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       if (input.clientId) await getOwnedClient(profile.id, input.clientId);
       if (input.serviceId) await getOwnedService(profile.id, input.serviceId);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const subtotalCents = input.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
+      const subtotalCents = input.items.reduce((sum, item) => sum + Math.round(item.quantity * item.unitPriceCents), 0);
       const totalCents = Math.max(0, subtotalCents - input.discountCents);
       const secureToken = nanoid(32);
       const insert = (await db.insert(quotes).values({ profileId: profile.id, clientId: input.clientId ?? null, requestId: input.requestId ?? null, serviceId: input.serviceId ?? null, description: input.description ?? null, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? null, paymentTerms: input.paymentTerms ?? null, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : null, secureToken, status: input.sendNow ? "enviado" : "rascunho" })) as unknown as [{ insertId: number }];
       const quoteId = Number(insert[0].insertId);
-      await db.insert(quoteItems).values(input.items.map(item => ({ quoteId, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
+      await db.insert(quoteItems).values(input.items.map(item => ({ quoteId, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: Math.round(item.quantity * item.unitPriceCents) })));
       if (input.requestId) await db.update(requests).set({ status: input.sendNow ? "orcamento_enviado" : "em_analise" }).where(and(eq(requests.id, input.requestId), eq(requests.profileId, profile.id)));
       if (input.sendNow) await createNotification(profile.id, "Orçamento enviado", "Seu orçamento está disponível por um link público.", "quote");
       return { success: true, quoteId, token: input.sendNow ? secureToken : null };
     }),
-    update: protectedProcedure.input(z.object({ id: z.number(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(true), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().int().min(1).max(100), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
+    update: protectedProcedure.input(z.object({ id: z.number(), description: z.string().max(1800).optional(), discountCents: z.number().int().min(0).default(0), notes: z.string().max(1800).optional(), paymentTerms: z.string().max(1000).optional(), validUntil: z.string().datetime().optional(), sendNow: z.boolean().default(true), items: z.array(z.object({ description: z.string().min(1).max(180), quantity: z.number().min(0.01).max(1000), unitPriceCents: z.number().int().min(0) })).min(1) })).mutation(async ({ ctx, input }) => {
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const existing = (await db.select().from(quotes).where(and(eq(quotes.id, input.id), eq(quotes.profileId, profile.id))).limit(1))[0];
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Orçamento não encontrado." });
-      const subtotalCents = input.items.reduce((sum, item) => sum + item.quantity * item.unitPriceCents, 0);
+      const subtotalCents = input.items.reduce((sum, item) => sum + Math.round(item.quantity * item.unitPriceCents), 0);
       const totalCents = Math.max(0, subtotalCents - input.discountCents);
       await db.delete(quoteItems).where(eq(quoteItems.quoteId, input.id));
-      await db.insert(quoteItems).values(input.items.map(item => ({ quoteId: input.id, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: item.quantity * item.unitPriceCents })));
+      await db.insert(quoteItems).values(input.items.map(item => ({ quoteId: input.id, description: item.description, quantity: item.quantity, unitPriceCents: item.unitPriceCents, totalCents: Math.round(item.quantity * item.unitPriceCents) })));
       await db.update(quotes).set({ description: input.description ?? existing.description, subtotalCents, discountCents: input.discountCents, totalCents, notes: input.notes ?? existing.notes, paymentTerms: input.paymentTerms ?? existing.paymentTerms, changeRequest: null, validUntil: input.validUntil ? new Date(input.validUntil) : existing.validUntil, status: input.sendNow ? "enviado" : "rascunho", respondedAt: null }).where(eq(quotes.id, input.id));
       if (input.sendNow) await createNotification(profile.id, "Orçamento revisado e reenviado", "A proposta atualizada está disponível no link do cliente.", "quote");
       return { success: true, token: input.sendNow ? existing.secureToken : null };
@@ -1089,6 +1108,17 @@ export const appRouter = router({
         }
       } else {
         await createNotification(quote.profileId, "Orçamento recusado", "O cliente recusou a proposta.", "quote_response");
+      }
+      if (quote.requestId) {
+        try {
+          if (input.action === "aceito") {
+            await db.update(requests).set({ status: "proposta_aceita" }).where(eq(requests.id, quote.requestId));
+          } else if (input.action === "alteracao_solicitada") {
+            await db.update(requests).set({ status: "em_analise" }).where(eq(requests.id, quote.requestId));
+          }
+        } catch (reqUpdateErr) {
+          console.warn("[respondPublic] Erro ao sincronizar status da solicitação:", reqUpdateErr);
+        }
       }
       await db.update(quotes).set(updateData).where(eq(quotes.id, quote.id));
       return { success: true };
@@ -1441,8 +1471,14 @@ export const appRouter = router({
       const buffer = Buffer.from(encoded, "base64");
       if (buffer.length > 5_000_000) throw new TRPCError({ code: "BAD_REQUEST", message: "A foto deve ter no máximo 5 MB." });
       const sanitizedName = input.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
-      const stored = await storagePut(`profiles/${profile.id}/team-avatar-${Date.now()}-${sanitizedName}`, buffer, input.mimeType);
-      return { success: true, avatarUrl: stored.url };
+      let avatarUrl = input.dataUrl;
+      try {
+        const stored = await storagePut(`profiles/${profile.id}/team-avatar-${Date.now()}-${sanitizedName}`, buffer, input.mimeType);
+        if (stored?.url) avatarUrl = stored.url;
+      } catch (err) {
+        console.warn("[team.uploadAvatar] Storage put failed, using dataUrl fallback:", err);
+      }
+      return { success: true, avatarUrl };
     }),
 
     report: protectedProcedure.input(z.object({
@@ -1563,14 +1599,28 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const now = new Date();
-      const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-      const from = input?.from ? new Date(input.from) : defaultFrom;
-      const to = input?.to ? new Date(input.to) : new Date(now.getTime() + 1);
+
+      const appConditions = [eq(appointments.profileId, profile.id), ne(appointments.status, "cancelado")];
+      const payConditions = [eq(payments.profileId, profile.id)];
+      const clientConditions = [eq(clients.profileId, profile.id)];
+
+      if (input?.from) {
+        const fromDate = new Date(input.from);
+        appConditions.push(gte(appointments.startsAt, fromDate));
+        payConditions.push(gte(payments.createdAt, fromDate));
+        clientConditions.push(gte(clients.createdAt, fromDate));
+      }
+      if (input?.to) {
+        const toDate = new Date(input.to);
+        appConditions.push(lte(appointments.startsAt, toDate));
+        payConditions.push(lte(payments.createdAt, toDate));
+        clientConditions.push(lte(clients.createdAt, toDate));
+      }
+
       const [periodAppointments, periodPayments, periodClients, profileServices] = await Promise.all([
-        db.select().from(appointments).where(and(eq(appointments.profileId, profile.id), gte(appointments.startsAt, from), lte(appointments.startsAt, to), ne(appointments.status, "cancelado"))),
-        db.select().from(payments).where(and(eq(payments.profileId, profile.id), gte(payments.createdAt, from), lte(payments.createdAt, to))),
-        db.select().from(clients).where(and(eq(clients.profileId, profile.id), gte(clients.createdAt, from), lte(clients.createdAt, to))),
+        db.select().from(appointments).where(and(...appConditions)),
+        db.select().from(payments).where(and(...payConditions)),
+        db.select().from(clients).where(and(...clientConditions)),
         db.select().from(services).where(eq(services.profileId, profile.id)),
       ]);
       const metrics = calculateDeduplicatedMetrics(periodAppointments as any, periodPayments as any);
@@ -1581,7 +1631,7 @@ export const appRouter = router({
       const clientVisitCounts = new Map<number, number>();
       for (const item of allClientAppointments) if (item.clientId) clientVisitCounts.set(item.clientId, (clientVisitCounts.get(item.clientId) || 0) + 1);
       const recurringClientIds = Array.from(clientVisitCounts.values()).filter(count => count > 1).length;
-      return { from, to, revenueCents: metrics.faturamentoCents, receivedCents: metrics.recebidoCents, pendingCents: metrics.pendenteCents, appointmentCount: metrics.appointmentCount, newClients: periodClients.length, recurringClients: recurringClientIds, topServices };
+      return { from: input?.from ? new Date(input.from) : null, to: input?.to ? new Date(input.to) : null, revenueCents: metrics.faturamentoCents, receivedCents: metrics.recebidoCents, pendingCents: metrics.pendenteCents, appointmentCount: metrics.appointmentCount, newClients: periodClients.length, recurringClients: recurringClientIds, topServices };
     }),
   }),
 

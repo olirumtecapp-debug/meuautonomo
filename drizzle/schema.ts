@@ -138,7 +138,7 @@ export const requests = mysqlTable("requests", {
   address: text("address"),
   desiredAt: timestamp("desiredAt"),
   preferredTime: varchar("preferredTime", { length: 80 }),
-  status: mysqlEnum("status", ["nova", "em_analise", "orcamento_enviado", "agendada", "arquivada"]).default("nova").notNull(),
+  status: mysqlEnum("status", ["nova", "em_analise", "orcamento_enviado", "proposta_aceita", "agendada", "arquivada"]).default("nova").notNull(),
   secureToken: varchar("secureToken", { length: 80 }).notNull().unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
