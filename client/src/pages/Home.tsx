@@ -20,7 +20,7 @@ export default function Home() {
   const [authTab, setAuthTab] = useState<"register" | "login" | "forgot">("register");
   const [installModalOpen, setInstallModalOpen] = useState(false);
   const [contactDevOpen, setContactDevOpen] = useState(false);
-  const [showInstallPill, setShowInstallPill] = useState(true);
+  const [showInstallPill, setShowInstallPill] = useState(false);
   const { theme, setTheme } = useTheme();
   const { user, logout } = useAuth();
 
@@ -29,14 +29,55 @@ export default function Home() {
     setAuthOpen(true);
   };
 
+  const handleDismissPill = () => {
+    setShowInstallPill(false);
+    try {
+      localStorage.setItem("meuautonomo_install_pill_dismissed", "true");
+    } catch (e) {}
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // Detecta se a aplicação já está instalada ou rodando em modo standalone (PWA no celular ou desktop)
+    const isStandalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+      document.referrer.includes("android-app://");
+
+    const alreadyInstalled = localStorage.getItem("meuautonomo_app_installed") === "true";
+    const dismissed = localStorage.getItem("meuautonomo_install_pill_dismissed") === "true";
+
+    if (isStandalone) {
+      try {
+        localStorage.setItem("meuautonomo_app_installed", "true");
+      } catch (e) {}
+      setShowInstallPill(false);
+    } else if (!alreadyInstalled && !dismissed) {
+      setShowInstallPill(true);
+    }
+
+    const handleInstalled = () => {
+      setShowInstallPill(false);
+      try {
+        localStorage.setItem("meuautonomo_app_installed", "true");
+      } catch (e) {}
+    };
+
+    window.addEventListener("appinstalled", handleInstalled);
+    window.addEventListener("meuautonomo_app_installed_event", handleInstalled);
+
     const params = new URLSearchParams(window.location.search);
     if (params.get("login") === "true") {
       openAuth("login");
     } else if (params.get("register") === "true") {
       openAuth("register");
     }
+
+    return () => {
+      window.removeEventListener("appinstalled", handleInstalled);
+      window.removeEventListener("meuautonomo_app_installed_event", handleInstalled);
+    };
   }, []);
 
   return <div className="min-h-screen overflow-hidden bg-[#f5f7f2] text-[#173a34]">
@@ -373,7 +414,7 @@ export default function Home() {
             </Button>
             <button
               type="button"
-              onClick={() => setShowInstallPill(false)}
+              onClick={handleDismissPill}
               className="grid h-7 w-7 place-items-center rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
               title="Dispensar aviso"
               aria-label="Dispensar aviso de instalação"

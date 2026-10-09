@@ -49,8 +49,15 @@ export function InstallAppModal({ open, onOpenChange }: InstallAppModalProps) {
     // Detecta se já está rodando como app instalado
     const isStandaloneMode =
       window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true ||
+      document.referrer.includes("android-app://");
     setIsStandalone(isStandaloneMode);
+
+    if (isStandaloneMode) {
+      try {
+        localStorage.setItem("meuautonomo_app_installed", "true");
+      } catch (e) {}
+    }
 
     if (globalDeferredPrompt) {
       setCanPrompt(true);
@@ -66,6 +73,10 @@ export function InstallAppModal({ open, onOpenChange }: InstallAppModalProps) {
       setInstallSuccess(true);
       setCanPrompt(false);
       globalDeferredPrompt = null;
+      try {
+        localStorage.setItem("meuautonomo_app_installed", "true");
+        window.dispatchEvent(new Event("meuautonomo_app_installed_event"));
+      } catch (e) {}
     };
 
     window.addEventListener("beforeinstallprompt", handlePrompt);
@@ -85,6 +96,10 @@ export function InstallAppModal({ open, onOpenChange }: InstallAppModalProps) {
       if (choice.outcome === "accepted") {
         setInstallSuccess(true);
         setCanPrompt(false);
+        try {
+          localStorage.setItem("meuautonomo_app_installed", "true");
+          window.dispatchEvent(new Event("meuautonomo_app_installed_event"));
+        } catch (e) {}
       }
       globalDeferredPrompt = null;
     } catch (err) {
