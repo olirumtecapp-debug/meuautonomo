@@ -20,6 +20,7 @@ export default function Home() {
   const [authTab, setAuthTab] = useState<"register" | "login" | "forgot">("register");
   const [installModalOpen, setInstallModalOpen] = useState(false);
   const [contactDevOpen, setContactDevOpen] = useState(false);
+  const [showInstallPill, setShowInstallPill] = useState(true);
   const { theme, setTheme } = useTheme();
   const { user, logout } = useAuth();
 
@@ -39,109 +40,175 @@ export default function Home() {
   }, []);
 
   return <div className="min-h-screen overflow-hidden bg-[#f5f7f2] text-[#173a34]">
-    <header className="relative z-20 border-b border-[#dce5dc] bg-[#f5f7f2]/90 backdrop-blur">
-      <div className="container mx-auto px-4 sm:px-6 flex h-20 sm:h-24 items-center justify-between">
-        <a href="#top" className="flex items-center py-1"><img src="/logo.png" alt="MeuAutônomo" className="h-13 sm:h-16 w-auto object-contain" /></a>
-        <nav className="hidden items-center gap-3 text-sm font-semibold text-[#5c756d] md:flex">
-          <a href="#como-funciona" className="transition hover:text-[#173a34]">Como funciona</a>
-          <a href="#recursos" className="transition hover:text-[#173a34]">Recursos</a>
+    <header className="sticky top-0 z-40 border-b border-[#dce5dc]/90 bg-[#f5f7f2]/95 backdrop-blur-md">
+      <div className="container mx-auto px-4 sm:px-6 flex h-18 sm:h-20 items-center justify-between gap-4">
+        {/* Lado Esquerdo: Logo Oficial e Links Principais com Espaçamento Generoso */}
+        <div className="flex items-center gap-8 lg:gap-10 shrink-0">
+          <a href="#top" className="flex items-center py-1 shrink-0" aria-label="MeuAutônomo Home">
+            <img src="/logo.png" alt="MeuAutônomo" className="h-9 sm:h-11 w-auto object-contain" />
+          </a>
+          <nav className="hidden lg:flex items-center gap-7 text-sm font-semibold text-[#5c756d]">
+            <a href="#como-funciona" className="whitespace-nowrap transition hover:text-[#173a34]">Como funciona</a>
+            <a href="#recursos" className="whitespace-nowrap transition hover:text-[#173a34]">Recursos</a>
+          </nav>
+        </div>
+
+        {/* Lado Direito: Ações Principais e CTA de Entrada / Cadastro */}
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+          {/* Botão Instalar App (desktop e tablet) */}
           <button
             type="button"
             onClick={() => setInstallModalOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-[#cbd8cc] bg-white/70 px-3 py-1.5 text-xs font-bold text-[#173a34] transition hover:bg-white hover:text-[#173a34] cursor-pointer"
-            title="Instalar no celular ou computador"
+            className="hidden md:inline-flex items-center gap-1.5 rounded-xl border border-[#cbd8cc] bg-white/80 hover:bg-white hover:border-[#8aa500] px-3 py-1.5 text-xs font-bold text-[#173a34] transition shadow-2xs hover:shadow-xs cursor-pointer whitespace-nowrap"
+            title="Instalar aplicativo no smartphone ou computador"
           >
-            <Download className="h-3.5 w-3.5 text-[#8aa500]" /> Instalar App
+            <Download className="h-3.5 w-3.5 text-[#8aa500]" />
+            <span>Instalar App</span>
           </button>
-          <button
-            type="button"
-            onClick={() => setContactDevOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#5c756d] transition hover:text-[#173a34] cursor-pointer"
-            title="Falar com o desenvolvedor CreativeAM"
-          >
-            <Code2 className="h-3.5 w-3.5 text-[#8aa500]" /> Suporte & Dev
-          </button>
-          <label className="sr-only" htmlFor="theme-select">Tema</label>
-          <select id="theme-select" value={theme} onChange={event => setTheme(event.target.value as "light" | "dark" | "system")} className="h-9 rounded-xl border border-[#dce5dc] bg-white/60 px-2 text-xs font-semibold text-[#58716b] outline-none focus:ring-2 focus:ring-[#d9f56a]">
-            <option value="light">Claro</option>
-            <option value="dark">Escuro</option>
-            <option value="system">Automático</option>
-          </select>
+
+          {/* Seletor Compacto de Tema */}
+          <div className="hidden lg:flex items-center">
+            <label className="sr-only" htmlFor="theme-select">Tema</label>
+            <select
+              id="theme-select"
+              value={theme}
+              onChange={event => setTheme(event.target.value as "light" | "dark" | "system")}
+              className="h-8 rounded-xl border border-[#dce5dc] bg-white/70 px-2 text-xs font-semibold text-[#58716b] outline-none transition hover:border-[#cbd8cc] focus:ring-2 focus:ring-[#d9f56a]"
+            >
+              <option value="light">Claro</option>
+              <option value="dark">Escuro</option>
+              <option value="system">Auto</option>
+            </select>
+          </div>
+
+          <div className="hidden sm:block h-4 w-px bg-[#dce5dc] mx-0.5" />
+
+          {/* Autenticação e Entrada */}
           {user ? (
-            <div className="flex items-center gap-2">
-              <Button onClick={() => window.location.href = "/app"} className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]">
-                <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Meu Espaço ({user.name?.split(" ")[0] || "Autônomo"})
+            <div className="hidden sm:flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => window.location.href = "/app"}
+                className="h-9 rounded-xl bg-[#173a34] px-4 text-xs font-bold text-white hover:bg-[#28564d] shadow-sm whitespace-nowrap"
+              >
+                <Sparkles className="mr-1.5 h-3.5 w-3.5 text-[#d9f56a]" /> Meu Espaço ({user.name?.split(" ")[0] || "Autônomo"})
               </Button>
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={logout}
-                className="rounded-xl px-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-700"
+                className="h-9 rounded-xl px-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-700 whitespace-nowrap"
                 title="Sair desta conta para criar ou entrar com outra"
               >
                 <LogOut className="mr-1 h-3.5 w-3.5" /> Sair
               </Button>
             </div>
           ) : (
-            <>
-              <Button variant="ghost" onClick={() => openAuth("login")} className="rounded-xl text-[#173a34] hover:bg-[#e4ece4]">
+            <div className="hidden sm:flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openAuth("login")}
+                className="h-9 rounded-xl px-3 text-xs sm:text-sm font-semibold text-[#173a34] hover:bg-[#e4ece4] whitespace-nowrap"
+              >
                 <LogIn className="mr-1.5 h-4 w-4" /> Entrar
               </Button>
-              <Button onClick={() => openAuth("register")} className="rounded-xl bg-[#173a34] text-white hover:bg-[#28564d]">
+              <Button
+                size="sm"
+                onClick={() => openAuth("register")}
+                className="h-9 rounded-xl bg-[#173a34] px-4 text-xs sm:text-sm font-bold text-white shadow-sm hover:bg-[#28564d] whitespace-nowrap"
+              >
                 <UserPlus className="mr-1.5 h-4 w-4" /> Criar Conta
               </Button>
-            </>
-          )}
-        </nav>
-        <button className="rounded-xl p-2 md:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Abrir menu">{menuOpen ? <X /> : <Menu />}</button>
-      </div>
-      {menuOpen && <div className="border-t border-[#dce5dc] bg-white p-4 md:hidden">
-        <div className="grid gap-3">
-          <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-semibold">Como funciona</a>
-          <a href="#recursos" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-semibold">Recursos</a>
-          
-          <Button
-            variant="outline"
-            onClick={() => { setMenuOpen(false); setInstallModalOpen(true); }}
-            className="w-full justify-start rounded-xl border-[#cbd8cc] text-[#173a34] font-bold"
-          >
-            <Download className="mr-2 h-4 w-4 text-[#8aa500]" /> Instalar no Celular ou PC
-          </Button>
-
-          <Button
-            variant="ghost"
-            onClick={() => { setMenuOpen(false); setContactDevOpen(true); }}
-            className="w-full justify-start rounded-xl text-[#5c756d]"
-          >
-            <Code2 className="mr-2 h-4 w-4 text-[#8aa500]" /> Falar com Desenvolvedor (CreativeAM)
-          </Button>
-
-          <label className="px-3 pt-2 text-xs font-semibold uppercase tracking-wider text-[#82948e]" htmlFor="mobile-theme-select">Tema</label>
-          <select id="mobile-theme-select" value={theme} onChange={event => setTheme(event.target.value as "light" | "dark" | "system")} className="h-11 rounded-xl border border-[#dce5dc] bg-white px-3 text-sm font-semibold">
-            <option value="light">Claro</option>
-            <option value="dark">Escuro</option>
-            <option value="system">Automático</option>
-          </select>
-          {user ? (
-            <div className="grid gap-2 pt-2">
-              <Button onClick={() => window.location.href = "/app"} className="w-full rounded-xl bg-[#173a34] text-white">
-                <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Acessar Meu Espaço ({user.name?.split(" ")[0] || "Autônomo"})
-              </Button>
-              <Button variant="outline" onClick={logout} className="w-full rounded-xl border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50">
-                <LogOut className="mr-1.5 h-4 w-4" /> Sair desta conta
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 pt-2">
-              <Button variant="outline" onClick={() => { setMenuOpen(false); openAuth("login"); }} className="rounded-xl border-[#cbd8cc] text-[#173a34]">
-                Entrar
-              </Button>
-              <Button onClick={() => { setMenuOpen(false); openAuth("register"); }} className="rounded-xl bg-[#173a34] text-white">
-                Criar Conta
-              </Button>
             </div>
           )}
+
+          {/* Botão de Menu Mobile e Tablet */}
+          <button
+            className="grid h-10 w-10 place-items-center rounded-xl border border-[#dce5dc] bg-white/70 text-[#173a34] hover:bg-white lg:hidden transition"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Abrir menu"
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
         </div>
-      </div>}
+      </div>
+
+      {/* Gaveta de Navegação Mobile & Tablet */}
+      {menuOpen && (
+        <div className="border-t border-[#dce5dc] bg-white p-5 lg:hidden shadow-lg animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="grid gap-3">
+            <a
+              href="#como-funciona"
+              onClick={() => setMenuOpen(false)}
+              className="rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[#173a34] hover:bg-[#f5f7f2] transition"
+            >
+              Como funciona
+            </a>
+            <a
+              href="#recursos"
+              onClick={() => setMenuOpen(false)}
+              className="rounded-xl px-3.5 py-2.5 text-sm font-semibold text-[#173a34] hover:bg-[#f5f7f2] transition"
+            >
+              Recursos
+            </a>
+
+            <div className="h-px bg-[#eef2ee] my-1" />
+
+            <Button
+              variant="outline"
+              onClick={() => { setMenuOpen(false); setInstallModalOpen(true); }}
+              className="w-full justify-start rounded-xl border-[#cbd8cc] text-[#173a34] font-bold h-11"
+            >
+              <Download className="mr-2 h-4 w-4 text-[#8aa500]" /> Instalar no Celular ou PC
+            </Button>
+
+            <Button
+              variant="ghost"
+              onClick={() => { setMenuOpen(false); setContactDevOpen(true); }}
+              className="w-full justify-start rounded-xl text-[#5c756d] hover:text-[#173a34] h-11"
+            >
+              <Code2 className="mr-2 h-4 w-4 text-[#8aa500]" /> Falar com o Desenvolvedor (CreativeAM)
+            </Button>
+
+            <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-[#f5f7f2]">
+              <span className="text-xs font-semibold text-[#5c756d]">Tema visual:</span>
+              <select
+                id="mobile-theme-select"
+                value={theme}
+                onChange={event => setTheme(event.target.value as "light" | "dark" | "system")}
+                className="h-9 rounded-lg border border-[#dce5dc] bg-white px-2.5 text-xs font-semibold text-[#173a34]"
+              >
+                <option value="light">Claro</option>
+                <option value="dark">Escuro</option>
+                <option value="system">Automático</option>
+              </select>
+            </div>
+
+            <div className="h-px bg-[#eef2ee] my-1" />
+
+            {user ? (
+              <div className="grid gap-2 pt-1">
+                <Button onClick={() => window.location.href = "/app"} className="w-full h-11 rounded-xl bg-[#173a34] text-white font-bold">
+                  <Sparkles className="mr-1.5 h-4 w-4 text-[#d9f56a]" /> Acessar Meu Espaço ({user.name?.split(" ")[0] || "Autônomo"})
+                </Button>
+                <Button variant="outline" onClick={logout} className="w-full h-10 rounded-xl border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50">
+                  <LogOut className="mr-1.5 h-4 w-4" /> Sair desta conta
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Button variant="outline" onClick={() => { setMenuOpen(false); openAuth("login"); }} className="h-11 rounded-xl border-[#cbd8cc] text-[#173a34] font-semibold">
+                  <LogIn className="mr-1.5 h-4 w-4" /> Entrar
+                </Button>
+                <Button onClick={() => { setMenuOpen(false); openAuth("register"); }} className="h-11 rounded-xl bg-[#173a34] text-white font-bold">
+                  <UserPlus className="mr-1.5 h-4 w-4" /> Criar Conta
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </header>
     <main id="top">
       <section className="relative">
@@ -283,27 +350,40 @@ export default function Home() {
       </section>
     </main>
 
-    {/* Floating bottom install pill */}
-    <aside aria-label="Instalação do Aplicativo" className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 px-4 w-full max-w-md">
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#dce5dc] bg-[#173a34] px-4 py-2.5 text-white shadow-[0_12px_30px_rgba(19,42,39,0.25)] backdrop-blur">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#d9f56a] text-[#173a34]">
-            <Download className="h-4 w-4" />
+    {/* Floating bottom install pill (dismissible) */}
+    {showInstallPill && (
+      <aside aria-label="Instalação do Aplicativo" className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 px-4 w-full max-w-md animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#dce5dc] bg-[#173a34] px-4 py-2.5 text-white shadow-[0_12px_30px_rgba(19,42,39,0.25)] backdrop-blur">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#d9f56a] text-[#173a34]">
+              <Download className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-white">Instalar o MeuAutônomo</p>
+              <p className="truncate text-[10px] text-white/70">Acesse direto da sua tela inicial ou PC</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-xs font-bold text-white">Instalar o MeuAutônomo</p>
-            <p className="truncate text-[10px] text-white/70">Acesse direto da sua tela inicial ou PC</p>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setInstallModalOpen(true)}
+              className="rounded-xl bg-[#d9f56a] px-3 py-1 text-xs font-bold text-[#173a34] hover:bg-[#cbe65c]"
+            >
+              Instalar
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowInstallPill(false)}
+              className="grid h-7 w-7 place-items-center rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition cursor-pointer"
+              title="Dispensar aviso"
+              aria-label="Dispensar aviso de instalação"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
-        <Button
-          size="sm"
-          onClick={() => setInstallModalOpen(true)}
-          className="shrink-0 rounded-xl bg-[#d9f56a] px-3 py-1 text-xs font-bold text-[#173a34] hover:bg-[#cbe65c]"
-        >
-          Instalar
-        </Button>
-      </div>
-    </aside>
+      </aside>
+    )}
 
     <footer className="border-t border-[#dce5dc] py-8 bg-[#f5f7f2]">
       <div className="container mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-[#82948e]">
