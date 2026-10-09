@@ -48,6 +48,7 @@ import {
   Gift,
   Ticket,
   Crown,
+  Code2,
 } from "lucide-react";
 import { CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -55,6 +56,7 @@ import { toast } from "sonner";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
 import { InstallAppModal } from "./InstallAppModal";
+import { ContactDevModal } from "./ContactDevModal";
 import { GuidedTutorialModal } from "./GuidedTutorialModal";
 import { VoucherRedeemModal } from "./VoucherRedeemModal";
 import { ReferralModal } from "./ReferralModal";
@@ -112,6 +114,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
   const isMobile = useIsMobile();
   const [isResizing, setIsResizing] = useState(false);
   const [installModalOpen, setInstallModalOpen] = useState(false);
+  const [contactDevOpen, setContactDevOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [voucherModalOpen, setVoucherModalOpen] = useState(false);
   const [referralModalOpen, setReferralModalOpen] = useState(false);
@@ -244,6 +247,20 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
                 <span className="rounded-md bg-[#d9f56a]/20 px-1.5 py-0.5 text-[9px] font-bold text-[#d9f56a]">PC / Celular</span>
               </button>
             </div>
+            <div className="mb-2 px-1 group-data-[collapsible=icon]:hidden">
+              <button
+                type="button"
+                onClick={() => setContactDevOpen(true)}
+                className="flex w-full items-center justify-between rounded-xl bg-white/5 px-2.5 py-2 text-xs font-medium text-white/80 transition hover:bg-white/10 hover:text-white cursor-pointer"
+                title="Falar diretamente com o desenvolvedor CreativeAM"
+              >
+                <span className="flex items-center gap-2">
+                  <Code2 className="h-3.5 w-3.5 text-[#d9f56a]" />
+                  <span>Falar com o Desenvolvedor</span>
+                </span>
+                <span className="rounded-md bg-[#25d366]/20 px-1.5 py-0.5 text-[9px] font-bold text-[#4ade80]">WhatsApp</span>
+              </button>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#d9f56a] group-data-[collapsible=icon]:justify-center">
@@ -259,6 +276,9 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
                 <DropdownMenuItem onClick={() => setInstallModalOpen(true)} className="cursor-pointer font-medium text-[#173a34]">
                   <Download className="mr-2 h-4 w-4 text-[#8aa500]" /> Instalar no Celular ou PC
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setContactDevOpen(true)} className="cursor-pointer font-medium text-[#173a34]">
+                  <Code2 className="mr-2 h-4 w-4 text-[#8aa500]" /> Falar com o Desenvolvedor
+                </DropdownMenuItem>
                 <p className="px-2 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Aparência</p>
                 <DropdownMenuItem onClick={() => setTheme("light")} className="cursor-pointer"><SunMedium className="mr-2 h-4 w-4" /> Claro {theme === "light" && <span className="ml-auto text-xs text-[#8aa500]">Ativo</span>}</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setTheme("dark")} className="cursor-pointer"><Moon className="mr-2 h-4 w-4" /> Escuro {theme === "dark" && <span className="ml-auto text-xs text-[#8aa500]">Ativo</span>}</DropdownMenuItem>
@@ -266,6 +286,16 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
                 <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive"><LogOut className="mr-2 h-4 w-4" /> Sair da conta</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <div className="pt-2 text-center group-data-[collapsible=icon]:hidden">
+              <button
+                type="button"
+                onClick={() => setContactDevOpen(true)}
+                className="text-[10px] text-white/40 hover:text-white/70 transition cursor-pointer"
+                title="CreativeAM Soluções Digitais"
+              >
+                Criado por <span className="font-bold text-white/60">CreativeAM</span>
+              </button>
+            </div>
           </SidebarFooter>
         </Sidebar>
         <div className={`absolute right-0 top-0 z-50 h-full w-1 cursor-col-resize transition hover:bg-[#d9f56a]/40 ${isCollapsed ? "hidden" : ""}`} onMouseDown={() => setIsResizing(true)} />
@@ -408,6 +438,7 @@ function DashboardLayoutContent({ children, setSidebarWidth }: { children: React
           {menuItems.slice(0, 5).map(item => { const active = location === item.path; return <button key={item.path} onClick={() => setLocation(item.path)} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-semibold ${active ? "text-[#173a34]" : "text-[#8a9b95]"}`}><item.icon className={`h-5 w-5 ${active ? "text-[#8aa500]" : ""}`} /><span className="truncate">{item.label}</span></button>; })}
         </nav>}
         <InstallAppModal open={installModalOpen} onOpenChange={setInstallModalOpen} />
+        <ContactDevModal open={contactDevOpen} onOpenChange={setContactDevOpen} />
         <GuidedTutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} />
         <VoucherRedeemModal open={voucherModalOpen} onOpenChange={setVoucherModalOpen} />
         <ReferralModal open={referralModalOpen} onOpenChange={setReferralModalOpen} />

@@ -3619,6 +3619,12 @@ Quer ativar para experimentar no seu próximo serviço?`}
           </Card>
         </div>
       )}
+
+      <footer className="mt-12 pt-6 border-t border-[#dce5dc] pb-8 text-center text-xs text-[#71867f]">
+        <p>
+          Painel de Controle MeuAutônomo • Desenvolvido com excelência por <strong className="text-[#173a34]">CreativeAM</strong>
+        </p>
+      </footer>
     </div>
   );
 }

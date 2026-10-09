@@ -2191,6 +2191,83 @@ function modeloOrcamentoAprovado(params) {
   `;
   return { assunto, texto, html };
 }
+function modeloRecuperacaoSenha(params) {
+  const assunto = `C\xF3digo de Recupera\xE7\xE3o de Senha: ${params.codigo} \u2014 MeuAut\xF4nomo`;
+  const texto = `Ol\xE1, ${params.nome}!
+
+Recebemos uma solicita\xE7\xE3o para redefinir a senha da sua conta no MeuAut\xF4nomo.
+
+Seu c\xF3digo de verifica\xE7\xE3o \xE9: ${params.codigo}
+
+Este c\xF3digo \xE9 v\xE1lido por 20 minutos. Se voc\xEA n\xE3o solicitou esta altera\xE7\xE3o, ignore este e-mail.
+
+Equipe MeuAut\xF4nomo \u2022 CreativeAM`;
+  const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Recupera\xE7\xE3o de Senha \u2014 MeuAut\xF4nomo</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7f1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #173a34;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f7f1; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 40px rgba(23,58,52,0.08); border: 1px solid #dce5dc;">
+          <tr>
+            <td style="background-color: #173a34; padding: 28px 32px; text-align: center;">
+              <span style="display: inline-block; background-color: #d9f56a; color: #173a34; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 8px;">
+                MeuAut\xF4nomo
+              </span>
+              <h1 style="color: #ffffff; font-size: 20px; margin: 12px 0 0 0; font-weight: 700;">
+                Recupera\xE7\xE3o de Senha
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px; text-align: left;">
+              <p style="font-size: 15px; line-height: 1.6; margin: 0 0 16px 0; color: #3a574f;">
+                Ol\xE1, <strong>${params.nome}</strong>!
+              </p>
+              <p style="font-size: 14px; line-height: 1.6; margin: 0 0 24px 0; color: #526d64;">
+                Recebemos um pedido para redefinir a senha de acesso \xE0 sua conta vinculada ao e-mail <strong>${params.email}</strong>.
+              </p>
+
+              <div style="background-color: #f4f8ed; border-radius: 16px; padding: 20px; text-align: center; margin: 24px 0; border: 1px solid #dce8d5;">
+                <span style="font-size: 12px; color: #71867f; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; display: block; margin-bottom: 6px;">
+                  Seu C\xF3digo de Confirma\xE7\xE3o
+                </span>
+                <div style="font-size: 32px; font-weight: 900; letter-spacing: 0.25em; color: #173a34; font-family: monospace;">
+                  ${params.codigo}
+                </div>
+                <span style="font-size: 11px; color: #8aa500; font-weight: 600; display: block; margin-top: 6px;">
+                  V\xE1lido por 20 minutos
+                </span>
+              </div>
+
+              <p style="font-size: 13px; line-height: 1.6; margin: 0 0 16px 0; color: #698279;">
+                Insira este c\xF3digo na tela do MeuAut\xF4nomo para cadastrar sua nova senha.
+              </p>
+
+              <p style="font-size: 11px; line-height: 1.5; color: #8fa099; background-color: #f7f9f6; padding: 12px 14px; border-radius: 12px; margin: 20px 0 0 0;">
+                \u{1F512} Se voc\xEA n\xE3o solicitou a redefini\xE7\xE3o da sua senha, fique tranquilo: sua conta permanece segura e voc\xEA pode ignorar esta mensagem.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f9fbf8; padding: 18px 32px; border-top: 1px solid #edf1eb; text-align: center; font-size: 11px; color: #8fa099;">
+              Desenvolvido com excel\xEAncia por <strong>CreativeAM</strong> \u2022 MeuAut\xF4nomo
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+  return { assunto, texto, html };
+}
 
 // server/routers.ts
 import crypto3 from "node:crypto";
@@ -2415,6 +2492,7 @@ function secureEquals(left, right) {
   const rightBuffer = Buffer.from(right);
   return leftBuffer.length === rightBuffer.length && crypto3.timingSafeEqual(leftBuffer, rightBuffer);
 }
+var passwordResetMap = /* @__PURE__ */ new Map();
 var modality = z2.enum(["presencial", "endereco", "online", "hibrido"]);
 var paymentMethod = z2.enum(["pix", "dinheiro", "cartao", "transferencia", "outro"]);
 var appointmentStatus = z2.enum(["agendado", "confirmado", "andamento", "concluido", "cancelado", "faltou"]);
@@ -2644,6 +2722,92 @@ var appRouter = router({
         ]);
       }
       return { success: true };
+    }),
+    requestPasswordReset: publicProcedure.input(z2.object({ email: z2.string().email("Informe um e-mail v\xE1lido.") })).mutation(async ({ input }) => {
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const user = await getUserByEmail(normalizedEmail);
+      if (!user) {
+        return {
+          success: true,
+          message: "Se o e-mail estiver cadastrado, o c\xF3digo de recupera\xE7\xE3o foi enviado para sua caixa de entrada."
+        };
+      }
+      const code = Math.floor(1e5 + Math.random() * 9e5).toString();
+      const expiresAt = Date.now() + 20 * 60 * 1e3;
+      passwordResetMap.set(normalizedEmail, {
+        code,
+        expiresAt,
+        email: normalizedEmail,
+        userId: user.id
+      });
+      const emailData = modeloRecuperacaoSenha({
+        nome: user.name || "Profissional",
+        email: normalizedEmail,
+        codigo: code
+      });
+      try {
+        await enviarEmail({
+          para: normalizedEmail,
+          assunto: emailData.assunto,
+          texto: emailData.texto,
+          html: emailData.html
+        });
+      } catch (err) {
+        console.error("[Auth] Erro ao enviar e-mail de recupera\xE7\xE3o:", err);
+      }
+      return {
+        success: true,
+        message: "C\xF3digo de recupera\xE7\xE3o enviado com sucesso para seu e-mail!",
+        email: normalizedEmail
+      };
+    }),
+    resetPasswordWithCode: publicProcedure.input(
+      z2.object({
+        email: z2.string().email("Informe um e-mail v\xE1lido."),
+        code: z2.string().min(4, "C\xF3digo inv\xE1lido."),
+        newPassword: z2.string().min(6, "A nova senha deve ter no m\xEDnimo 6 caracteres.")
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const normalizedEmail = input.email.trim().toLowerCase();
+      const entry = passwordResetMap.get(normalizedEmail);
+      if (!entry || entry.code !== input.code.trim()) {
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: "C\xF3digo de recupera\xE7\xE3o incorreto ou n\xE3o encontrado."
+        });
+      }
+      if (Date.now() > entry.expiresAt) {
+        passwordResetMap.delete(normalizedEmail);
+        throw new TRPCError3({
+          code: "BAD_REQUEST",
+          message: "O c\xF3digo de recupera\xE7\xE3o expirou. Solicite um novo c\xF3digo."
+        });
+      }
+      const user = await getUserByEmail(normalizedEmail);
+      if (!user) {
+        throw new TRPCError3({
+          code: "NOT_FOUND",
+          message: "Usu\xE1rio n\xE3o encontrado."
+        });
+      }
+      const newHash = hashPassword(input.newPassword);
+      const db = await getDb();
+      if (db) {
+        await db.update(users).set({ passwordHash: newHash }).where(eq4(users.id, user.id));
+      }
+      passwordResetMap.delete(normalizedEmail);
+      const sessionToken = await sdk.createSessionToken(user.openId, {
+        name: user.name || "Profissional",
+        expiresInMs: ONE_YEAR_MS
+      });
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      return {
+        success: true,
+        message: "Senha alterada com sucesso! Voc\xEA j\xE1 est\xE1 conectado.",
+        sessionToken,
+        user
+      };
     })
   }),
   profile: router({

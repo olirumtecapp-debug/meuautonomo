@@ -305,3 +305,79 @@ export function modeloOrcamentoAprovado(params: ModeloOrcamentoAprovadoParams) {
 
   return { assunto, texto, html };
 }
+
+export function modeloRecuperacaoSenha(params: {
+  nome: string;
+  email: string;
+  codigo: string;
+}): { assunto: string; texto: string; html: string } {
+  const assunto = `Código de Recuperação de Senha: ${params.codigo} — MeuAutônomo`;
+  const texto = `Olá, ${params.nome}!\n\nRecebemos uma solicitação para redefinir a senha da sua conta no MeuAutônomo.\n\nSeu código de verificação é: ${params.codigo}\n\nEste código é válido por 20 minutos. Se você não solicitou esta alteração, ignore este e-mail.\n\nEquipe MeuAutônomo • CreativeAM`;
+
+  const html = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Recuperação de Senha — MeuAutônomo</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7f1; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #173a34;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f7f1; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 540px; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 40px rgba(23,58,52,0.08); border: 1px solid #dce5dc;">
+          <tr>
+            <td style="background-color: #173a34; padding: 28px 32px; text-align: center;">
+              <span style="display: inline-block; background-color: #d9f56a; color: #173a34; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; padding: 4px 10px; border-radius: 8px;">
+                MeuAutônomo
+              </span>
+              <h1 style="color: #ffffff; font-size: 20px; margin: 12px 0 0 0; font-weight: 700;">
+                Recuperação de Senha
+              </h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px; text-align: left;">
+              <p style="font-size: 15px; line-height: 1.6; margin: 0 0 16px 0; color: #3a574f;">
+                Olá, <strong>${params.nome}</strong>!
+              </p>
+              <p style="font-size: 14px; line-height: 1.6; margin: 0 0 24px 0; color: #526d64;">
+                Recebemos um pedido para redefinir a senha de acesso à sua conta vinculada ao e-mail <strong>${params.email}</strong>.
+              </p>
+
+              <div style="background-color: #f4f8ed; border-radius: 16px; padding: 20px; text-align: center; margin: 24px 0; border: 1px solid #dce8d5;">
+                <span style="font-size: 12px; color: #71867f; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; display: block; margin-bottom: 6px;">
+                  Seu Código de Confirmação
+                </span>
+                <div style="font-size: 32px; font-weight: 900; letter-spacing: 0.25em; color: #173a34; font-family: monospace;">
+                  ${params.codigo}
+                </div>
+                <span style="font-size: 11px; color: #8aa500; font-weight: 600; display: block; margin-top: 6px;">
+                  Válido por 20 minutos
+                </span>
+              </div>
+
+              <p style="font-size: 13px; line-height: 1.6; margin: 0 0 16px 0; color: #698279;">
+                Insira este código na tela do MeuAutônomo para cadastrar sua nova senha.
+              </p>
+
+              <p style="font-size: 11px; line-height: 1.5; color: #8fa099; background-color: #f7f9f6; padding: 12px 14px; border-radius: 12px; margin: 20px 0 0 0;">
+                🔒 Se você não solicitou a redefinição da sua senha, fique tranquilo: sua conta permanece segura e você pode ignorar esta mensagem.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f9fbf8; padding: 18px 32px; border-top: 1px solid #edf1eb; text-align: center; font-size: 11px; color: #8fa099;">
+              Desenvolvido com excelência por <strong>CreativeAM</strong> • MeuAutônomo
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  return { assunto, texto, html };
+}

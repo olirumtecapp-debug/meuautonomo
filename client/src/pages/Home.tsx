@@ -1,7 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/contexts/ThemeContext";
 import { AuthModal } from "@/components/AuthModal";
-import { ArrowRight, CalendarDays, CheckCircle2, CircleDollarSign, ClipboardList, LogIn, LogOut, Menu, Sparkles, UserPlus, Users, X } from "lucide-react";
+import { InstallAppModal } from "@/components/InstallAppModal";
+import { ContactDevModal } from "@/components/ContactDevModal";
+import { ArrowRight, CalendarDays, CheckCircle2, CircleDollarSign, ClipboardList, Code2, Download, LogIn, LogOut, Menu, Sparkles, UserPlus, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -15,7 +17,9 @@ const features = [
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
-  const [authTab, setAuthTab] = useState<"register" | "login">("register");
+  const [authTab, setAuthTab] = useState<"register" | "login" | "forgot">("register");
+  const [installModalOpen, setInstallModalOpen] = useState(false);
+  const [contactDevOpen, setContactDevOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { user, logout } = useAuth();
 
@@ -38,9 +42,25 @@ export default function Home() {
     <header className="relative z-20 border-b border-[#dce5dc] bg-[#f5f7f2]/90 backdrop-blur">
       <div className="container mx-auto px-4 sm:px-6 flex h-20 sm:h-24 items-center justify-between">
         <a href="#top" className="flex items-center py-1"><img src="/logo.png" alt="MeuAutônomo" className="h-13 sm:h-16 w-auto object-contain" /></a>
-        <nav className="hidden items-center gap-4 text-sm font-semibold text-[#5c756d] md:flex">
+        <nav className="hidden items-center gap-3 text-sm font-semibold text-[#5c756d] md:flex">
           <a href="#como-funciona" className="transition hover:text-[#173a34]">Como funciona</a>
           <a href="#recursos" className="transition hover:text-[#173a34]">Recursos</a>
+          <button
+            type="button"
+            onClick={() => setInstallModalOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#cbd8cc] bg-white/70 px-3 py-1.5 text-xs font-bold text-[#173a34] transition hover:bg-white hover:text-[#173a34] cursor-pointer"
+            title="Instalar no celular ou computador"
+          >
+            <Download className="h-3.5 w-3.5 text-[#8aa500]" /> Instalar App
+          </button>
+          <button
+            type="button"
+            onClick={() => setContactDevOpen(true)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#5c756d] transition hover:text-[#173a34] cursor-pointer"
+            title="Falar com o desenvolvedor CreativeAM"
+          >
+            <Code2 className="h-3.5 w-3.5 text-[#8aa500]" /> Suporte & Dev
+          </button>
           <label className="sr-only" htmlFor="theme-select">Tema</label>
           <select id="theme-select" value={theme} onChange={event => setTheme(event.target.value as "light" | "dark" | "system")} className="h-9 rounded-xl border border-[#dce5dc] bg-white/60 px-2 text-xs font-semibold text-[#58716b] outline-none focus:ring-2 focus:ring-[#d9f56a]">
             <option value="light">Claro</option>
@@ -78,6 +98,23 @@ export default function Home() {
         <div className="grid gap-3">
           <a href="#como-funciona" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-semibold">Como funciona</a>
           <a href="#recursos" onClick={() => setMenuOpen(false)} className="rounded-xl px-3 py-2 text-sm font-semibold">Recursos</a>
+          
+          <Button
+            variant="outline"
+            onClick={() => { setMenuOpen(false); setInstallModalOpen(true); }}
+            className="w-full justify-start rounded-xl border-[#cbd8cc] text-[#173a34] font-bold"
+          >
+            <Download className="mr-2 h-4 w-4 text-[#8aa500]" /> Instalar no Celular ou PC
+          </Button>
+
+          <Button
+            variant="ghost"
+            onClick={() => { setMenuOpen(false); setContactDevOpen(true); }}
+            className="w-full justify-start rounded-xl text-[#5c756d]"
+          >
+            <Code2 className="mr-2 h-4 w-4 text-[#8aa500]" /> Falar com Desenvolvedor (CreativeAM)
+          </Button>
+
           <label className="px-3 pt-2 text-xs font-semibold uppercase tracking-wider text-[#82948e]" htmlFor="mobile-theme-select">Tema</label>
           <select id="mobile-theme-select" value={theme} onChange={event => setTheme(event.target.value as "light" | "dark" | "system")} className="h-11 rounded-xl border border-[#dce5dc] bg-white px-3 text-sm font-semibold">
             <option value="light">Claro</option>
@@ -144,6 +181,17 @@ export default function Home() {
                   </Button>
                 </>
               )}
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setInstallModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-[#cbd8cc] bg-white/70 px-3.5 py-2 text-xs font-bold text-[#173a34] transition hover:bg-white hover:border-[#8aa500] cursor-pointer shadow-2xs"
+              >
+                <Download className="h-4 w-4 text-[#8aa500]" />
+                <span>Instalar no Celular ou Computador (App PWA)</span>
+                <span className="rounded-md bg-[#d9f56a] px-1.5 py-0.5 text-[10px] font-extrabold text-[#173a34]">1 Clique</span>
+              </button>
             </div>
             <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#708880]">
               <span><CheckCircle2 className="mr-1.5 inline h-4 w-4 text-[#8aa500]" />Sem planilhas</span>
@@ -234,14 +282,62 @@ export default function Home() {
         </div>
       </section>
     </main>
-    <footer className="border-t border-[#dce5dc] py-8">
-      <div className="container mx-auto px-4 sm:px-6 flex flex-col justify-between items-center gap-3 text-sm text-[#82948e] sm:flex-row">
-        <img src="/logo.png" alt="MeuAutônomo" className="h-8 w-auto object-contain" />
-        <span>Feito para profissionais que fazem acontecer.</span>
+
+    {/* Floating bottom install pill */}
+    <aside aria-label="Instalação do Aplicativo" className="fixed bottom-4 left-1/2 z-30 -translate-x-1/2 px-4 w-full max-w-md">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#dce5dc] bg-[#173a34] px-4 py-2.5 text-white shadow-[0_12px_30px_rgba(19,42,39,0.25)] backdrop-blur">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[#d9f56a] text-[#173a34]">
+            <Download className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-xs font-bold text-white">Instalar o MeuAutônomo</p>
+            <p className="truncate text-[10px] text-white/70">Acesse direto da sua tela inicial ou PC</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => setInstallModalOpen(true)}
+          className="shrink-0 rounded-xl bg-[#d9f56a] px-3 py-1 text-xs font-bold text-[#173a34] hover:bg-[#cbe65c]"
+        >
+          Instalar
+        </Button>
+      </div>
+    </aside>
+
+    <footer className="border-t border-[#dce5dc] py-8 bg-[#f5f7f2]">
+      <div className="container mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-[#82948e]">
+        <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="MeuAutônomo" className="h-8 w-auto object-contain" />
+          <span>Feito para profissionais que fazem acontecer.</span>
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-4 text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => setInstallModalOpen(true)}
+            className="inline-flex items-center gap-1.5 text-[#58716b] hover:text-[#173a34] transition cursor-pointer"
+          >
+            <Download className="h-3.5 w-3.5 text-[#8aa500]" /> Instalar App
+          </button>
+          <span className="text-[#cbd8cc]">|</span>
+          <button
+            type="button"
+            onClick={() => setContactDevOpen(true)}
+            className="inline-flex items-center gap-1.5 text-[#58716b] hover:text-[#173a34] transition cursor-pointer"
+          >
+            <Code2 className="h-3.5 w-3.5 text-[#8aa500]" /> Falar com o Desenvolvedor
+          </button>
+          <span className="text-[#cbd8cc]">|</span>
+          <span className="text-[#58716b]">
+            Criado por <strong className="text-[#173a34] font-bold">CreativeAM</strong>
+          </span>
+        </div>
       </div>
     </footer>
 
     <AuthModal open={authOpen} onOpenChange={setAuthOpen} defaultTab={authTab} />
+    <InstallAppModal open={installModalOpen} onOpenChange={setInstallModalOpen} />
+    <ContactDevModal open={contactDevOpen} onOpenChange={setContactDevOpen} />
   </div>;
 }
 

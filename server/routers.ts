@@ -27,7 +27,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { enviarEmail, modeloOrcamentoAprovado } from "./email";
+import { enviarEmail, modeloOrcamentoAprovado, modeloRecuperacaoSenha } from "./email";
 import { getAdminEmail, getAdminPassword, getAdminUsername, isDemoMode, setDemoMode } from "./demoConfig";
 import crypto from "node:crypto";
 import { generateReceiptAuthCode } from "./receiptAuth";
@@ -62,6 +62,14 @@ function secureEquals(left: string, right: string): boolean {
   const rightBuffer = Buffer.from(right);
   return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
+
+interface PasswordResetEntry {
+  code: string;
+  expiresAt: number;
+  email: string;
+  userId: number;
+}
+const passwordResetMap = new Map<string, PasswordResetEntry>();
 
 const modality = z.enum(["presencial", "endereco", "online", "hibrido"]);
 const paymentMethod = z.enum(["pix", "dinheiro", "cartao", "transferencia", "outro"]);
@@ -341,6 +349,112 @@ export const appRouter = router({
       }
       return { success: true } as const;
     }),
+
+    requestPasswordReset: publicProcedure
+      .input(z.object({ email: z.string().email("Informe um e-mail válido.") }))
+      .mutation(async ({ input }) => {
+        const normalizedEmail = input.email.trim().toLowerCase();
+        const user = await getUserByEmail(normalizedEmail);
+
+        if (!user) {
+          return {
+            success: true,
+            message: "Se o e-mail estiver cadastrado, o código de recuperação foi enviado para sua caixa de entrada.",
+          };
+        }
+
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = Date.now() + 20 * 60 * 1000; // 20 minutos
+
+        passwordResetMap.set(normalizedEmail, {
+          code,
+          expiresAt,
+          email: normalizedEmail,
+          userId: user.id,
+        });
+
+        const emailData = modeloRecuperacaoSenha({
+          nome: user.name || "Profissional",
+          email: normalizedEmail,
+          codigo: code,
+        });
+
+        try {
+          await enviarEmail({
+            para: normalizedEmail,
+            assunto: emailData.assunto,
+            texto: emailData.texto,
+            html: emailData.html,
+          });
+        } catch (err) {
+          console.error("[Auth] Erro ao enviar e-mail de recuperação:", err);
+        }
+
+        return {
+          success: true,
+          message: "Código de recuperação enviado com sucesso para seu e-mail!",
+          email: normalizedEmail,
+        };
+      }),
+
+    resetPasswordWithCode: publicProcedure
+      .input(
+        z.object({
+          email: z.string().email("Informe um e-mail válido."),
+          code: z.string().min(4, "Código inválido."),
+          newPassword: z.string().min(6, "A nova senha deve ter no mínimo 6 caracteres."),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const normalizedEmail = input.email.trim().toLowerCase();
+        const entry = passwordResetMap.get(normalizedEmail);
+
+        if (!entry || entry.code !== input.code.trim()) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Código de recuperação incorreto ou não encontrado.",
+          });
+        }
+
+        if (Date.now() > entry.expiresAt) {
+          passwordResetMap.delete(normalizedEmail);
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "O código de recuperação expirou. Solicite um novo código.",
+          });
+        }
+
+        const user = await getUserByEmail(normalizedEmail);
+        if (!user) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Usuário não encontrado.",
+          });
+        }
+
+        const newHash = hashPassword(input.newPassword);
+        const db = await getDb();
+        if (db) {
+          await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, user.id));
+        }
+
+        passwordResetMap.delete(normalizedEmail);
+
+        const sessionToken = await sdk.createSessionToken(user.openId, {
+          name: user.name || "Profissional",
+          expiresInMs: ONE_YEAR_MS,
+        });
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+        return {
+          success: true,
+          message: "Senha alterada com sucesso! Você já está conectado.",
+          sessionToken,
+          user,
+        };
+      }),
   }),
 
   profile: router({
