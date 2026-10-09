@@ -7,21 +7,21 @@
       "email": "contato@meuautonomo.com.br",
       "loginMethod": "local-dev",
       "role": "admin",
-      "createdAt": "2026-10-09T15:46:41.625Z",
-      "updatedAt": "2026-10-09T15:46:41.625Z",
-      "lastSignedIn": "2026-10-09T15:46:41.625Z"
+      "createdAt": "2026-10-09T16:21:23.362Z",
+      "updatedAt": "2026-10-09T16:21:23.362Z",
+      "lastSignedIn": "2026-10-09T16:21:23.362Z"
     },
     {
-      "openId": "user_sa7edPk6YRMD",
+      "openId": "user_Ge4mA8V_FV08",
       "name": "Mariana Gestora",
       "email": "mariana@marianastudio.com.br",
       "loginMethod": "local-password",
-      "passwordHash": "35c68b833aae0fcb42980498511033d4:784a423c3e8dc9214365e4f09a3b26b3a5df1380315032b7a83f7b8c4204b289371a7a1cba27cee3168df1555d847f5f59e1da5bcf90cbfd167f61cf96f25c2e",
+      "passwordHash": "71edd8ffdac16476953bae2b5482387f:ef502d6f3248cca442073908a8b55fa99ba70c05234ec19608e4728d313556ce068644d2a88b85ddf399975facc29a420288d923e649f3357155106f41d1c18d",
       "role": "user",
-      "lastSignedIn": "2026-10-09T15:46:41.850Z",
-      "createdAt": "2026-10-09T15:46:41.850Z",
+      "lastSignedIn": "2026-10-09T16:21:23.595Z",
+      "createdAt": "2026-10-09T16:21:23.595Z",
       "id": 2,
-      "updatedAt": "2026-10-09T15:46:41.850Z"
+      "updatedAt": "2026-10-09T16:21:23.595Z"
     }
   ],
   "professionalProfiles": [
@@ -40,11 +40,11 @@
       "bookingEnabled": true,
       "accountType": "equipe",
       "userId": 2,
-      "referralCode": "MARIANAS-G1OD",
+      "referralCode": "MARIANAS-TNLQ",
       "bio": null,
       "id": 1,
-      "createdAt": "2026-10-09T15:46:41.877Z",
-      "updatedAt": "2026-10-09T15:46:41.877Z"
+      "createdAt": "2026-10-09T16:21:23.611Z",
+      "updatedAt": "2026-10-09T16:21:23.611Z"
     }
   ],
   "availability": [],
@@ -60,8 +60,8 @@
       "address": null,
       "notes": null,
       "id": 1,
-      "createdAt": "2026-10-09T15:46:41.892Z",
-      "updatedAt": "2026-10-09T15:46:41.892Z"
+      "createdAt": "2026-10-09T16:21:23.632Z",
+      "updatedAt": "2026-10-09T16:21:23.632Z"
     },
     {
       "name": "Fernanda Lima",
@@ -73,8 +73,8 @@
       "address": null,
       "notes": null,
       "id": 2,
-      "createdAt": "2026-10-09T15:46:41.893Z",
-      "updatedAt": "2026-10-09T15:46:41.893Z"
+      "createdAt": "2026-10-09T16:21:23.638Z",
+      "updatedAt": "2026-10-09T16:21:23.638Z"
     },
     {
       "name": "Camila Santos",
@@ -86,8 +86,8 @@
       "address": null,
       "notes": null,
       "id": 3,
-      "createdAt": "2026-10-09T15:46:41.910Z",
-      "updatedAt": "2026-10-09T15:46:41.910Z"
+      "createdAt": "2026-10-09T16:21:23.640Z",
+      "updatedAt": "2026-10-09T16:21:23.640Z"
     }
   ],
   "appointments": [
@@ -105,8 +105,8 @@
       "notes": null,
       "paymentMethod": "pix",
       "id": 1,
-      "createdAt": "2026-10-09T15:46:41.916Z",
-      "updatedAt": "2026-10-09T15:46:41.930Z"
+      "createdAt": "2026-10-09T16:21:23.646Z",
+      "updatedAt": "2026-10-09T16:21:23.672Z"
     },
     {
       "teamMemberId": 2,
@@ -122,8 +122,8 @@
       "notes": null,
       "paymentMethod": "pix",
       "id": 2,
-      "createdAt": "2026-10-09T15:46:41.920Z",
-      "updatedAt": "2026-10-09T15:46:41.955Z"
+      "createdAt": "2026-10-09T16:21:23.648Z",
+      "updatedAt": "2026-10-09T16:21:23.676Z"
     },
     {
       "teamMemberId": 3,
@@ -139,8 +139,8 @@
       "notes": null,
       "paymentMethod": "pix",
       "id": 3,
-      "createdAt": "2026-10-09T15:46:41.923Z",
-      "updatedAt": "2026-10-09T15:46:41.962Z"
+      "createdAt": "2026-10-09T16:21:23.663Z",
+      "updatedAt": "2026-10-09T16:21:23.725Z"
     }
   ],
   "requests": [],
@@ -162,10 +162,10 @@
       "method": "pix",
       "status": "pago",
       "note": null,
-      "paidAt": "2026-10-09T15:46:41.927Z",
+      "paidAt": "2026-10-09T16:21:23.669Z",
       "id": 1,
-      "createdAt": "2026-10-09T15:46:41.927Z",
-      "updatedAt": "2026-10-09T15:46:41.927Z"
+      "createdAt": "2026-10-09T16:21:23.669Z",
+      "updatedAt": "2026-10-09T16:21:23.669Z"
     },
     {
       "profileId": 1,
@@ -181,10 +181,10 @@
       "method": "pix",
       "status": "pago",
       "note": null,
-      "paidAt": "2026-10-09T15:46:41.933Z",
+      "paidAt": "2026-10-09T16:21:23.674Z",
       "id": 2,
-      "createdAt": "2026-10-09T15:46:41.934Z",
-      "updatedAt": "2026-10-09T15:46:41.934Z"
+      "createdAt": "2026-10-09T16:21:23.674Z",
+      "updatedAt": "2026-10-09T16:21:23.674Z"
     },
     {
       "profileId": 1,
@@ -200,10 +200,10 @@
       "method": "pix",
       "status": "pago",
       "note": null,
-      "paidAt": "2026-10-09T15:46:41.958Z",
+      "paidAt": "2026-10-09T16:21:23.678Z",
       "id": 3,
-      "createdAt": "2026-10-09T15:46:41.958Z",
-      "updatedAt": "2026-10-09T15:46:41.958Z"
+      "createdAt": "2026-10-09T16:21:23.678Z",
+      "updatedAt": "2026-10-09T16:21:23.678Z"
     }
   ],
   "expenses": [
@@ -215,8 +215,8 @@
       "occurredAt": "2026-10-15T18:00:00.000Z",
       "note": null,
       "id": 1,
-      "createdAt": "2026-10-09T15:46:41.965Z",
-      "updatedAt": "2026-10-09T15:46:41.965Z"
+      "createdAt": "2026-10-09T16:21:23.730Z",
+      "updatedAt": "2026-10-09T16:21:23.730Z"
     }
   ],
   "notifications": [],
@@ -234,8 +234,8 @@
       "notes": null,
       "active": true,
       "id": 1,
-      "createdAt": "2026-10-09T15:46:41.883Z",
-      "updatedAt": "2026-10-09T15:46:41.883Z"
+      "createdAt": "2026-10-09T16:21:23.616Z",
+      "updatedAt": "2026-10-09T16:21:23.616Z"
     },
     {
       "profileId": 1,
@@ -250,8 +250,8 @@
       "notes": null,
       "active": true,
       "id": 2,
-      "createdAt": "2026-10-09T15:46:41.885Z",
-      "updatedAt": "2026-10-09T15:46:41.885Z"
+      "createdAt": "2026-10-09T16:21:23.621Z",
+      "updatedAt": "2026-10-09T16:21:23.621Z"
     },
     {
       "profileId": 1,
@@ -266,8 +266,8 @@
       "notes": null,
       "active": true,
       "id": 3,
-      "createdAt": "2026-10-09T15:46:41.886Z",
-      "updatedAt": "2026-10-09T15:46:41.886Z"
+      "createdAt": "2026-10-09T16:21:23.623Z",
+      "updatedAt": "2026-10-09T16:21:23.623Z"
     }
   ],
   "vouchers": [
@@ -306,6 +306,28 @@
     },
     {
       "id": 4,
+      "code": "EQUIPE20",
+      "description": "Degustação VIP 20 Dias Módulo Equipe / Estúdio",
+      "days": 20,
+      "plan": "team",
+      "isVipTotal": false,
+      "maxUses": 100,
+      "usedCount": 0,
+      "active": true
+    },
+    {
+      "id": 5,
+      "code": "VIP-EQUIPE20",
+      "description": "Acesso Especial 20 Dias Módulo Equipe / Estúdio",
+      "days": 20,
+      "plan": "team",
+      "isVipTotal": false,
+      "maxUses": 100,
+      "usedCount": 0,
+      "active": true
+    },
+    {
+      "id": 6,
       "code": "PRO10",
       "description": "Bônus 10 Dias Plano PRO",
       "days": 10,
@@ -316,7 +338,7 @@
       "active": true
     },
     {
-      "id": 5,
+      "id": 7,
       "code": "PRO15",
       "description": "Bônus 15 Dias Plano PRO",
       "days": 15,
@@ -327,7 +349,7 @@
       "active": true
     },
     {
-      "id": 6,
+      "id": 8,
       "code": "PRO30",
       "description": "Bônus 30 Dias (1 Mês Grátis)",
       "days": 30,
@@ -338,7 +360,7 @@
       "active": true
     },
     {
-      "id": 7,
+      "id": 9,
       "code": "VIPTOTAL",
       "description": "Acesso VIP Total Vitalício",
       "days": 0,
@@ -349,7 +371,7 @@
       "active": true
     },
     {
-      "id": 8,
+      "id": 10,
       "code": "VIP-MEUAUTONOMO",
       "description": "VIP Vitalício Fundador / Embaixador",
       "days": 0,
