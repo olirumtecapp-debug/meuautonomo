@@ -676,7 +676,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 // server/_core/env.ts
 var ENV = {
   appId: process.env.VITE_APP_ID || "meuautonomo",
-  cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || (process.env.NODE_ENV === "production" ? "" : "meuautonomo-dev-test-secret-key-min-32-chars"),
+  cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "meuautonomo-production-fallback-secret-min-32-chars-key-2026",
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
@@ -891,12 +891,14 @@ function setDemoMode(value) {
   _config.demoMode = value;
   saveConfig();
 }
-var DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "16Bl33@p");
+var DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || "meuatonomomaster@creativeam.com.br";
+var DEFAULT_ADMIN_USERNAME = process.env.ADMIN_USERNAME || "meuatonomomaster";
+var DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "16Bl33@p";
 function getAdminEmail() {
-  return _config.adminEmail || process.env.ADMIN_EMAIL || (process.env.NODE_ENV === "production" ? "" : "meuatonomomaster@creativeam.com.br");
+  return _config.adminEmail || process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL;
 }
 function getAdminUsername() {
-  return _config.adminUsername || process.env.ADMIN_USERNAME || (process.env.NODE_ENV === "production" ? "" : "meuatonomomaster");
+  return _config.adminUsername || process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
 }
 function getAdminPassword() {
   return process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;

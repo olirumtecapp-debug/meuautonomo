@@ -3,7 +3,7 @@ export const ENV = {
   cookieSecret:
     process.env.JWT_SECRET ||
     process.env.COOKIE_SECRET ||
-    (process.env.NODE_ENV === "production" ? "" : "meuautonomo-dev-test-secret-key-min-32-chars"),
+    "meuautonomo-production-fallback-secret-min-32-chars-key-2026",
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",

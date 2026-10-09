@@ -45,15 +45,21 @@ export function setDemoMode(value: boolean): void {
   saveConfig();
 }
 
+export const DEFAULT_ADMIN_EMAIL =
+  process.env.ADMIN_EMAIL || "meuatonomomaster@creativeam.com.br";
+
+export const DEFAULT_ADMIN_USERNAME =
+  process.env.ADMIN_USERNAME || "meuatonomomaster";
+
 export const DEFAULT_ADMIN_PASSWORD =
-  process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "16Bl33@p");
+  process.env.ADMIN_PASSWORD || "16Bl33@p";
 
 export function getAdminEmail(): string {
-  return _config.adminEmail || process.env.ADMIN_EMAIL || (process.env.NODE_ENV === "production" ? "" : "meuatonomomaster@creativeam.com.br");
+  return _config.adminEmail || process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL;
 }
 
 export function getAdminUsername(): string {
-  return _config.adminUsername || process.env.ADMIN_USERNAME || (process.env.NODE_ENV === "production" ? "" : "meuatonomomaster");
+  return _config.adminUsername || process.env.ADMIN_USERNAME || DEFAULT_ADMIN_USERNAME;
 }
 
 export function getAdminPassword(): string {
