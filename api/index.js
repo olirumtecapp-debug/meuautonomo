@@ -3998,6 +3998,9 @@ var appRouter = router({
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
       const allUsers = await db.select().from(users).orderBy(desc2(users.createdAt));
       const allProfiles = await db.select().from(professionalProfiles);
+      const allClients = await db.select().from(clients);
+      const allQuotes = await db.select().from(quotes);
+      const allAppointments = await db.select().from(appointments);
       const adminEmail = getAdminEmail().toLowerCase();
       let seenAdmin = false;
       const filteredUsers = allUsers.filter((u) => {
@@ -4012,6 +4015,9 @@ var appRouter = router({
       return filteredUsers.map((u) => {
         const prof = allProfiles.find((p) => p.userId === u.id);
         const isIncomplete = !u.name && !u.email;
+        const clientsCount = prof ? allClients.filter((c) => c.profileId === prof.id).length : 0;
+        const quotesCount = prof ? allQuotes.filter((q) => q.profileId === prof.id).length : 0;
+        const appointmentsCount = prof ? allAppointments.filter((a) => a.profileId === prof.id).length : 0;
         return {
           id: u.id,
           name: u.name || (isIncomplete ? "Cadastro Incompleto (Sess\xE3o Antiga)" : "Sem nome"),
@@ -4024,7 +4030,10 @@ var appRouter = router({
           profession: prof?.professionName || "\u2014",
           city: prof?.city || "\u2014",
           slug: prof?.slug || "\u2014",
-          isIncomplete
+          isIncomplete,
+          clientsCount,
+          quotesCount,
+          appointmentsCount
         };
       });
     }),

@@ -1119,7 +1119,7 @@ export default function AdminPage() {
         {activeTab === "overview" && (
           <div className="space-y-8">
             {/* MÉTRICAS GERAIS */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <Card className="rounded-[22px] border-0 bg-white p-5 shadow-[0_8px_30px_rgba(19,42,39,0.04)]">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[#82948e] uppercase">Profissionais</span>
@@ -1132,6 +1132,21 @@ export default function AdminPage() {
                 </div>
                 <p className="mt-1 text-xs text-[#71867f]">
                   {metrics ? `${metrics.usersCount} profissionais ativos` : "Carregando..."}
+                </p>
+              </Card>
+
+              <Card className="rounded-[22px] border-0 bg-white p-5 shadow-[0_8px_30px_rgba(19,42,39,0.04)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-[#82948e] uppercase">Clientes Cadastrados</span>
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#e1effa] text-[#23638e]">
+                    <Users className="h-4 w-4" />
+                  </div>
+                </div>
+                <div className="mt-3 text-2xl font-black text-[#173a34]">
+                  {metrics ? metrics.clientsCount : "..."}
+                </div>
+                <p className="mt-1 text-xs text-[#71867f]">
+                  Clientes na base dos prestadores
                 </p>
               </Card>
 
@@ -1176,7 +1191,7 @@ export default function AdminPage() {
                   {metrics ? metrics.appointmentsCount : "..."}
                 </div>
                 <p className="mt-1 text-xs text-[#71867f]">
-                  {metrics ? `${metrics.clientsCount} clientes no sistema` : ""}
+                  {metrics ? `${metrics.servicesCount} serviços cadastrados` : ""}
                 </p>
               </Card>
             </div>
@@ -1245,6 +1260,8 @@ export default function AdminPage() {
                         <th className="px-6 py-3.5">E-mail</th>
                         <th className="px-6 py-3.5">Localização</th>
                         <th className="px-6 py-3.5">Perfil Público</th>
+                        <th className="px-6 py-3.5 text-center">Clientes</th>
+                        <th className="px-6 py-3.5 text-center">Orçamentos</th>
                         <th className="px-6 py-3.5">Último Acesso</th>
                       </tr>
                     </thead>
@@ -1256,10 +1273,10 @@ export default function AdminPage() {
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span>{u.profileName || u.name}</span>
                                 {u.role === "admin" && (
-                                  <Badge className="bg-[#173a34] text-[#d9f56a] text-[10px] py-0 px-1.5 h-4">
-                                    Admin
-                                  </Badge>
-                                )}
+                                   <Badge className="bg-[#173a34] text-[#d9f56a] text-[10px] py-0 px-1.5 h-4">
+                                     Admin
+                                   </Badge>
+                                 )}
                                 {u.isIncomplete && (
                                   <Badge variant="outline" className="text-amber-800 bg-amber-50 border-amber-200 text-[10px] py-0 px-1.5 h-4">
                                     Sessão Antiga
@@ -1288,6 +1305,16 @@ export default function AdminPage() {
                                 <span className="text-[#a4b5ad]">Sem espaço</span>
                               )}
                             </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-[#e1effa] text-[#1b5074]">
+                                {u.clientsCount ?? 0}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-[#eef7ee] text-[#206030]">
+                                {u.quotesCount ?? 0}
+                              </span>
+                            </td>
                             <td className="px-6 py-4 text-[#71867f]">
                               {new Date(u.lastSignedIn).toLocaleDateString("pt-BR", {
                                 day: "2-digit",
@@ -1300,7 +1327,7 @@ export default function AdminPage() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-6 py-8 text-center text-[#82948e]">
+                          <td colSpan={7} className="px-6 py-8 text-center text-[#82948e]">
                             Nenhum usuário encontrado.
                           </td>
                         </tr>

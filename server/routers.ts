@@ -1843,6 +1843,9 @@ export const appRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
       const allProfiles = await db.select().from(professionalProfiles);
+      const allClients = await db.select().from(clients);
+      const allQuotes = await db.select().from(quotes);
+      const allAppointments = await db.select().from(appointments);
       const adminEmail = getAdminEmail().toLowerCase();
 
       // Deduplica visualmente registros de admin (mantendo o mais recente)
@@ -1860,6 +1863,9 @@ export const appRouter = router({
       return filteredUsers.map(u => {
         const prof = allProfiles.find(p => p.userId === u.id);
         const isIncomplete = !u.name && !u.email;
+        const clientsCount = prof ? allClients.filter(c => c.profileId === prof.id).length : 0;
+        const quotesCount = prof ? allQuotes.filter(q => q.profileId === prof.id).length : 0;
+        const appointmentsCount = prof ? allAppointments.filter(a => a.profileId === prof.id).length : 0;
         return {
           id: u.id,
           name: u.name || (isIncomplete ? "Cadastro Incompleto (Sessão Antiga)" : "Sem nome"),
@@ -1873,6 +1879,9 @@ export const appRouter = router({
           city: prof?.city || "—",
           slug: prof?.slug || "—",
           isIncomplete,
+          clientsCount,
+          quotesCount,
+          appointmentsCount,
         };
       });
     }),
