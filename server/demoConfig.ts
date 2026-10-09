@@ -12,8 +12,8 @@ interface AdminConfig {
 
 let _config: AdminConfig = {
   demoMode: false,
-  adminEmail: process.env.ADMIN_EMAIL || "meuatonomomaster@creativeam.com.br",
-  adminUsername: process.env.ADMIN_USERNAME || "meuatonomomaster",
+  adminEmail: process.env.ADMIN_EMAIL || "",
+  adminUsername: process.env.ADMIN_USERNAME || "",
 };
 
 // Load saved config if exists
@@ -45,12 +45,17 @@ export function setDemoMode(value: boolean): void {
   saveConfig();
 }
 
+export const DEFAULT_ADMIN_PASSWORD =
+  process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "16Bl33@p");
+
 export function getAdminEmail(): string {
-  return _config.adminEmail || "meuatonomomaster@creativeam.com.br";
+  return _config.adminEmail || process.env.ADMIN_EMAIL || (process.env.NODE_ENV === "production" ? "" : "meuatonomomaster@creativeam.com.br");
 }
 
 export function getAdminUsername(): string {
-  return _config.adminUsername || "meuatonomomaster";
+  return _config.adminUsername || process.env.ADMIN_USERNAME || (process.env.NODE_ENV === "production" ? "" : "meuatonomomaster");
 }
 
-export const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "16Bl33@p";
+export function getAdminPassword(): string {
+  return process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+}

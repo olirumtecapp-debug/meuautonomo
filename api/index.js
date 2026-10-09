@@ -451,7 +451,10 @@ function evaluateParsed(item, parsed) {
       if (op === ">") return itemTime > targetTime;
       if (op === "<") return itemTime < targetTime;
     }
-    if (op === "=") return itemVal === targetVal;
+    if (op === "=") {
+      if (targetVal === false) return itemVal === false || itemVal === void 0 || itemVal === null;
+      return itemVal === targetVal;
+    }
     if (op === "<>") return itemVal !== targetVal;
     if (op === ">=") return itemVal >= targetVal;
     if (op === "<=") return itemVal <= targetVal;
@@ -673,7 +676,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 // server/_core/env.ts
 var ENV = {
   appId: process.env.VITE_APP_ID || "meuautonomo",
-  cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "meuautonomo-jwt-secret-key-super-secure-min-32-chars-fallback",
+  cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || (process.env.NODE_ENV === "production" ? "" : "meuautonomo-dev-test-secret-key-min-32-chars"),
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
@@ -861,8 +864,8 @@ import path2 from "path";
 var CONFIG_FILE = path2.resolve(process.cwd(), "server", "data", "admin-config.json");
 var _config = {
   demoMode: false,
-  adminEmail: process.env.ADMIN_EMAIL || "meuatonomomaster@creativeam.com.br",
-  adminUsername: process.env.ADMIN_USERNAME || "meuatonomomaster"
+  adminEmail: process.env.ADMIN_EMAIL || "",
+  adminUsername: process.env.ADMIN_USERNAME || ""
 };
 try {
   if (fs2.existsSync(CONFIG_FILE)) {
@@ -888,13 +891,16 @@ function setDemoMode(value) {
   _config.demoMode = value;
   saveConfig();
 }
+var DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === "production" ? "" : "16Bl33@p");
 function getAdminEmail() {
-  return _config.adminEmail || "meuatonomomaster@creativeam.com.br";
+  return _config.adminEmail || process.env.ADMIN_EMAIL || (process.env.NODE_ENV === "production" ? "" : "meuatonomomaster@creativeam.com.br");
 }
 function getAdminUsername() {
-  return _config.adminUsername || "meuatonomomaster";
+  return _config.adminUsername || process.env.ADMIN_USERNAME || (process.env.NODE_ENV === "production" ? "" : "meuatonomomaster");
 }
-var DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "16Bl33@p";
+function getAdminPassword() {
+  return process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+}
 
 // server/_core/cookies.ts
 function isSecureRequest(req) {
@@ -1029,7 +1035,10 @@ var SDKServer = class {
     return new Map(Object.entries(parsed));
   }
   getSessionSecret() {
-    const secret = ENV.cookieSecret || "meuautonomo-jwt-secret-key-super-secure-min-32-chars-fallback";
+    const secret = ENV.cookieSecret;
+    if (!secret) {
+      throw new Error("JWT_SECRET or COOKIE_SECRET must be configured.");
+    }
     return new TextEncoder().encode(secret);
   }
   /**
@@ -1938,8 +1947,8 @@ var systemRouter = router({
 // server/email.ts
 import nodemailer from "nodemailer";
 var RESEND_API_URL = "https://api.resend.com/emails";
-var GMAIL_USER = process.env.GMAIL_USER || "contatocreativeam@gmail.com";
-var GMAIL_PASS = process.env.GMAIL_PASS || "kdepmqzpwvqwgcuo";
+var GMAIL_USER = process.env.GMAIL_USER;
+var GMAIL_PASS = process.env.GMAIL_PASS;
 var _transporter = null;
 function getTransporter() {
   if (!_transporter && GMAIL_USER && GMAIL_PASS) {
@@ -1966,7 +1975,7 @@ async function enviarEmail({ para, assunto, texto, html, replyTo }) {
         from: `"${remetenteNome}" <${GMAIL_USER}>`,
         to: para,
         subject: assunto,
-        replyTo: replyTo || GMAIL_USER,
+        replyTo: replyTo || GMAIL_USER || void 0,
         text: texto || "",
         html: html || void 0,
         headers: {
@@ -2397,6 +2406,11 @@ function verifyPassword(password, stored) {
     return false;
   }
 }
+function secureEquals(left, right) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && crypto3.timingSafeEqual(leftBuffer, rightBuffer);
+}
 var modality = z2.enum(["presencial", "endereco", "online", "hibrido"]);
 var paymentMethod = z2.enum(["pix", "dinheiro", "cartao", "transferencia", "outro"]);
 var appointmentStatus = z2.enum(["agendado", "confirmado", "andamento", "concluido", "cancelado", "faltou"]);
@@ -2778,7 +2792,7 @@ var appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR" });
-      await db.insert(clients).values({ ...input, profileId: profile.id, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null });
+      await db.insert(clients).values({ ...input, profileId: profile.id, archived: false, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null });
       return { success: true };
     }),
     update: protectedProcedure.input(z2.object({ id: z2.number(), name: z2.string().min(2).max(160), phone: z2.string().max(40).optional(), whatsapp: z2.string().max(40).optional(), email: z2.string().email().optional().or(z2.literal("")), address: z2.string().max(600).optional(), notes: z2.string().max(1200).optional(), archived: z2.boolean().default(false) })).mutation(async ({ ctx, input }) => {
@@ -3900,22 +3914,14 @@ var appRouter = router({
   admin: router({
     login: publicProcedure.input(z2.object({ email: z2.string().min(1), password: z2.string().min(1) })).mutation(async ({ ctx, input }) => {
       const inputLogin = input.email.trim().toLowerCase();
-      const adminEmail = getAdminEmail().toLowerCase();
-      const adminUser = getAdminUsername().toLowerCase();
-      const validLogins = [
-        adminEmail,
-        adminUser,
-        "meuatonomomaster",
-        "meuautonomomaster",
-        "meuatonomomaster@creativeam.com.br",
-        "meuautonomomaster@creativeam.com.br",
-        "admin@meuautonomo.com.br"
-      ];
-      const validPasswords = [
-        DEFAULT_ADMIN_PASSWORD,
-        "16Bl33@p"
-      ];
-      if (!validLogins.includes(inputLogin) || !validPasswords.includes(input.password)) {
+      const adminEmail = getAdminEmail().trim().toLowerCase();
+      const adminUser = getAdminUsername().trim().toLowerCase();
+      const adminPassword = getAdminPassword();
+      if (!adminEmail || !adminUser || !adminPassword) {
+        throw new TRPCError3({ code: "PRECONDITION_FAILED", message: "Acesso administrativo n\xE3o configurado." });
+      }
+      const validLogin = secureEquals(inputLogin, adminEmail) || secureEquals(inputLogin, adminUser);
+      if (!validLogin || !secureEquals(input.password, adminPassword)) {
         throw new TRPCError3({ code: "UNAUTHORIZED", message: "Credenciais de administrador incorretas." });
       }
       const openId = "admin_master";

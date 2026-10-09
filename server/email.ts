@@ -7,8 +7,8 @@ import nodemailer from "nodemailer";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 
-const GMAIL_USER = process.env.GMAIL_USER || "contatocreativeam@gmail.com";
-const GMAIL_PASS = process.env.GMAIL_PASS || "kdepmqzpwvqwgcuo";
+const GMAIL_USER = process.env.GMAIL_USER;
+const GMAIL_PASS = process.env.GMAIL_PASS;
 
 let _transporter: any = null;
 function getTransporter() {
@@ -54,7 +54,7 @@ export async function enviarEmail({ para, assunto, texto, html, replyTo }: Envia
         from: `"${remetenteNome}" <${GMAIL_USER}>`,
         to: para,
         subject: assunto,
-        replyTo: replyTo || GMAIL_USER,
+        replyTo: replyTo || GMAIL_USER || undefined,
         text: texto || "",
         html: html || undefined,
         headers: {

@@ -25,31 +25,6 @@ import {
   UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { COOKIE_NAME } from "@shared/const";
-
-export function setSessionToken(token: string) {
-  try {
-    localStorage.setItem("manus-token", token);
-    sessionStorage.setItem("manus-token", token);
-    sessionStorage.setItem("manus-cookie", `${COOKIE_NAME}=${token}`);
-    document.cookie = `${COOKIE_NAME}=${token}; Path=/; Max-Age=31536000; SameSite=Lax`;
-  } catch (e) {
-    console.warn("[Auth] Failed to set session token in storage", e);
-  }
-}
-
-export function clearSessionToken() {
-  try {
-    localStorage.removeItem("manus-token");
-    sessionStorage.removeItem("manus-token");
-    sessionStorage.removeItem("manus-cookie");
-    localStorage.removeItem("manus-runtime-user-info");
-    document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax`;
-  } catch (e) {
-    console.warn("[Auth] Failed to clear session token", e);
-  }
-}
-
 interface AuthModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -88,9 +63,6 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: (data) => {
       setErrorMessage(null);
-      if (data.sessionToken) {
-        setSessionToken(data.sessionToken);
-      }
       utils.auth.me.setData(undefined, data.user);
       toast.success("Conta criada com sucesso! Redirecionando para seu espaço...");
       onOpenChange(false);
@@ -106,9 +78,6 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: (data) => {
       setErrorMessage(null);
-      if (data.sessionToken) {
-        setSessionToken(data.sessionToken);
-      }
       utils.auth.me.setData(undefined, data.user);
       toast.success("Login realizado com sucesso! Redirecionando...");
       onOpenChange(false);

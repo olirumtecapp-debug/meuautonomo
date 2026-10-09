@@ -28,7 +28,7 @@ import { sdk } from "./_core/sdk";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { enviarEmail, modeloOrcamentoAprovado } from "./email";
-import { DEFAULT_ADMIN_PASSWORD, getAdminEmail, getAdminUsername, isDemoMode, setDemoMode } from "./demoConfig";
+import { getAdminEmail, getAdminPassword, getAdminUsername, isDemoMode, setDemoMode } from "./demoConfig";
 import crypto from "node:crypto";
 import { generateReceiptAuthCode } from "./receiptAuth";
 import {
@@ -55,6 +55,12 @@ function verifyPassword(password: string, stored: string): boolean {
   } catch {
     return false;
   }
+}
+
+function secureEquals(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 const modality = z.enum(["presencial", "endereco", "online", "hibrido"]);
@@ -497,7 +503,7 @@ export const appRouter = router({
       const profile = await requireProfile(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await db.insert(clients).values({ ...input, profileId: profile.id, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null });
+      await db.insert(clients).values({ ...input, profileId: profile.id, archived: false, phone: input.phone ?? null, whatsapp: input.whatsapp ?? null, email: input.email || null, address: input.address ?? null, notes: input.notes ?? null });
       return { success: true };
     }),
     update: protectedProcedure.input(z.object({ id: z.number(), name: z.string().min(2).max(160), phone: z.string().max(40).optional(), whatsapp: z.string().max(40).optional(), email: z.string().email().optional().or(z.literal("")), address: z.string().max(600).optional(), notes: z.string().max(1200).optional(), archived: z.boolean().default(false) })).mutation(async ({ ctx, input }) => {
@@ -1739,25 +1745,16 @@ export const appRouter = router({
       .input(z.object({ email: z.string().min(1), password: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
         const inputLogin = input.email.trim().toLowerCase();
-        const adminEmail = getAdminEmail().toLowerCase();
-        const adminUser = getAdminUsername().toLowerCase();
+        const adminEmail = getAdminEmail().trim().toLowerCase();
+        const adminUser = getAdminUsername().trim().toLowerCase();
+        const adminPassword = getAdminPassword();
 
-        const validLogins = [
-          adminEmail,
-          adminUser,
-          "meuatonomomaster",
-          "meuautonomomaster",
-          "meuatonomomaster@creativeam.com.br",
-          "meuautonomomaster@creativeam.com.br",
-          "admin@meuautonomo.com.br",
-        ];
+        if (!adminEmail || !adminUser || !adminPassword) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Acesso administrativo não configurado." });
+        }
 
-        const validPasswords = [
-          DEFAULT_ADMIN_PASSWORD,
-          "16Bl33@p",
-        ];
-
-        if (!validLogins.includes(inputLogin) || !validPasswords.includes(input.password)) {
+        const validLogin = secureEquals(inputLogin, adminEmail) || secureEquals(inputLogin, adminUser);
+        if (!validLogin || !secureEquals(input.password, adminPassword)) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Credenciais de administrador incorretas." });
         }
         const openId = "admin_master";

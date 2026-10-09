@@ -154,7 +154,10 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret || "meuautonomo-jwt-secret-key-super-secure-min-32-chars-fallback";
+    const secret = ENV.cookieSecret;
+    if (!secret) {
+      throw new Error("JWT_SECRET or COOKIE_SECRET must be configured.");
+    }
     return new TextEncoder().encode(secret);
   }
 

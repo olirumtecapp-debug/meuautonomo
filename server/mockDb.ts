@@ -215,7 +215,10 @@ function evaluateParsed(item: any, parsed: any): boolean {
       if (op === ">") return itemTime > targetTime;
       if (op === "<") return itemTime < targetTime;
     }
-    if (op === "=") return itemVal === targetVal;
+    if (op === "=") {
+      if (targetVal === false) return itemVal === false || itemVal === undefined || itemVal === null;
+      return itemVal === targetVal;
+    }
     if (op === "<>") return itemVal !== targetVal;
     if (op === ">=") return itemVal >= targetVal;
     if (op === "<=") return itemVal <= targetVal;

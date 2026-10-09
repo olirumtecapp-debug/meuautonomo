@@ -50,7 +50,6 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 
 import { SimulatorTour } from "@/components/SimulatorTour";
-import { setSessionToken, clearSessionToken } from "@/components/AuthModal";
 
 // Gerador Oficial de Payload PIX Padrão BACEN / EMV BRCode (compatível com todos os bancos)
 function formatEMV(id: string, value: string): string {
@@ -231,9 +230,6 @@ export default function AdminPage() {
 
   const loginMutation = trpc.admin.login.useMutation({
     onSuccess: async (data) => {
-      if (data.sessionToken) {
-        setSessionToken(data.sessionToken);
-      }
       toast.success("Autenticado como administrador com sucesso!");
       await utils.auth.me.invalidate();
       await meQuery.refetch();
@@ -283,7 +279,6 @@ export default function AdminPage() {
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: async () => {
-      clearSessionToken();
       toast.info("Sessão administrativa encerrada.");
       await utils.auth.me.invalidate();
       await meQuery.refetch();
