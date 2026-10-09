@@ -433,23 +433,6 @@ export default function AdminPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-xl bg-[#eef7f0] p-2.5 text-xs text-[#173a34] border border-[#cbe4d1]">
-              <span className="text-[11px] text-[#446258]">
-                Usuário: <strong>meuautonomomaster</strong> | Senha: <strong>16Bl33@p</strong>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("meuautonomomaster");
-                  setPassword("16Bl33@p");
-                  toast.success("Credenciais preenchidas com sucesso!");
-                }}
-                className="text-[11px] font-bold text-[#173a34] bg-white hover:bg-[#d9f56a] px-2.5 py-1 rounded-lg border border-[#cbe4d1] transition cursor-pointer"
-              >
-                Preencher
-              </button>
-            </div>
-
             <Button
               type="submit"
               disabled={loginMutation.isPending}
