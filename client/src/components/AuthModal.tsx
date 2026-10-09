@@ -63,6 +63,12 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: (data) => {
       setErrorMessage(null);
+      if (data.sessionToken) {
+        try {
+          localStorage.setItem("manus-token", data.sessionToken);
+          sessionStorage.setItem("manus-token", data.sessionToken);
+        } catch (e) {}
+      }
       utils.auth.me.setData(undefined, data.user);
       toast.success("Conta criada com sucesso! Redirecionando para seu espaço...");
       onOpenChange(false);
@@ -78,6 +84,12 @@ export function AuthModal({ open, onOpenChange, defaultTab = "register" }: AuthM
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: (data) => {
       setErrorMessage(null);
+      if (data.sessionToken) {
+        try {
+          localStorage.setItem("manus-token", data.sessionToken);
+          sessionStorage.setItem("manus-token", data.sessionToken);
+        } catch (e) {}
+      }
       utils.auth.me.setData(undefined, data.user);
       toast.success("Login realizado com sucesso! Redirecionando...");
       onOpenChange(false);

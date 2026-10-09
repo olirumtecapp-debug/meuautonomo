@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { COOKIE_NAME } from "@shared/const";
 
 import { SimulatorTour } from "@/components/SimulatorTour";
 
@@ -280,7 +281,26 @@ export default function AdminPage() {
 
   const loginMutation = trpc.admin.login.useMutation({
     onSuccess: async (data) => {
+      if (data.sessionToken) {
+        try {
+          localStorage.setItem("manus-token", data.sessionToken);
+          sessionStorage.setItem("manus-token", data.sessionToken);
+        } catch (e) {
+          console.error("Storage error:", e);
+        }
+      }
       toast.success("Autenticado como administrador com sucesso!");
+      utils.auth.me.setData(undefined, {
+        id: 0,
+        openId: "admin_master",
+        name: "Administrador do Sistema",
+        email: data.email || "admin@meuautonomo.com.br",
+        role: "admin",
+        loginMethod: "admin-panel",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastSignedIn: new Date(),
+      } as any);
       await utils.auth.me.invalidate();
       await meQuery.refetch();
       await metricsQuery.refetch();
@@ -329,7 +349,16 @@ export default function AdminPage() {
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: async () => {
+      try {
+        localStorage.removeItem("manus-token");
+        sessionStorage.removeItem("manus-token");
+        sessionStorage.removeItem("manus-cookie");
+        localStorage.removeItem("manus-runtime-user-info");
+        document.cookie = `${COOKIE_NAME}=; Path=/; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = "manus-auth-session-token=; Path=/; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      } catch (e) {}
       toast.info("Sessão administrativa encerrada.");
+      utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
       await meQuery.refetch();
     },
