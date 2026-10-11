@@ -46,16 +46,92 @@ async function ensureSchema(db: any) {
   await _schemaMigrationPromise;
 }
 
+let _lastMeuAutonomoVaultDay = "";
+
+async function syncMeuAutonomoCloudVault(db: any) {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    if (_lastMeuAutonomoVaultDay === today) return;
+    _lastMeuAutonomoVaultDay = today;
+
+    const schema = await import("../drizzle/schema");
+    const [
+      allUsers,
+      allProfiles,
+      allClients,
+      allServices,
+      allAppointments,
+      allQuotes,
+      allPayments,
+      allExpenses,
+    ] = await Promise.all([
+      db.select().from(schema.users).catch(() => []),
+      db.select().from(schema.professionalProfiles).catch(() => []),
+      db.select().from(schema.clients).catch(() => []),
+      db.select().from(schema.services).catch(() => []),
+      db.select().from(schema.appointments).catch(() => []),
+      db.select().from(schema.quotes).catch(() => []),
+      db.select().from(schema.payments).catch(() => []),
+      db.select().from(schema.expenses).catch(() => []),
+    ]);
+
+    const apiKey = process.env.FIREBASE_API_KEY || "AIzaSyBUHGXoUMg0bV3EdmfpfmVAEYMLQceqkQc";
+    const projectId = process.env.FIREBASE_PROJECT_ID || "expedicao-brasil";
+    const daySlot = `slot_day_${new Date().getUTCDay()}`; // 0 (Dom) a 6 (Sab) - Time-Machine automatico 7 dias
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/meuautonomo_vault_snapshots/${daySlot}?key=${apiKey}`;
+
+    const snapshotPayload = JSON.stringify({
+      date: today,
+      users: allUsers,
+      professionalProfiles: allProfiles,
+      clients: allClients,
+      services: allServices,
+      appointments: allAppointments,
+      quotes: allQuotes,
+      payments: allPayments,
+      expenses: allExpenses,
+    }).slice(0, 850000);
+
+    await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fields: {
+          date: { stringValue: today },
+          updatedAt: { stringValue: new Date().toISOString() },
+          totalUsers: { integerValue: String(allUsers.length) },
+          totalClients: { integerValue: String(allClients.length) },
+          payloadJson: { stringValue: snapshotPayload },
+        },
+      }),
+    });
+  } catch (e) {
+    // Silencioso para nunca afetar operacao principal
+  }
+}
+
 export async function getDb(): Promise<ReturnType<typeof drizzle>> {
   if (process.env.DATABASE_URL) {
     if (!_db || _db.__isMock) {
-      try {
-        _db = drizzle(process.env.DATABASE_URL);
-        ensureSchema(_db).catch((err) => console.warn("[Database] ensureSchema error:", err?.message || err));
-      } catch (error) {
-        console.warn("[Database] Failed to connect to DATABASE_URL:", error);
+      let lastErr: any = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          _db = drizzle(process.env.DATABASE_URL);
+          ensureSchema(_db).catch((err) => console.warn("[Database] ensureSchema error:", err?.message || err));
+          lastErr = null;
+          break;
+        } catch (error) {
+          lastErr = error;
+          await new Promise((r) => setTimeout(r, 400 * attempt));
+        }
+      }
+      if (lastErr && (!_db || _db.__isMock)) {
+        console.warn("[Database] Failed to connect to DATABASE_URL after 3 attempts:", lastErr);
         _db = getMockDb();
       }
+    }
+    if (_db && !_db.__isMock) {
+      syncMeuAutonomoCloudVault(_db).catch(() => {});
     }
     return _db;
   }

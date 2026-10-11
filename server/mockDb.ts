@@ -21,7 +21,8 @@ export interface MockStore {
   voucherRedemptions: any[];
 }
 
-const DATA_DIR = path.resolve(process.cwd(), "server", "data");
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL ? "/tmp" : path.resolve(process.cwd(), "server", "data");
 const STORE_FILE = path.join(DATA_DIR, "db-store.json");
 
 function createCleanStore(): MockStore {
