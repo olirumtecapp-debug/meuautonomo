@@ -75,8 +75,9 @@ async function syncMeuAutonomoCloudVault(db: any) {
       db.select().from(schema.expenses).catch(() => []),
     ]);
 
-    const apiKey = process.env.FIREBASE_API_KEY || "AIzaSyBUHGXoUMg0bV3EdmfpfmVAEYMLQceqkQc";
+    const apiKey = process.env.FIREBASE_API_KEY || "";
     const projectId = process.env.FIREBASE_PROJECT_ID || "expedicao-brasil";
+    if (!apiKey) return;
     const daySlot = `slot_day_${new Date().getUTCDay()}`; // 0 (Dom) a 6 (Sab) - Time-Machine automatico 7 dias
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/meuautonomo_vault_snapshots/${daySlot}?key=${apiKey}`;
 
